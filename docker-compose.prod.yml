@@ -1,6 +1,5 @@
 # 生产部署 docker-compose（宝塔面板适用）
 # 使用方式：docker-compose -f docker-compose.prod.yml up -d --build
-version: '3.8'
 
 services:
   # Next.js 前端 + API
