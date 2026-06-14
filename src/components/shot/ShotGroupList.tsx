@@ -13,6 +13,8 @@ export interface ShotGroupShot {
   orderIndex: number
   prompt: string | null
   coverUrl: string | null
+  /** 对白 JSON 字符串（格式：[{speaker,text}]），无对白时为 null */
+  dialogue: string | null
 }
 
 // 分镜组结构（与 GET /api/projects/[id] 返回的 shotGroups 对齐)
@@ -21,11 +23,15 @@ export interface ShotGroupData {
   groupIndex: number
   genStatus: string
   genVideoUrl: string | null
+  /** 生成视频抽帧封面 URL（来自 genVideoUrl 的 ffmpeg 抽帧，非原始视频帧） */
+  genCoverUrl: string | null
   genDuration: number
   timelineScript: string | null
   shots: ShotGroupShot[]
   // 本组选中的人物 id（默认=该组镜头出现的人物，可在卡片上增删)
   characterIds: string[]
+  // 结构化取舍说明：合并脚本时发生的分镜丢弃/截断信息，非 null 时前端须可见展示（禁止静默处理）
+  lossNotice?: string | null
 }
 
 // 人物素材库精简结构（供分镜组选择人物用)
@@ -190,8 +196,10 @@ export default function ShotGroupList({
             prev.map((g) => g.id.startsWith('virtual-') ? { ...g, genStatus: 'QUEUED' } : g)
           )
         } else {
+          // 单组生成：更新状态为 QUEUED，并附带后端返回的 lossNotice（合并取舍说明）
+          const responseLossNotice: string | null = data?.lossNotice ?? null
           setGroups((prev) =>
-            prev.map((g) => (g.id === groupId ? { ...g, genStatus: 'QUEUED' } : g))
+            prev.map((g) => (g.id === groupId ? { ...g, genStatus: 'QUEUED', lossNotice: responseLossNotice } : g))
           )
         }
       } catch {
@@ -241,8 +249,12 @@ export default function ShotGroupList({
         return
       }
 
-      // 成功：所有组置为 QUEUED
-      setGroups((prev) => prev.map((g) => ({ ...g, genStatus: 'QUEUED' })))
+      // 成功：所有组置为 QUEUED，并将各组取舍说明（lossNotices）非静默附带到对应组
+      const lossNotices: Array<{ groupId: string; lossNotice: string }> = data?.lossNotices ?? []
+      setGroups((prev) => prev.map((g) => {
+        const notice = lossNotices.find((n: { groupId: string; lossNotice: string }) => n.groupId === g.id)
+        return { ...g, genStatus: 'QUEUED', lossNotice: notice?.lossNotice ?? null }
+      }))
     } catch {
       setBatchError('网络错误，请重试')
     } finally {
@@ -456,12 +468,23 @@ function ShotGroupCard({ group, submitting, error, characterLibrary, onGenerate 
         </div>
       )}
 
+      {/* 脚本取舍警告：合并过程中发生了分镜丢弃/截断，非静默展示给用户（禁止仅 console.warn 后静默继续） */}
+      {group.lossNotice && (
+        <div className="mt-3 rounded-lg border border-[var(--cine-amber-dim)] bg-[var(--cine-amber-dim)] p-3">
+          <p className="text-xs text-[var(--cine-amber)]">
+            ⚠ {group.lossNotice}
+          </p>
+        </div>
+      )}
+
       {/* 已生成：展示合并视频 */}
       {succeeded && (
         <div className="mt-3">
           <VideoPlayer
             src={group.genVideoUrl as string}
-            poster={group.shots[0]?.coverUrl || undefined}
+            // 使用生成视频封面（genCoverUrl 来自 genVideoUrl 的 ffmpeg 抽帧），
+            // 确保封面与生成视频内容一致，而非原始视频帧（Bug 2 修复 — Req 2.8）
+            poster={group.genCoverUrl || undefined}
             className="w-full h-[320px] border border-[var(--cine-line-2)]"
           />
         </div>
@@ -564,9 +587,24 @@ function ShotGroupCard({ group, submitting, error, characterLibrary, onGenerate 
                 )}
               </div>
             </div>
-            <p className="flex-1 line-clamp-3 text-xs text-[var(--cine-text-2)]">
+            <p className="flex-1 text-xs text-[var(--cine-text-2)]">
               {shot.prompt || '暂无提示词'}
             </p>
+            {shot.dialogue && (() => {
+              try {
+                const lines = JSON.parse(shot.dialogue) as Array<{ speaker: string; text: string }>
+                if (lines.length === 0) return null
+                return (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {lines.map((line, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 rounded bg-[var(--cine-surface)] px-1.5 py-0.5 text-xs text-[var(--cine-gold)]">
+                        💬 {line.speaker}：「{line.text}」
+                      </span>
+                    ))}
+                  </div>
+                )
+              } catch { return null }
+            })()}
           </div>
         ))}
       </div>

@@ -1,6 +1,12 @@
 /**
  * 视频生成 Worker
  * 处理 video-generate 队列任务
+ *
+ * 生成成功后流程：
+ * 1. 下载生成视频到本地临时文件
+ * 2. 从生成视频抽取封面帧（ffmpeg，0.1s）并上传 OSS → genCoverUrl
+ * 3. 上传生成视频到 OSS → ossVideoUrl
+ * 4. atomicSuccessUpdate 事务内一并写入 genStatus/genVideoUrl/genCoverUrl/lastFrameUrl
  */
 import { Worker, type Job, UnrecoverableError } from 'bullmq'
 import { redis } from '@/lib/redis'
@@ -17,7 +23,11 @@ import { applySameSceneContinuation } from '@/lib/frame-continuity'
 import { logger } from '@/lib/logger'
 import { writeFile, unlink } from 'fs/promises'
 import path from 'path'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 import type { ConnectionOptions } from 'bullmq'
+
+const execFileAsync = promisify(execFile)
 
 interface VideoGenerateJobData {
   jobId: string
@@ -147,16 +157,66 @@ async function uploadGeneratedVideoToOSS(
 }
 
 // ========================
+// 生成视频封面抽帧（Bug 2 修复）
+// ========================
+
+/**
+ * 从生成视频抽取封面帧并上传 OSS
+ * - 使用 ffmpeg 抽取第 0.1s 帧，JPEG 格式，等比缩放（宽度限 720px）
+ * - 上传 OSS 对象键：gencover/{projectId}/{shotGroupId}.jpg
+ * - 失败时记录真实错误并返回 undefined（不阻塞主流程、不写伪造 URL）
+ */
+async function extractAndUploadGenCover(
+  tempVideoPath: string,
+  projectId: string,
+  shotGroupId: string
+): Promise<string | undefined> {
+  const coverPath = path.join(
+    path.dirname(tempVideoPath),
+    `gencover_${shotGroupId}_${Date.now()}.jpg`
+  )
+
+  try {
+    // ffmpeg 从第 0.1s 抽取一帧，等比缩放宽度 720px（高度自适应）
+    await execFileAsync('ffmpeg', [
+      '-y',
+      '-ss', '0.1',
+      '-i', tempVideoPath,
+      '-frames:v', '1',
+      '-vf', 'scale=720:-2',
+      '-q:v', '2',
+      coverPath,
+    ], { timeout: 15000 })
+
+    // 上传到 OSS
+    const ossKey = `gencover/${projectId}/${shotGroupId}.jpg`
+    const genCoverUrl = await uploadFile(ossKey, coverPath)
+    return genCoverUrl
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error)
+    logger.error('生成视频封面抽帧失败', { shotGroupId, projectId, error: reason })
+    return undefined
+  } finally {
+    // 清理临时封面文件
+    await unlink(coverPath).catch(() => {})
+  }
+}
+
+// ========================
 // 原子化成功更新（Req 6）
 // ========================
 
 /**
  * 生成成功后的原子化更新（单一 Prisma 事务，超时 10s）
  * 在一个事务内完成：
- * 1. ShotGroup.genStatus = SUCCEEDED, genVideoUrl = ossUrl, lastFrameUrl = lastFrameUrl ?? null
+ * 1. ShotGroup.genStatus = SUCCEEDED, genVideoUrl = ossUrl, genCoverUrl = genCoverUrl, lastFrameUrl = lastFrameUrl ?? null
  * 2. 组内所有 Shot.genStatus = SUCCEEDED, genVideoUrl = ossUrl
  * 3. GenerationJob.status = SUCCEEDED, resultVideoUrl = ossUrl
  * 4. chargeCreditsTx（统一幂等扣费：existingCharge 幂等 + RESERVE 差额 REFUND）
+ *
+ * 生成视频封面抽帧并持久化：genCoverUrl 来源于生成视频自身（ffmpeg 抽帧），
+ * 在事务外完成 I/O，仅在事务内写入 ShotGroup.genCoverUrl，保持原子性/幂等性。
+ * 抽帧失败时 genCoverUrl 为 undefined，事务内不写该字段（不阻塞主流程、不写伪造 URL）。
  *
  * 尾帧持久化（同场景承接）：成功且 Seedance 返回尾帧时把受信尾帧 URL 写入 ShotGroup.lastFrameUrl，
  * 供后续同场景组（链式 / 单组）承接复用；本次无尾帧（未请求或未返回）则写 null，确保持久化尾帧始终
@@ -173,17 +233,24 @@ async function atomicSuccessUpdate(params: {
   ossVideoUrl: string
   costEstimate: number
   lastFrameUrl?: string
+  genCoverUrl?: string
 }): Promise<void> {
-  const { jobId, shotGroupId, userId, ossVideoUrl, costEstimate, lastFrameUrl } = params
+  const { jobId, shotGroupId, userId, ossVideoUrl, costEstimate, lastFrameUrl, genCoverUrl } = params
   const maxRetries = 3
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       await withCreditLock(() => prisma.$transaction(async (tx) => {
-        // 1. 更新 ShotGroup（持久化受信尾帧；无尾帧写 null 覆盖陈旧值）
+        // 1. 更新 ShotGroup（持久化受信尾帧；生成封面；无尾帧写 null 覆盖陈旧值）
         await tx.shotGroup.update({
           where: { id: shotGroupId },
-          data: { genStatus: 'SUCCEEDED', genVideoUrl: ossVideoUrl, lastFrameUrl: lastFrameUrl ?? null },
+          data: {
+            genStatus: 'SUCCEEDED',
+            genVideoUrl: ossVideoUrl,
+            lastFrameUrl: lastFrameUrl ?? null,
+            // genCoverUrl 来源于生成视频 ffmpeg 抽帧，抽帧失败时为 undefined 不写入（保留旧值）
+            ...(genCoverUrl !== undefined ? { genCoverUrl } : {}),
+          },
         })
 
         // 2. 更新组内所有 Shot
@@ -541,6 +608,9 @@ async function processGroupVideoGenerate(job: Job<VideoGenerateJobData>) {
       // 下载并验证
       await downloadAndValidateVideo(videoUrl, tempVideoPath)
 
+      // 从生成视频抽取封面帧（在 OSS 上传之前、事务之外完成 I/O）
+      const genCoverUrl = await extractAndUploadGenCover(tempVideoPath, projectId, shotGroupId)
+
       // 上传到 OSS
       const ossVideoUrl = await uploadGeneratedVideoToOSS(tempVideoPath, projectId, shotGroupId)
 
@@ -557,6 +627,8 @@ async function processGroupVideoGenerate(job: Job<VideoGenerateJobData>) {
         costEstimate: actualCost,
         // 透传轮询得到的受信尾帧（链式与单组共用此函数，一处持久化覆盖两路径）
         lastFrameUrl,
+        // 生成视频封面 URL（从 genVideoUrl 抽帧得到，事务内写入保证原子性）
+        genCoverUrl,
       })
 
       // 创建 AI_GENERATED 类型 Asset 并设置 14 天过期

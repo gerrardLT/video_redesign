@@ -100,6 +100,8 @@ export async function POST(
     // - 用户手动编辑过（scriptEdited=true）→ 固定复用 timelineScript，尊重用户改动；
     // - 否则 → 每次按最新规则自动重合并（确保对白/台词、风格等最新逻辑都纳入）。
     let finalScript: string
+    // 取舍说明：合并过程中如有分镜丢弃/截断，此字段非 null，非静默回传前端
+    let lossNotice: string | null = null
 
     if (group.scriptEdited && group.timelineScript && group.timelineScript.trim().length > 0) {
       // 用户已编辑脚本，直接使用，跳过自动合并
@@ -138,6 +140,8 @@ export async function POST(
       }
 
       finalScript = timelineScript.text
+      // 取舍说明：合并过程中如有分镜丢弃/截断，以结构化字段非静默回传前端（遵守用户铁律：禁止静默处理）
+      lossNotice = timelineScript.lossNotice
 
       // 合并结果写回 timelineScript 字段
       await prisma.shotGroup.update({
@@ -356,7 +360,7 @@ export async function POST(
     })
 
     return NextResponse.json(
-      { job: { id: job.id, status: 'QUEUED', costEstimate } },
+      { job: { id: job.id, status: 'QUEUED', costEstimate }, lossNotice },
       { status: 202 }
     )
   } catch (error) {

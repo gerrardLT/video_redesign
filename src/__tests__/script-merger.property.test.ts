@@ -3,7 +3,6 @@ import fc from 'fast-check'
 import {
   mergeTimelineScript,
   SUPPORTED_CAMERA_MOVES,
-  MAX_SCRIPT_LENGTH,
   type MergeInputShot,
 } from '@/lib/script-merger'
 
@@ -277,29 +276,34 @@ describe('Property 6: 每段运镜与动作分离且运镜术语合规', () => {
 // ─── Property 7: 时间轴脚本长度上限 ────────────────────────────────────────────
 
 /**
- * Feature: multi-shot-merge-generation, Property 7: 时间轴脚本长度上限
+ * Feature: multi-shot-merge-generation, Property 7: 全组分镜完整保留（字数为软目标）
  *
- * 即使大量分镜（如 20 个）且每个 prompt 超长（500+中文字符），
- * text 长度不超过 MAX_SCRIPT_LENGTH（=250 中文字符）。
+ * 修复后 MAX_SCRIPT_LENGTH 由「硬截断阈值」降级为「软目标」：
+ * 即使大量分镜且每个 prompt 超长，也绝不丢弃整段分镜，绝不切断 {台词}。
+ * text 非空（至少包含全部分段），droppedSegmentCount 恒为 0。
  *
  * **Validates: Requirements 2.6**
  */
-describe('Property 7: 时间轴脚本长度上限', () => {
-  it('任意分镜组：text 长度不超过 MAX_SCRIPT_LENGTH（250 中文字符）', () => {
+describe('Property 7: 全组分镜完整保留（字数为软目标）', () => {
+  it('任意分镜组：全部分镜完整保留，droppedSegmentCount=0，truncated=false', () => {
     fc.assert(
       fc.property(anyShotGroupArb, (shots) => {
         const result = mergeTimelineScript(shots)
-        expect(result.text.length).toBeLessThanOrEqual(MAX_SCRIPT_LENGTH)
+        expect(result.droppedSegmentCount).toBe(0)
+        expect(result.truncated).toBe(false)
+        expect(result.text.length).toBeGreaterThan(0)
       }),
       { numRuns: 100 }
     )
   })
 
-  it('大量分镜 + 超长 prompt：text 长度仍不超过 MAX_SCRIPT_LENGTH', () => {
+  it('大量分镜 + 超长 prompt：仍全部保留，不丢段', () => {
     fc.assert(
       fc.property(extremeShotGroupArb, (shots) => {
         const result = mergeTimelineScript(shots)
-        expect(result.text.length).toBeLessThanOrEqual(MAX_SCRIPT_LENGTH)
+        expect(result.droppedSegmentCount).toBe(0)
+        expect(result.truncated).toBe(false)
+        expect(result.text.length).toBeGreaterThan(0)
       }),
       { numRuns: 100 }
     )

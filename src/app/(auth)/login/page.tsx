@@ -88,14 +88,14 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? '登录中?..' : '登录'}
+            {loading ? '登录中...' : '登录'}
           </button>
         </form>
 
         <p className="text-center text-sm text-[var(--cine-text-2)]">
           还没有账户？{' '}
           <Link href="/register" className="text-[var(--cine-gold)] hover:text-[#818cf8]">
-            去注'
+            去注册
           </Link>
         </p>
       </div>

@@ -58,6 +58,7 @@ async function processGenerateCharacter(job: Job<ImageGenerateJobData>): Promise
     //    prompt 为人物外貌描述；无风格配置时 buildStylePrompt 返回空串，自动省略风格段。
     const stylePrefix = await buildStylePrompt(projectId)
     const finalPrompt = buildCharacterAnchorPrompt(stylePrefix, prompt)
+    console.log(`[generate-character] 完整生成 prompt characterId=${characterId}:\n${finalPrompt}`)
 
     // 3. 调用方舟 Seedream 5.0 lite 生成参考图（内部已转存到自有 OSS，返回公网 URL）
     const result = await generateCharacterImage(finalPrompt, `characters/${projectId}`)

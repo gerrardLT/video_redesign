@@ -198,16 +198,16 @@ interface MergeSegment {
 /**
  * 单段音轨来源决策结果。
  *
- * 成片音轨采用【单一确定优先级】，逐段独立决策、自上而下取第一个可用源（缺陷 8）：
- *   1) 生成片段自带音轨（Seedance generate_audio TTS 配音）——最高优先级；
- *   2) 该组 audioKey 原声（解析阶段按组切片并上传 OSS 的音频）；
- *   3) 从原始整段视频按该组时间范围 [startTime,endTime] 提取的原声。
- * 三源不再叠加混音（已移除"无音频时整段原声叠加"旧路径），仅按优先级取其一，消除串味/错位。
+ * 成片音轨采用【单一确定优先级】，逐段独立决策、自上而下取第一个可用源：
+ *   ① 该组 audioKey 原声（解析阶段按组切片的音频，各组不同）——最高优先级；
+ *   ② 生成片段自带音轨（Seedance generate_audio TTS 配音）；
+ *   ③ 从原始整段视频按该组时间范围 [startTime,endTime] 提取的原声。
+ * 三源不再叠加混音，仅按优先级取其一，消除串味/错位；各组 audioKey 真实作用于成片。
  */
 interface SegmentAudioPlan {
   /**
-   * - 'embedded'：用片段自带音轨（优先级 1）
-   * - 'file'：用外部音频文件 audioPath（优先级 2 组 audioKey 原声 / 优先级 3 原视频整段提取）
+   * - 'file'：用外部音频文件 audioPath（优先级 ① 组 audioKey 原声 / 优先级 ③ 原视频整段提取）
+   * - 'embedded'：用片段自带音轨（优先级 ②）
    * - 'silence'：该段无任何真实音源，用静音补齐维持时序（最后兜底，绝不伪造语音、绝不静默丢弃既有音轨）
    */
   source: 'embedded' | 'file' | 'silence'
@@ -247,13 +247,13 @@ async function resolveMediaUrlToLocal(url: string, destPath: string): Promise<st
 }
 
 /**
- * 逐段解析音轨来源（单一优先级：自带 TTS 配音 > 组 audioKey 原声 > 原视频整段按时间范围提取）。
+ * 逐段解析音轨来源（单一优先级：组 audioKey 原声 > 自带 TTS 配音 > 原视频整段按时间范围提取）。
  *
  * 仅当上一优先级不可用时才下探，避免无谓下载：
- * - 生成片段已含音轨（Seedance generate_audio TTS）→ 直接用自带音轨，不加载任何外部音源；
- * - 片段无音轨且该组有 audioKey → 取组原声音频文件（优先级 2）；
- * - 仍无 → 从原视频整段按 [startTime,endTime] 提取该段原声（优先级 3）；
- * - 都不可用 → 标记静音补齐（仅维持音画时序，绝不伪造语音、绝不静默丢弃既有音轨）。
+ * - ① 该组有 audioKey 原声 → 取组原声音频文件（各组真实不同的原声，最高优先级）；
+ * - ② 片段已含音轨（Seedance generate_audio TTS）→ 用自带音轨；
+ * - ③ 从原视频整段按 [startTime,endTime] 提取该段原声；
+ * - ④ 都不可用 → 标记静音补齐（仅维持音画时序，绝不伪造语音、绝不静默丢弃既有音轨）。
  *
  * 解析出的外部音频临时文件写入 tempDir，由调用方在合并结束后统一清理。
  */
@@ -262,56 +262,45 @@ async function resolveSegmentAudioPlans(
   projectId: string,
   tempDir: string
 ): Promise<SegmentAudioPlan[]> {
-  // 预取各段是否自带音轨（优先级 1 命中判断）
+  // 预取各段是否自带音轨（优先级 ② 命中判断）
   const embeddedFlags = await Promise.all(segments.map((s) => hasAudioStream(s.videoPath)))
 
-  // 仅当存在缺少自带音轨的段时，才加载组音频元数据与原视频
-  const needExternal = embeddedFlags.some((has) => !has)
-  let groupMetaByIndex = new Map<number, { audioKey: string | null; startTime: number; endTime: number }>()
+  // 始终加载组音频元数据：audioKey 为最高优先级（①），需优先判断
+  const groups = await prisma.shotGroup.findMany({
+    where: { projectId },
+    select: { groupIndex: true, audioKey: true, startTime: true, endTime: true },
+  })
+  const groupMetaByIndex = new Map(
+    groups.map((g) => [g.groupIndex, { audioKey: g.audioKey, startTime: g.startTime, endTime: g.endTime }])
+  )
+
+  // 仅当存在「无 audioKey 且无自带音轨」的段时，才需回退到原视频整段提取（优先级 ③）
   let originalVideoPath: string | null = null
   let originalHasAudio = false
 
-  if (needExternal) {
-    const groups = await prisma.shotGroup.findMany({
-      where: { projectId },
-      select: { groupIndex: true, audioKey: true, startTime: true, endTime: true },
+  const anyNeedsOriginal = segments.some(
+    (s, i) => !groupMetaByIndex.get(s.groupIndex)?.audioKey && !embeddedFlags[i]
+  )
+  if (anyNeedsOriginal) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { videoUrl: true },
     })
-    groupMetaByIndex = new Map(
-      groups.map((g) => [g.groupIndex, { audioKey: g.audioKey, startTime: g.startTime, endTime: g.endTime }])
-    )
-
-    // 仅当存在「无 audioKey」的缺音段时，才需回退到原视频整段提取（优先级 3）
-    const anyNeedsOriginal = segments.some(
-      (s, i) => !embeddedFlags[i] && !groupMetaByIndex.get(s.groupIndex)?.audioKey
-    )
-    if (anyNeedsOriginal) {
-      const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { videoUrl: true },
-      })
-      if (project?.videoUrl) {
-        originalVideoPath = await resolveMediaUrlToLocal(
-          project.videoUrl,
-          path.join(tempDir, `original_${Date.now()}.mp4`)
-        )
-        originalHasAudio = await hasAudioStream(originalVideoPath)
-      }
+    if (project?.videoUrl) {
+      originalVideoPath = await resolveMediaUrlToLocal(
+        project.videoUrl,
+        path.join(tempDir, `original_${Date.now()}.mp4`)
+      )
+      originalHasAudio = await hasAudioStream(originalVideoPath)
     }
   }
 
   const plans: SegmentAudioPlan[] = []
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]
-
-    // 优先级 1：片段自带 Seedance TTS 配音
-    if (embeddedFlags[i]) {
-      plans.push({ source: 'embedded' })
-      continue
-    }
-
     const meta = groupMetaByIndex.get(seg.groupIndex)
 
-    // 优先级 2：组 audioKey 原声
+    // 优先级 ①：组 audioKey 原声（各组真实不同，使成片体现各组原声差异）
     if (meta?.audioKey) {
       try {
         const audioUrl = getPublicUrl(meta.audioKey)
@@ -323,13 +312,19 @@ async function resolveSegmentAudioPlans(
         continue
       } catch (err) {
         console.warn(
-          `[merge-video] 组 ${seg.groupIndex} audioKey 原声获取失败，下探原视频提取:`,
+          `[merge-video] 组 ${seg.groupIndex} audioKey 原声获取失败，下探自带音轨/原视频提取:`,
           err instanceof Error ? err.message : String(err)
         )
       }
     }
 
-    // 优先级 3：从原视频整段按该组时间范围提取原声
+    // 优先级 ②：片段自带 Seedance TTS 配音
+    if (embeddedFlags[i]) {
+      plans.push({ source: 'embedded' })
+      continue
+    }
+
+    // 优先级 ③：从原视频整段按该组时间范围提取原声
     if (originalVideoPath && originalHasAudio && meta) {
       try {
         const extracted = path.join(tempDir, `seg_orig_audio_${seg.groupIndex}.aac`)
@@ -350,7 +345,7 @@ async function resolveSegmentAudioPlans(
       }
     }
 
-    // 最后兜底：静音补齐（仅维持音画时序）
+    // 最后兜底 ④：静音补齐（仅维持音画时序）
     plans.push({ source: 'silence' })
   }
 
@@ -361,8 +356,8 @@ async function resolveSegmentAudioPlans(
  * 使用 FFmpeg concat filter 合并多个分镜段。
  *
  * 视频：逐段缩放 + pad 到统一分辨率后顺序拼接。
- * 音频：按【单一确定优先级】逐段决定音源（自带 Seedance TTS 配音 > 组 audioKey 原声 >
- *   原视频整段按时间范围提取，详见 resolveSegmentAudioPlans），不再三源叠加混音。
+ * 音频：按【单一确定优先级】逐段决定音源（① 组 audioKey 原声 > ② 自带 Seedance TTS 配音 >
+ *   ③ 原视频整段按时间范围提取，详见 resolveSegmentAudioPlans），不再三源叠加混音。
  * 音画同步对齐规则：每段所选音轨一律按该段视频时长对齐——超出截断、不足以静音补齐（apad+atrim），
  *   并统一重采样到 44100/stereo/fltp，使逐段 A/V 一一对应，拼接后整体不串味、不错位。
  */
@@ -607,15 +602,27 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
     console.log(`[merge-video] 合并视频已上传到 OSS: ${ossVideoUrl}`)
 
     // 4. 在事务中创建 Asset + 更新项目状态（Req 3.2）
+    // 合并成功后，将项目展示封面更新为首个生成成功组的 genCoverUrl（生成视频抽帧封面），
+    // 使导出后的项目封面对应生成内容而非原始视频帧（Bug 2 修复 — Req 2.7）
     try {
       const { statSync } = await import('fs')
       const fileSize = statSync(outputPath).size
 
+      // 查询首个生成成功组的 genCoverUrl 作为项目展示封面
+      const firstSucceededGroup = await prisma.shotGroup.findFirst({
+        where: { projectId, genStatus: 'SUCCEEDED', genCoverUrl: { not: null } },
+        orderBy: { groupIndex: 'asc' },
+        select: { genCoverUrl: true },
+      })
+
       await prisma.$transaction(async (tx) => {
-        // 更新项目状态为已导出
+        // 更新项目状态为已导出，同时更新展示封面为生成视频封面
         await tx.project.update({
           where: { id: projectId },
-          data: { status: 'EXPORTED' },
+          data: {
+            status: 'EXPORTED',
+            ...(firstSucceededGroup?.genCoverUrl ? { coverUrl: firstSucceededGroup.genCoverUrl } : {}),
+          },
         })
 
         // 创建合并导出 Asset（url 为 OSS URL）

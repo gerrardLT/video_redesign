@@ -55,13 +55,30 @@ export interface BuildReferenceParams {
 // ========================
 
 /**
- * 判断 URL 是否为可用的公网地址
+ * 判断 URL 是否为可用的公网地址（用于 reference_image 等图像资源）
  * - 必须以 https:// 开头
  * - 不能包含 localhost（排除本地开发环境 URL）
  */
 function isPublicUrl(url: string | null | undefined): url is string {
   if (!url) return false
   return url.startsWith('https://') && !url.includes('localhost')
+}
+
+/**
+ * 判断音频 URL 是否可作为 Seedance reference_audio 或 merge 音源使用。
+ *
+ * 接受两种形态：
+ * 1. https:// 公网 URL（OSS 已配置时 getSignedObjectUrl 生成的签名 URL 或直链）
+ * 2. /uploads/ 本地路径（未配 OSS 时 getPublicUrl 返回的开发环境路径，
+ *    merge-video.ts 的 resolveMediaUrlToLocal 可将其映射到 public 目录真实音频文件）
+ *
+ * 注意：不接受 localhost、空值或其它无法被消费的格式。
+ */
+function isAudioRefUsable(url: string | null | undefined): url is string {
+  if (!url) return false
+  if (url.startsWith('https://') && !url.includes('localhost')) return true
+  if (url.startsWith('/uploads/')) return true
+  return false
 }
 
 // ========================
@@ -162,12 +179,19 @@ export interface GroupReferenceParams {
 export interface GroupReferenceData {
   /** reference_image：人物锚定图 + 本组场景帧 + 非角色素材，去重、≤9 张，人物图在前 */
   referenceImages: string[]
-  /** reference_audio：仅当 referenceImages 非空且 groupAudioUrl 有效时传（Seedance 硬约束） */
+  /** reference_audio：仅当 referenceImages 非空且 groupAudioUrl 可用时传（Seedance 硬约束） */
   referenceAudioUrl?: string
   /** 人物锚定资产在 referenceImages 中的 1 基序号（供 prompt「@图片N中的{角色}」引用） */
   avatarRefs: Array<{ name: string; imageIndex: number }>
   /** 场景帧在 referenceImages 中的 1 基序号（供 prompt「@图片N作为场景参考」引用） */
   sceneRefIndices: number[]
+  /**
+   * 音频参考不可用原因（非静默暴露）。
+   * 当组有 groupAudioUrl 但因各种原因无法作为 reference_audio 时，此字段描述具体原因，
+   * 调用方据此可见提示。null 表示音频参考正常可用或该组本就无组音频。
+   * 遵守用户铁律：禁止静默处理——有音频却无法提供时必须可被调用方感知。
+   */
+  audioUnavailableReason: string | null
 }
 
 /** reference_image 数量上限（Seedance 限制 0~9 张） */
@@ -185,7 +209,10 @@ const MAX_SCENE_FRAMES = 1
  * - reference_image 顺序：人物锚定 asset:// 在前（对应 prompt「图片1、图片2...」），
  *   其后是无脸场景帧与非角色素材图；
  * - 绝不把原视频真人帧塞进 reference_image（未受信会被人脸审核拦截）；
- * - reference_audio 必须配合至少 1 张参考图，否则 Seedance 拒绝。
+ * - reference_audio 必须配合至少 1 张参考图，否则 Seedance 拒绝；
+ * - 音频 URL 门控：接受 https 公网 URL（含 OSS 签名 URL）和本地 /uploads/ 路径
+ *   （开发环境真实音频，merge 阶段 resolveMediaUrlToLocal 可消费）；
+ * - 音频不可用时设置 audioUnavailableReason 非静默暴露原因（禁止静默置空为 undefined）。
  *
  * 纯函数，无 I/O。
  */
@@ -227,17 +254,34 @@ export function buildGroupReferenceData(params: GroupReferenceParams): GroupRefe
     .filter((idx) => idx > 0)
 
   // 3. reference_audio：仅在有参考图且组时长满足最低要求时才传（Seedance 不接受单独音频）
+  //    音频 URL 接受 https 公网或本地 /uploads/ 路径（后者由 merge-video resolveMediaUrlToLocal 消费）
   const audioMeetsDuration = groupDuration === undefined || groupDuration >= MIN_AUDIO_DURATION
-  const referenceAudioUrl =
-    referenceImages.length > 0 && isPublicUrl(groupAudioUrl) && audioMeetsDuration
-      ? groupAudioUrl
-      : undefined
+  let referenceAudioUrl: string | undefined
+  let audioUnavailableReason: string | null = null
+
+  if (groupAudioUrl) {
+    if (referenceImages.length === 0) {
+      // Seedance 硬约束：reference_audio 必须配合至少 1 张参考图
+      audioUnavailableReason = '缺少参考图（referenceImages 为空），Seedance 不接受单独音频'
+      referenceAudioUrl = undefined
+    } else if (!audioMeetsDuration) {
+      audioUnavailableReason = `组时长不满足 Seedance 最低要求（需 ≥${MIN_AUDIO_DURATION}s，实际 ${groupDuration}s）`
+      referenceAudioUrl = undefined
+    } else if (!isAudioRefUsable(groupAudioUrl)) {
+      // 组有 audioKey 但 URL 格式无法被 Seedance 或 merge 消费——非静默暴露
+      audioUnavailableReason = `组音频 URL 格式不可用（非 https 公网亦非本地 /uploads 路径）: ${groupAudioUrl}`
+      referenceAudioUrl = undefined
+    } else {
+      referenceAudioUrl = groupAudioUrl
+    }
+  }
 
   return {
     referenceImages,
     referenceAudioUrl,
     avatarRefs,
     sceneRefIndices,
+    audioUnavailableReason,
   }
 }
 

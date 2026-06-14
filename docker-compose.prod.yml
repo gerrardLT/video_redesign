@@ -1,0 +1,70 @@
+# 生产部署 docker-compose（宝塔面板适用）
+# 使用方式：docker-compose -f docker-compose.prod.yml up -d --build
+version: '3.8'
+
+services:
+  # Next.js 前端 + API
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=file:/app/data/prod.db
+    volumes:
+      - uploads_data:/app/public/uploads
+      - db_data:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/auth/me"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Workers（后台任务：视频解析/生成/合并/人物图等）
+  workers:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "--import", "tsx", "src/workers/index.ts"]
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=file:/app/data/prod.db
+    volumes:
+      - uploads_data:/app/public/uploads
+      - db_data:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # Redis（BullMQ 任务队列）
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  uploads_data:
+  db_data:
+  redis_data:

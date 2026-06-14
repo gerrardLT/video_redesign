@@ -3,14 +3,16 @@
  *
  * 为单组路由、链式首发、链式续接三处入队点统一装配 Seedance 生成所需的参考数据：
  * - reference_image：全片人物锚定图（Character.imageUrl，Seedream 受信产物 https URL）+ 本组无脸场景帧 + 非角色素材
- * - reference_audio：组音频（满足 Seedance 约束时）
+ * - reference_audio：组音频（已配 OSS 时用签名 URL 确保私有 Bucket 可被抓取；
+ *   未配 OSS 时本地 /uploads 路径可被 merge 阶段 resolveMediaUrlToLocal 消费；
+ *   音频不可用时非静默暴露原因，调用方可见提示）
  * - characterPrefix：拼到 prompt 最前的「图片N中的{角色}」引用（或外貌文字兜底）
  *
  * 全面放弃 first_frame：人物一致性由全片唯一人物锚定图承载，逐组独立引用，
  * 不依赖链式尾帧传递，逐组单独生成也保持一致。
  */
 import { prisma } from './db'
-import { getPublicUrl } from './storage'
+import { getPublicUrl, isOSSConfigured, getSignedObjectUrl } from './storage'
 import {
   buildGroupReferenceData,
   buildCharacterRefPrefix,
@@ -71,7 +73,17 @@ export async function buildGroupGenReference(shotGroupId: string): Promise<Group
     .map((s) => s.coverUrl as string)
     .filter((u) => u.startsWith('https://') && !u.includes('localhost'))
 
-  const groupAudioUrl = group.audioKey ? getPublicUrl(group.audioKey) : undefined
+  // 组音频 URL：已配 OSS 时生成短时效签名 URL（Bucket 私有读也可被 Seedance 抓取，
+  // 且以 https:// 开头通过 isAudioRefUsable 检查）；未配 OSS 时走本地 /uploads 路径
+  // （merge-video.ts resolveMediaUrlToLocal 可映射到 public 目录真实音频文件）
+  let groupAudioUrl: string | undefined
+  if (group.audioKey) {
+    if (isOSSConfigured()) {
+      groupAudioUrl = getSignedObjectUrl(group.audioKey, 600) // 10 分钟有效期，覆盖 Seedance 生成耗时
+    } else {
+      groupAudioUrl = getPublicUrl(group.audioKey) // 返回 /uploads/{key}，开发环境本地路径
+    }
+  }
 
   const ref = buildGroupReferenceData({
     shots: group.shots.map((s) => ({
@@ -87,6 +99,13 @@ export async function buildGroupGenReference(shotGroupId: string): Promise<Group
     groupAudioUrl,
     groupDuration: group.endTime - group.startTime,
   })
+
+  // 音频参考不可用时非静默暴露（遵守用户铁律：禁止静默处理）
+  if (ref.audioUnavailableReason) {
+    console.error(
+      `[group-gen-context] 组 ${shotGroupId} 音频参考不可用: ${ref.audioUnavailableReason}`
+    )
+  }
 
   const characterPrefix = buildCharacterRefPrefix(ref.avatarRefs, ref.sceneRefIndices, appearanceFallback)
 

@@ -12,7 +12,7 @@
  * 一致性保证：
  * - 所有组共用相同的「风格前缀」（从项目 StyleConfig 提取）。
  * - 人物外貌一致性由 asset:// 人物锚定 reference_image 承载（每组独立引用，不依赖链式尾帧传递）。
- * - 每组 prompt 经 mergeTimelineScript 合并，受 MAX_SCRIPT_LENGTH（250 字总预算）约束。
+ * - 每组 prompt 经 mergeTimelineScript 合并，全组分镜/台词完整保留（MAX_SCRIPT_LENGTH 为软目标，不做硬截断丢段）。
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -172,7 +172,7 @@ async function handleChainGenerate(params: {
   }
 
   // 为每个待生成组合并 prompt
-  const groupPrompts: Array<{ groupId: string; prompt: string; duration: number }> = []
+  const groupPrompts: Array<{ groupId: string; prompt: string; duration: number; lossNotice: string | null }> = []
 
   for (const group of groups) {
     const mergeInput: MergeInputShot[] = group.shots.map((s) => ({
@@ -197,6 +197,8 @@ async function handleChainGenerate(params: {
       groupId: group.id,
       prompt: `${groupRef.characterPrefix}${merged.text}`,
       duration: genDuration,
+      // 取舍说明：合并过程中如有分镜丢弃/截断，以结构化字段非静默回传前端（遵守用户铁律：禁止静默处理）
+      lossNotice: merged.lossNotice,
     })
   }
 
@@ -313,6 +315,11 @@ async function handleChainGenerate(params: {
         groupIndex: j.groupIndex,
         status: i === 0 ? 'QUEUED' : 'WAITING',
       })),
+      // 各组取舍说明：合并过程中发生分镜丢弃/截断的组会附带非 null 的 lossNotice，
+      // 以结构化字段非静默回传前端展示（遵守用户铁律：禁止静默处理）
+      lossNotices: groupPrompts
+        .filter((g) => g.lossNotice !== null)
+        .map((g) => ({ groupId: g.groupId, lossNotice: g.lossNotice })),
     },
     { status: 202 }
   )

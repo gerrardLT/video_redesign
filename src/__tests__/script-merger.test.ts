@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { mergeTimelineScript, MAX_SCRIPT_LENGTH, type MergeInputShot } from '../lib/script-merger'
+import { mergeTimelineScript, type MergeInputShot } from '../lib/script-merger'
 
 describe('mergeTimelineScript 属性化测试', () => {
   // 生成有效的组内分镜输入
@@ -49,39 +49,41 @@ describe('mergeTimelineScript 属性化测试', () => {
           )
           const lastSeg = result.segments[result.segments.length - 1]
           expect(lastSeg.relEnd).toBeCloseTo(totalDuration, 10)
-          // text 采用镜头制渲染（镜头N：…），且长度恒在预算内
+          // text 采用镜头制渲染（镜头N：…），且全部分镜完整保留（不再做硬截断丢段）
           expect(result.text).toMatch(/^镜头1：/)
-          expect(result.text.length).toBeLessThanOrEqual(MAX_SCRIPT_LENGTH)
+          expect(result.droppedSegmentCount).toBe(0)
+          expect(result.truncated).toBe(false)
         }
       ),
       { numRuns: 100 }
     )
   })
 
-  it('P5: text.length ≤ MAX_SCRIPT_LENGTH', () => {
+  it('P5: text 非空且全部分镜保留（MAX_SCRIPT_LENGTH 为软目标，不做硬截断）', () => {
     fc.assert(
       fc.property(
         genGroupShots(),
         (shots) => {
           const result = mergeTimelineScript(shots)
-          expect(result.text.length).toBeLessThanOrEqual(MAX_SCRIPT_LENGTH)
+          // 修复后 MAX_SCRIPT_LENGTH 为软目标：全组分镜完整保留，绝不丢段
+          expect(result.text.length).toBeGreaterThan(0)
+          expect(result.droppedSegmentCount).toBe(0)
+          expect(result.truncated).toBe(false)
         }
       ),
       { numRuns: 200 }
     )
   })
 
-  it('P5: truncated 时 droppedSegmentCount > 0', () => {
+  it('P5: truncated 恒为 false（修复后全组分镜完整保留，绝不丢段）', () => {
     fc.assert(
       fc.property(
         genGroupShots(),
         (shots) => {
           const result = mergeTimelineScript(shots)
-          if (result.truncated) {
-            expect(result.droppedSegmentCount).toBeGreaterThan(0)
-          } else {
-            expect(result.droppedSegmentCount).toBe(0)
-          }
+          // 修复后恒不丢段
+          expect(result.truncated).toBe(false)
+          expect(result.droppedSegmentCount).toBe(0)
         }
       ),
       { numRuns: 200 }

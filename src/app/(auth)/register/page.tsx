@@ -35,7 +35,7 @@ export default function RegisterPage() {
         return
       }
 
-      // 使用 window.location 确保 cookie 生效后再跳转（Next.js router.push 可能?cookie 写入前触发)
+      // 使用 window.location 确保 cookie 生效后再跳转（Next.js router.push 可能在 cookie 写入前触发）
       window.location.href = '/dashboard'
     } catch {
       setError('网络错误，请稍后重试')
@@ -49,7 +49,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-sm space-y-6 rounded-xl border border-[var(--cine-line-2)] bg-[var(--cine-surface)] p-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white">注册</h1>
-          <p className="mt-2 text-sm text-[var(--cine-text-2)]">创建账户，开始使用?AI 视频重塑</p>
+          <p className="mt-2 text-sm text-[var(--cine-text-2)]">创建账户，开始使用 AI 视频重塑</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -76,7 +76,7 @@ export default function RegisterPage() {
 
           <div className="space-y-2">
             <label htmlFor="nickname" className="text-sm font-medium text-[var(--cine-text)]">
-              昵称 <span className="text-[var(--cine-text-3)]">(可选?</span>
+              昵称 <span className="text-[var(--cine-text-3)]">(可选)</span>
             </label>
             <input
               id="nickname"
@@ -109,14 +109,15 @@ export default function RegisterPage() {
             disabled={loading}
             className="w-full rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? '注册中?..' : '注册'}
+            {loading ? '注册中...' : '注册'}
           </button>
         </form>
 
         <p className="text-center text-sm text-[var(--cine-text-2)]">
           已有账户？{' '}
           <Link href="/login" className="text-[var(--cine-gold)] hover:text-[#818cf8]">
-            去登'          </Link>
+            去登录
+          </Link>
         </p>
       </div>
     </div>

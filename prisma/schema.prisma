@@ -106,6 +106,7 @@ model ShotGroup {
   endTime        Float    @map("end_time") // 组内末个 Shot 的 endTime
   genStatus      String   @default("PENDING") @map("gen_status") // PENDING|QUEUED|GENERATING|SUCCEEDED|FAILED|CANCELED
   genVideoUrl    String?  @map("gen_video_url") // 未生成时为空
+  genCoverUrl    String?  @map("gen_cover_url") // 生成视频封面 URL（从 genVideoUrl 抽帧持久化，用于前端 poster 展示）
   lastFrameUrl   String?  @map("last_frame_url") // 本组生成成功时 Seedance 返回的受信尾帧 URL（returnLastFrame=true 时有值），供后续同场景承接复用
   audioKey       String?  @map("audio_key") // group_{groupIndex}.mp3 的 OSS 键
   clipVideoUrl   String?  @map("clip_video_url") // 按组裁切的视频片段 OSS URL（修复风险14）

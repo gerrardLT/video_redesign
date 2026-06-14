@@ -39,6 +39,7 @@ export async function GET(
             groupIndex: true,
             genStatus: true,
             genVideoUrl: true,
+            genCoverUrl: true,
             genDuration: true,
             timelineScript: true,
             groupCharacters: { select: { characterId: true } },
@@ -49,6 +50,7 @@ export async function GET(
                 orderIndex: true,
                 prompt: true,
                 coverUrl: true,
+                dialogue: true,
               },
             },
           },
@@ -79,6 +81,7 @@ export async function GET(
       groupIndex: g.groupIndex,
       genStatus: g.genStatus,
       genVideoUrl: g.genVideoUrl,
+      genCoverUrl: g.genCoverUrl,
       genDuration: g.genDuration,
       timelineScript: g.timelineScript,
       characterIds: g.groupCharacters.map((gc) => gc.characterId),
@@ -87,6 +90,7 @@ export async function GET(
         orderIndex: s.orderIndex,
         prompt: s.prompt,
         coverUrl: s.coverUrl,
+        dialogue: s.dialogue,
       })),
     }))
 
@@ -102,6 +106,7 @@ export async function GET(
           endTime: true,
           prompt: true,
           coverUrl: true,
+          dialogue: true,
         },
       })
 
@@ -125,6 +130,7 @@ export async function GET(
               groupIndex: virtualGroups.length,
               genStatus: 'PENDING',
               genVideoUrl: null,
+              genCoverUrl: null,
               genDuration: Math.round(currentDuration * 100) / 100,
               timelineScript: null,
               characterIds: [],
@@ -133,6 +139,7 @@ export async function GET(
                 orderIndex: s.orderIndex,
                 prompt: s.prompt,
                 coverUrl: s.coverUrl,
+                dialogue: s.dialogue,
               })),
             })
             currentGroup = [shot]
@@ -146,6 +153,7 @@ export async function GET(
             groupIndex: virtualGroups.length,
             genStatus: 'PENDING',
             genVideoUrl: null,
+            genCoverUrl: null,
             genDuration: Math.round(currentDuration * 100) / 100,
             timelineScript: null,
             characterIds: [],
@@ -154,6 +162,7 @@ export async function GET(
               orderIndex: s.orderIndex,
               prompt: s.prompt,
               coverUrl: s.coverUrl,
+              dialogue: s.dialogue,
             })),
           })
         }
@@ -186,6 +195,7 @@ export async function GET(
         shotGroups: shotGroupsResponse.map((g) => ({
           ...g,
           genVideoUrl: toMediaProxyUrl(g.genVideoUrl) ?? null,
+          genCoverUrl: toMediaProxyUrl(g.genCoverUrl) ?? null,
           shots: g.shots.map((s) => ({ ...s, coverUrl: toMediaProxyUrl(s.coverUrl) ?? null })),
         })),
       },
