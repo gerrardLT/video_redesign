@@ -4,13 +4,14 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# 安装 ffmpeg（视频处理必需）和构建工具
-RUN apk add --no-cache ffmpeg python3 make g++
+# 安装 ffmpeg（视频处理必需）、构建工具和 pnpm
+RUN apk add --no-cache ffmpeg python3 make g++ && \
+    corepack enable && corepack prepare pnpm@latest --activate
 
-COPY package.json package-lock.json* ./
+COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma/
 
-RUN npm ci --omit=dev && npx prisma generate
+RUN pnpm install --frozen-lockfile --prod=false && npx prisma generate
 
 # ========================
 # Stage 2: Build
@@ -18,7 +19,8 @@ RUN npm ci --omit=dev && npx prisma generate
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache ffmpeg && \
+    corepack enable && corepack prepare pnpm@latest --activate
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/prisma ./prisma
@@ -29,7 +31,7 @@ ARG NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
 
 # 构建 Next.js
-RUN npm run build
+RUN pnpm build
 
 # ========================
 # Stage 3: Production Runner
