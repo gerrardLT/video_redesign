@@ -6,7 +6,7 @@ WORKDIR /app
 
 # 安装 ffmpeg（视频处理必需）、构建工具和 pnpm
 RUN apk add --no-cache ffmpeg python3 make g++ && \
-    corepack enable && corepack prepare pnpm@latest --activate
+    corepack enable && corepack prepare pnpm@10 --activate
 
 COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma/
@@ -20,7 +20,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 RUN apk add --no-cache ffmpeg && \
-    corepack enable && corepack prepare pnpm@latest --activate
+    corepack enable && corepack prepare pnpm@10 --activate
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/prisma ./prisma

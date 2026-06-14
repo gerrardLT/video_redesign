@@ -68,5 +68,15 @@
     "typescript": "^5",
     "typescript-eslint": "^8.60.1",
     "vitest": "^4.1.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "better-sqlite3",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma",
+      "sharp"
+    ]
   }
 }
