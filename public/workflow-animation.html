@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<!--
+  工作流程动画 · 循环自动播放
+  模拟产品流程：上传→AI解析→分镜生成→合并出片
+  20s 一个循环，纯 CSS + JS 时间轴驱动
+  后续嵌入 Landing Page 的 How it works 区域
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工作流程动画</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{--bg:#0B0C0E;--surface:#141619;--surface-2:#181B1F;--line:rgba(255,255,255,0.06);--text:#E9E6DF;--text-2:#8C8B85;--text-3:#5A5B57;--gold:#C7A877;--gold-dim:rgba(199,168,119,0.12);--green:#7E9B86;--amber:#C2965A;}
+body{background:var(--bg);font-family:-apple-system,'Noto Sans SC',sans-serif;color:var(--text);display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;}
+
+.stage{width:900px;height:520px;background:var(--surface);border-radius:16px;border:1px solid var(--line);position:relative;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.6);}
+
+/* Mock top bar */
+.mock-bar{height:40px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 16px;gap:8px;}
+.mock-bar .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.08);}
+.mock-bar .dot:nth-child(1){background:#FF5F57;}
+.mock-bar .dot:nth-child(2){background:#FEBC2E;}
+.mock-bar .dot:nth-child(3){background:#28C840;}
+.mock-bar .title{margin-left:12px;font-size:12px;color:var(--text-2);letter-spacing:1px;}
+
+/* Mock content area */
+.mock-content{padding:24px;height:calc(100% - 40px);position:relative;}
+
+/* Phase indicator */
+.phase-bar{display:flex;gap:4px;margin-bottom:20px;}
+.phase-dot{height:3px;flex:1;border-radius:2px;background:rgba(255,255,255,.06);transition:background .5s;}
+.phase-dot.active{background:var(--gold);}
+.phase-dot.done{background:var(--green);}
+.phase-label{font-size:11px;color:var(--gold);letter-spacing:3px;margin-bottom:16px;opacity:0;transform:translateY(8px);transition:all .4s cubic-bezier(.16,1,.3,1);}
+.phase-label.show{opacity:1;transform:translateY(0);}
+
+/* Upload phase */
+.upload-zone{position:absolute;inset:64px 24px 24px;border:2px dashed rgba(255,255,255,.08);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;opacity:0;transition:opacity .5s;}
+.upload-zone.show{opacity:1;}
+.upload-zone .icon{font-size:36px;opacity:.5;}
+.upload-zone .txt{font-size:14px;color:var(--text-2);}
+.upload-progress{width:200px;height:4px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;margin-top:8px;}
+.upload-progress .bar{height:100%;background:var(--gold);width:0%;transition:width 3s linear;}
+
+/* Parse phase - shots appearing */
+.shots-grid{position:absolute;inset:84px 24px 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;opacity:0;transition:opacity .5s;}
+.shots-grid.show{opacity:1;}
+.shot-card{border-radius:8px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden;opacity:0;transform:translateY(20px) scale(0.95);transition:all .4s cubic-bezier(.16,1,.3,1);}
+.shot-card.appear{opacity:1;transform:translateY(0) scale(1);}
+.shot-thumb{height:80px;background:linear-gradient(135deg,rgba(199,168,119,.05),rgba(199,168,119,.02));position:relative;}
+.shot-thumb .num{position:absolute;top:6px;left:8px;font-size:10px;background:rgba(0,0,0,.5);padding:2px 6px;border-radius:3px;color:var(--text-2);}
+.shot-info{padding:10px;font-size:11px;color:var(--text-2);line-height:1.5;}
+
+/* Generate phase */
+.gen-panel{position:absolute;inset:84px 24px 24px;display:flex;flex-direction:column;gap:12px;opacity:0;transition:opacity .5s;}
+.gen-panel.show{opacity:1;}
+.gen-group{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;align-items:center;justify-content:space-between;}
+.gen-group .left{display:flex;align-items:center;gap:12px;}
+.gen-group .badge{font-size:11px;padding:3px 8px;border-radius:5px;font-weight:500;}
+.gen-group .badge.pending{background:rgba(255,255,255,.05);color:var(--text-3);}
+.gen-group .badge.gen{background:rgba(194,150,90,.12);color:var(--amber);}
+.gen-group .badge.done{background:rgba(126,155,134,.12);color:var(--green);}
+.gen-group .meta{font-size:11px;color:var(--text-3);}
+.gen-progress{height:3px;border-radius:2px;background:rgba(255,255,255,.05);margin-top:10px;overflow:hidden;}
+.gen-progress .bar{height:100%;background:var(--amber);width:0%;transition:width 2.5s linear;}
+
+/* Export phase */
+.export-panel{position:absolute;inset:84px 24px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;opacity:0;transition:opacity .5s;}
+.export-panel.show{opacity:1;}
+.export-check{width:64px;height:64px;border-radius:50%;border:2px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--green);opacity:0;transform:scale(0.5);transition:all .5s cubic-bezier(.16,1.4,.3,1);}
+.export-check.pop{opacity:1;transform:scale(1);}
+.export-text{font-size:16px;font-weight:500;opacity:0;transform:translateY(10px);transition:all .4s .2s;}
+.export-text.show{opacity:1;transform:translateY(0);}
+.export-sub{font-size:12px;color:var(--text-2);opacity:0;transition:opacity .4s .4s;}
+.export-sub.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="mock-bar">
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="title">视频重塑 · 创作流程</span>
+  </div>
+  <div class="mock-content">
+    <div class="phase-bar">
+      <div class="phase-dot" id="pd1"></div>
+      <div class="phase-dot" id="pd2"></div>
+      <div class="phase-dot" id="pd3"></div>
+      <div class="phase-dot" id="pd4"></div>
+    </div>
+    <div class="phase-label" id="phase-label">上传视频</div>
+
+    <!-- Phase 1: Upload -->
+    <div class="upload-zone" id="upload">
+      <div class="icon">📤</div>
+      <div class="txt">拖拽视频文件到此处</div>
+      <div class="upload-progress"><div class="bar" id="upload-bar"></div></div>
+    </div>
+
+    <!-- Phase 2: Parse -->
+    <div class="shots-grid" id="shots">
+      <div class="shot-card" id="s1"><div class="shot-thumb"><span class="num">01</span></div><div class="shot-info">清晨天际线，暖金阳光</div></div>
+      <div class="shot-card" id="s2"><div class="shot-thumb"><span class="num">02</span></div><div class="shot-info">落地窗前，侧脸轮廓</div></div>
+      <div class="shot-card" id="s3"><div class="shot-thumb"><span class="num">03</span></div><div class="shot-info">地铁逆行，人群拥挤</div></div>
+      <div class="shot-card" id="s4"><div class="shot-thumb"><span class="num">04</span></div><div class="shot-info">出站口逆光，剪影</div></div>
+      <div class="shot-card" id="s5"><div class="shot-thumb"><span class="num">05</span></div><div class="shot-info">雨夜霓虹，低角度</div></div>
+      <div class="shot-card" id="s6"><div class="shot-thumb"><span class="num">06</span></div><div class="shot-info">便利店暖光，雨痕</div></div>
+    </div>
+
+    <!-- Phase 3: Generate -->
+    <div class="gen-panel" id="gen">
+      <div class="gen-group"><div class="left"><span style="font-size:13px;font-weight:500;">第 1 组</span><span class="badge done" id="g1-badge">已完成</span></div><span class="meta">3 镜 · 6s</span></div>
+      <div class="gen-group"><div class="left"><span style="font-size:13px;font-weight:500;">第 2 组</span><span class="badge gen" id="g2-badge">生成中</span></div><span class="meta">2 镜 · 8s</span></div>
+      <div class="gen-progress"><div class="bar" id="gen-bar"></div></div>
+      <div class="gen-group"><div class="left"><span style="font-size:13px;font-weight:500;">第 3 组</span><span class="badge pending" id="g3-badge">待生成</span></div><span class="meta">4 镜 · 10s</span></div>
+    </div>
+
+    <!-- Phase 4: Export -->
+    <div class="export-panel" id="export">
+      <div class="export-check" id="exp-check">✓</div>
+      <div class="export-text" id="exp-text">合并导出完成</div>
+      <div class="export-sub" id="exp-sub">视频已准备就绪，可直接下载</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CYCLE = 20000; // 20s per loop
+const phases = ['upload','parse','generate','export'];
+let frame;
+
+function reset() {
+  // Hide all panels
+  document.getElementById('upload').classList.remove('show');
+  document.getElementById('shots').classList.remove('show');
+  document.getElementById('gen').classList.remove('show');
+  document.getElementById('export').classList.remove('show');
+  document.getElementById('phase-label').classList.remove('show');
+  document.getElementById('upload-bar').style.width = '0%';
+  document.getElementById('gen-bar').style.width = '0%';
+  ['s1','s2','s3','s4','s5','s6'].forEach(id => document.getElementById(id).classList.remove('appear'));
+  document.getElementById('exp-check').classList.remove('pop');
+  document.getElementById('exp-text').classList.remove('show');
+  document.getElementById('exp-sub').classList.remove('show');
+  ['pd1','pd2','pd3','pd4'].forEach(id => {
+    document.getElementById(id).classList.remove('active','done');
+  });
+  document.getElementById('g1-badge').className = 'badge pending';
+  document.getElementById('g1-badge').textContent = '待生成';
+  document.getElementById('g2-badge').className = 'badge pending';
+  document.getElementById('g2-badge').textContent = '待生成';
+  document.getElementById('g3-badge').className = 'badge pending';
+  document.getElementById('g3-badge').textContent = '待生成';
+}
+
+function runCycle() {
+  reset();
+  const label = document.getElementById('phase-label');
+
+  // Phase 1: Upload (0-4s)
+  setTimeout(() => {
+    document.getElementById('pd1').classList.add('active');
+    label.textContent = '上传视频';
+    label.classList.add('show');
+    document.getElementById('upload').classList.add('show');
+    setTimeout(() => { document.getElementById('upload-bar').style.width = '100%'; }, 200);
+  }, 300);
+
+  // Phase 2: Parse (4-9s)
+  setTimeout(() => {
+    document.getElementById('upload').classList.remove('show');
+    document.getElementById('pd1').classList.remove('active');
+    document.getElementById('pd1').classList.add('done');
+    document.getElementById('pd2').classList.add('active');
+    label.textContent = 'AI 解析分镜';
+    document.getElementById('shots').classList.add('show');
+    // Stagger shot cards
+    ['s1','s2','s3','s4','s5','s6'].forEach((id, i) => {
+      setTimeout(() => document.getElementById(id).classList.add('appear'), i * 400);
+    });
+  }, 4500);
+
+  // Phase 3: Generate (9-15s)
+  setTimeout(() => {
+    document.getElementById('shots').classList.remove('show');
+    document.getElementById('pd2').classList.remove('active');
+    document.getElementById('pd2').classList.add('done');
+    document.getElementById('pd3').classList.add('active');
+    label.textContent = '生成视频';
+    document.getElementById('gen').classList.add('show');
+    // Simulate generation progress
+    setTimeout(() => {
+      document.getElementById('g1-badge').className = 'badge done';
+      document.getElementById('g1-badge').textContent = '已完成';
+    }, 800);
+    setTimeout(() => {
+      document.getElementById('g2-badge').className = 'badge gen';
+      document.getElementById('g2-badge').textContent = '生成中';
+      document.getElementById('gen-bar').style.width = '100%';
+    }, 1200);
+    setTimeout(() => {
+      document.getElementById('g2-badge').className = 'badge done';
+      document.getElementById('g2-badge').textContent = '已完成';
+      document.getElementById('g3-badge').className = 'badge gen';
+      document.getElementById('g3-badge').textContent = '生成中';
+    }, 3500);
+    setTimeout(() => {
+      document.getElementById('g3-badge').className = 'badge done';
+      document.getElementById('g3-badge').textContent = '已完成';
+    }, 5200);
+  }, 9500);
+
+  // Phase 4: Export (15-19s)
+  setTimeout(() => {
+    document.getElementById('gen').classList.remove('show');
+    document.getElementById('pd3').classList.remove('active');
+    document.getElementById('pd3').classList.add('done');
+    document.getElementById('pd4').classList.add('active');
+    label.textContent = '合并导出';
+    document.getElementById('export').classList.add('show');
+    setTimeout(() => document.getElementById('exp-check').classList.add('pop'), 400);
+    setTimeout(() => document.getElementById('exp-text').classList.add('show'), 600);
+    setTimeout(() => document.getElementById('exp-sub').classList.add('show'), 900);
+    setTimeout(() => {
+      document.getElementById('pd4').classList.remove('active');
+      document.getElementById('pd4').classList.add('done');
+    }, 1200);
+  }, 15500);
+
+  // Restart
+  setTimeout(runCycle, CYCLE);
+}
+
+runCycle();
+</script>
+</body>
+</html>
