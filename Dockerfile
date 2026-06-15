@@ -69,6 +69,9 @@ COPY --from=builder /app/src/lib ./src/lib
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+# .env.production 复制为 .env，供 Prisma CLI (dotenv/config) 和运行时读取
+COPY --from=builder /app/.env.production ./.env
 
 # 创建上传目录
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
