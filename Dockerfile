@@ -26,8 +26,14 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/prisma ./prisma
 COPY . .
 
+# 构建时使用临时 SQLite（仅供 SSG 预渲染读空表用，运行时由 .env.production 覆盖）
+ENV DATABASE_URL="file:./build.db"
+
 # Prisma 客户端生成（输出到 src/generated/prisma，须在 COPY 源码后执行）
 RUN npx prisma generate
+
+# 创建空数据库供 SSG 预渲染使用（构建时需要表结构，运行时会用真实 DB）
+RUN npx prisma db push --accept-data-loss 2>/dev/null || true
 
 # 构建时需要的环境变量（Next.js 内联 NEXT_PUBLIC_* 到客户端包）
 ARG NEXT_PUBLIC_APP_URL
