@@ -98,7 +98,7 @@ export default function LandingPage() {
           <a href="#features">功能</a>
           <a href="#showcase">案例</a>
           <a href="/help">帮助</a>
-          <Link href="/login" className="lp-nav-cta">开始使用</Link>
+          <Link href="/dashboard" className="lp-nav-cta">开始使用</Link>
         </div>
       </nav>
 
