@@ -31,9 +31,7 @@ services:
 
   # Workers（后台任务：视频解析/生成/合并/人物图等）
   workers:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: video-redesign-app
     command: ["node", "--import", "tsx", "src/workers/index.ts"]
     env_file:
       - .env.production
