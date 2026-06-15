@@ -52,6 +52,7 @@ function getOSSClient(): OSS {
       accessKeySecret: OSS_ACCESS_KEY_SECRET,
       endpoint: OSS_ENDPOINT,
       secure: true,
+      timeout: 300000, // 上传超时 300 秒（跨云传输大文件需要更长时间）
     })
   }
   return _ossClient
