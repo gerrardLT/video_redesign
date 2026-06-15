@@ -10,7 +10,11 @@ import { prisma } from '@/lib/db'
 import { videoParseQueue } from '@/lib/queue'
 import { estimateParseCreditCost, getBalance } from '@/lib/credit-service'
 import path from 'path'
-import { mkdir, writeFile } from 'fs/promises'
+import { mkdir } from 'fs/promises'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+
+const execFileAsync = promisify(execFile)
 
 // ========================
 // 类型定义
@@ -24,232 +28,72 @@ export interface DownloadVideoJobData {
 }
 
 // ========================
-// 链接解析 - 跟随重定向获取真实视频地址
+// yt-dlp 一体化下载（解析 + 下载 + 无水印）
 // ========================
 
 /**
- * 解析短链接，跟随重定向获取最终 URL
- * 适用于 v.douyin.com、v.kuaishou.com 等短链接
- */
-async function resolveRedirectUrl(shortUrl: string): Promise<string> {
-  try {
-    const response = await fetch(shortUrl, {
-      method: 'GET',
-      redirect: 'follow',
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-      },
-    })
-
-    // 返回最终跳转后的 URL
-    return response.url || shortUrl
-  } catch {
-    // 如果重定向解析失败，返回原始 URL
-    return shortUrl
-  }
-}
-
-/**
- * 根据平台解析真实视频下载地址
- * 注意：各平台的实际解析逻辑需要根据平台 API 变化维护
- */
-async function resolveVideoUrl(sourceUrl: string, platform: string): Promise<string> {
-  // 1. 先解析短链接重定向
-  const resolvedUrl = await resolveRedirectUrl(sourceUrl)
-  console.log(`[download-video] 短链接解析: ${sourceUrl} → ${resolvedUrl}`)
-
-  // 2. 根据平台进行不同处理
-  // 注意：真实环境中需要根据各平台页面结构提取视频直链
-  // 这里实现基础框架，具体的平台解析逻辑需要后续根据实际情况完善
-  switch (platform) {
-    case 'douyin':
-      return await resolveDouyinVideo(resolvedUrl)
-    case 'kuaishou':
-      return await resolveKuaishouVideo(resolvedUrl)
-    case 'weixin':
-      return await resolveWeixinVideo(resolvedUrl)
-    default:
-      throw new Error(`不支持的平台: ${platform}`)
-  }
-}
-
-/**
- * 抖音视频解析
- * 从抖音页面提取真实视频播放地址
- */
-async function resolveDouyinVideo(pageUrl: string): Promise<string> {
-  try {
-    const response = await fetch(pageUrl, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Referer: 'https://www.douyin.com/',
-        Cookie: '', // 部分接口需要 cookie
-      },
-    })
-
-    const html = await response.text()
-
-    // 尝试从页面数据中提取视频 URL
-    // 抖音通常在 SSR 数据中包含视频播放地址
-    const videoUrlMatch = html.match(/"playAddr":\s*\[?\s*\{\s*"src":\s*"([^"]+)"/)
-      || html.match(/"play_addr".*?"url_list":\s*\["([^"]+)"/)
-      || html.match(/playAddr.*?src['":\s]+['"]([^'"]+)/)
-
-    if (videoUrlMatch?.[1]) {
-      // 解码 URL（抖音可能对 URL 进行编码）
-      return videoUrlMatch[1].replace(/\\u002F/g, '/')
-    }
-
-    // 降级：返回页面 URL，后续可通过其他方式获取
-    throw new Error('无法从页面提取视频地址，请确认链接有效')
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('无法从页面')) {
-      throw error
-    }
-    throw new Error(`抖音视频解析失败: ${error instanceof Error ? error.message : '网络请求失败'}`)
-  }
-}
-
-/**
- * 快手视频解析
- */
-async function resolveKuaishouVideo(pageUrl: string): Promise<string> {
-  try {
-    const response = await fetch(pageUrl, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Referer: 'https://www.kuaishou.com/',
-      },
-    })
-
-    const html = await response.text()
-
-    // 快手视频地址通常在 SSR 数据中
-    const videoUrlMatch = html.match(/"photoUrl":\s*"([^"]+)"/)
-      || html.match(/"srcNoMark":\s*"([^"]+)"/)
-      || html.match(/"url":\s*"(https?:\/\/[^"]*\.mp4[^"]*)"/)
-
-    if (videoUrlMatch?.[1]) {
-      return videoUrlMatch[1]
-    }
-
-    throw new Error('无法从页面提取视频地址，请确认链接有效')
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('无法从页面')) {
-      throw error
-    }
-    throw new Error(`快手视频解析失败: ${error instanceof Error ? error.message : '网络请求失败'}`)
-  }
-}
-
-/**
- * 微信视频号解析
- */
-async function resolveWeixinVideo(pageUrl: string): Promise<string> {
-  try {
-    const response = await fetch(pageUrl, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Referer: 'https://channels.weixin.qq.com/',
-      },
-    })
-
-    const html = await response.text()
-
-    // 微信视频号地址提取
-    const videoUrlMatch = html.match(/"url":\s*"(https?:\/\/[^"]*finder[^"]*\.mp4[^"]*)"/)
-      || html.match(/src="(https?:\/\/[^"]*\.mp4[^"]*)"/)
-
-    if (videoUrlMatch?.[1]) {
-      return videoUrlMatch[1]
-    }
-
-    throw new Error('无法从页面提取视频地址，请确认链接有效')
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('无法从页面')) {
-      throw error
-    }
-    throw new Error(`微信视频号解析失败: ${error instanceof Error ? error.message : '网络请求失败'}`)
-  }
-}
-
-// ========================
-// 代理下载 - 服务端下载视频，绕过防盗链
-// ========================
-
-/**
- * 代理下载视频文件
- * 使用服务端发起请求绕过防盗链限制
+ * 使用 yt-dlp 下载视频（支持抖音/快手/微信视频号/B站等 1000+ 平台）
+ * yt-dlp 内部自动处理短链接重定向、反爬、无水印提取等
  * @returns 下载后的本地文件路径
  */
-async function downloadVideo(
-  videoUrl: string,
-  projectId: string,
-  platform: string,
-  onProgress?: (progress: number) => void
-): Promise<string> {
-  // 构造输出目录和文件名
+async function downloadWithYtDlp(sourceUrl: string, projectId: string): Promise<{ localPath: string; title: string }> {
   const outputDir = path.join(process.cwd(), 'public', 'uploads', 'downloads', projectId)
   await mkdir(outputDir, { recursive: true })
 
-  const fileName = `source_${Date.now()}.mp4`
-  const outputPath = path.join(outputDir, fileName)
+  const outputTemplate = path.join(outputDir, `source_${Date.now()}.%(ext)s`)
 
-  // 构造带防盗链绕过的请求头
-  const headers: Record<string, string> = {
-    'User-Agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    Accept: '*/*',
-    'Accept-Encoding': 'identity', // 不使用压缩，方便计算进度
+  try {
+    // 使用 yt-dlp 下载，输出 JSON 元数据用于获取标题
+    const { stdout } = await execFileAsync('yt-dlp', [
+      '--no-warnings',
+      '--no-playlist',           // 不下载播放列表
+      '-f', 'best[ext=mp4]/best', // 优先 mp4 格式
+      '--merge-output-format', 'mp4',
+      '-o', outputTemplate,      // 输出路径模板
+      '--print', 'after_move:filepath', // 打印最终文件路径
+      '--print', 'title',        // 打印视频标题
+      '--max-filesize', '300m',  // 最大 300MB（与上传限制一致）
+      '--socket-timeout', '30',  // 网络超时 30s
+      sourceUrl,
+    ], { timeout: 180000 }) // 总超时 3 分钟
+
+    const lines = stdout.trim().split('\n')
+    // yt-dlp --print 按顺序输出：filepath, title
+    const title = lines[0] || '导入视频'
+    const localPath = lines[1] || ''
+
+    if (!localPath || !localPath.includes(outputDir)) {
+      // 如果 --print filepath 没有输出，尝试查找目录里的文件
+      const { readdir } = await import('fs/promises')
+      const files = await readdir(outputDir)
+      const downloaded = files.find(f => f.startsWith('source_') && f.endsWith('.mp4'))
+      if (downloaded) {
+        return { localPath: path.join(outputDir, downloaded), title }
+      }
+      throw new Error('yt-dlp 下载完成但未找到输出文件')
+    }
+
+    return { localPath, title }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error)
+    // yt-dlp 常见错误翻译
+    if (msg.includes('Unsupported URL')) {
+      throw new Error('不支持的链接格式，请检查链接是否正确')
+    }
+    if (msg.includes('Video unavailable') || msg.includes('removed')) {
+      throw new Error('视频已被删除或不可用')
+    }
+    if (msg.includes('Private video')) {
+      throw new Error('该视频为私密视频，无法下载')
+    }
+    if (msg.includes('max-filesize')) {
+      throw new Error('视频文件过大，当前支持 300MB 以内')
+    }
+    if (msg.includes('timeout') || msg.includes('timed out')) {
+      throw new Error('下载超时，请稍后重试')
+    }
+    throw new Error(`视频下载失败: ${msg.slice(0, 200)}`)
   }
-
-  // 根据平台设置 Referer（防盗链关键）
-  switch (platform) {
-    case 'douyin':
-      headers['Referer'] = 'https://www.douyin.com/'
-      break
-    case 'kuaishou':
-      headers['Referer'] = 'https://www.kuaishou.com/'
-      break
-    case 'weixin':
-      headers['Referer'] = 'https://channels.weixin.qq.com/'
-      break
-  }
-
-  const response = await fetch(videoUrl, { headers })
-
-  if (!response.ok) {
-    throw new Error(`视频下载失败: HTTP ${response.status} ${response.statusText}`)
-  }
-
-  // 检查文件大小（限制 500MB）
-  const contentLength = Number(response.headers.get('content-length') || 0)
-  const maxSize = 500 * 1024 * 1024 // 500MB
-  if (contentLength > maxSize) {
-    throw new Error('视频文件过大，当前支持 500MB 以内')
-  }
-
-  // 流式下载并写入本地文件
-  const arrayBuffer = await response.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
-
-  // 检查实际大小
-  if (buffer.length > maxSize) {
-    throw new Error('视频文件过大，当前支持 500MB 以内')
-  }
-
-  await writeFile(outputPath, buffer)
-
-  // 报告进度
-  onProgress?.(100)
-
-  return outputPath
 }
 
 // ========================
@@ -291,31 +135,16 @@ async function processDownloadVideo(job: Job<DownloadVideoJobData>): Promise<voi
       data: { status: 'DOWNLOADING', progress: 0 },
     })
 
-    // 2. 解析真实视频地址
+    // 2. 使用 yt-dlp 解析并下载视频（一步完成：短链接解析 + 反爬 + 无水印下载）
     await job.updateProgress(10)
     await prisma.videoDownloadTask.update({
       where: { id: taskId },
       data: { progress: 10 },
     })
-    console.log(`[download-video] 开始解析视频地址...`)
+    console.log(`[download-video] 开始使用 yt-dlp 下载视频...`)
 
-    const videoUrl = await resolveVideoUrl(sourceUrl, platform)
-    console.log(`[download-video] 解析成功，视频地址: ${videoUrl.substring(0, 80)}...`)
-
-    await job.updateProgress(30)
-    await prisma.videoDownloadTask.update({
-      where: { id: taskId },
-      data: { progress: 30 },
-    })
-
-    // 3. 代理下载视频
-    console.log(`[download-video] 开始下载视频...`)
-    const localPath = await downloadVideo(videoUrl, projectId, platform, (progress) => {
-      // 下载进度映射到 30-80%
-      const mappedProgress = 30 + Math.floor(progress * 0.5)
-      job.updateProgress(mappedProgress)
-    })
-    console.log(`[download-video] 视频下载完成: ${localPath}`)
+    const { localPath, title } = await downloadWithYtDlp(sourceUrl, projectId)
+    console.log(`[download-video] yt-dlp 下载完成: ${localPath} (标题: ${title})`)
 
     await job.updateProgress(80)
     await prisma.videoDownloadTask.update({
@@ -323,7 +152,7 @@ async function processDownloadVideo(job: Job<DownloadVideoJobData>): Promise<voi
       data: { progress: 80 },
     })
 
-    // 4. 上传到 OSS
+    // 3. 上传到 OSS
     console.log(`[download-video] 开始上传到 OSS...`)
     const ossUrl = await uploadToOSS(localPath, projectId)
     console.log(`[download-video] OSS 上传完成: ${ossUrl}`)
@@ -334,7 +163,7 @@ async function processDownloadVideo(job: Job<DownloadVideoJobData>): Promise<voi
       data: { progress: 90 },
     })
 
-    // 5. 更新 Project 状态为 PARSING，写入 videoUrl
+    // 4. 更新 Project 状态为 PARSING，写入 videoUrl
     await prisma.project.update({
       where: { id: projectId },
       data: {
@@ -343,7 +172,7 @@ async function processDownloadVideo(job: Job<DownloadVideoJobData>): Promise<voi
       },
     })
 
-    // 6. 更新下载任务为 COMPLETED
+    // 5. 更新下载任务为 COMPLETED
     await prisma.videoDownloadTask.update({
       where: { id: taskId },
       data: {
@@ -352,7 +181,7 @@ async function processDownloadVideo(job: Job<DownloadVideoJobData>): Promise<voi
       },
     })
 
-    // 7. 触发 video-parse 队列前校验余额（解析消耗 AI 分析 + 首帧图等真实资源）
+    // 6. 触发 video-parse 队列前校验余额（解析消耗 AI 分析 + 首帧图等真实资源）
     const projectForCost = await prisma.project.findUniqueOrThrow({
       where: { id: projectId },
       select: { userId: true, duration: true },
@@ -436,4 +265,4 @@ worker.on('failed', (job, err) => {
 })
 
 export default worker
-export { processDownloadVideo, resolveRedirectUrl, resolveVideoUrl, downloadVideo, uploadToOSS }
+export { processDownloadVideo, downloadWithYtDlp, uploadToOSS }

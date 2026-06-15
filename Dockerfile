@@ -50,8 +50,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# 安装 ffmpeg + ffprobe（运行时视频处理必需）
-RUN apk add --no-cache ffmpeg
+# 安装 ffmpeg + ffprobe + yt-dlp（运行时视频处理和链接下载必需）
+RUN apk add --no-cache ffmpeg yt-dlp
 
 # 创建非 root 用户
 RUN addgroup --system --gid 1001 nodejs && \
