@@ -49,6 +49,8 @@ next-env.d.ts
 # Local database
 dev.db
 dev.db-journal
+dev.db-shm
+dev.db-wal
 
 # Playwright MCP snapshots
 .playwright-mcp/

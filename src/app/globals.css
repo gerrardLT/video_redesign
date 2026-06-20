@@ -341,7 +341,8 @@ main {
 /* Nav */
 .lp-nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:16px 40px;background:rgba(11,12,14,0.5);backdrop-filter:blur(20px);border-bottom:1px solid var(--cine-line);}
 .lp-nav-logo{display:flex;align-items:center;gap:11px;}
-.lp-nav-mark{width:30px;height:30px;border-radius:7px;background:var(--cine-gold);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--cine-ink);}
+.lp-nav-mark{width:30px;height:30px;border-radius:7px;overflow:hidden;flex-shrink:0;}
+.lp-nav-mark-img{width:30px;height:30px;object-fit:contain;display:block;}
 .lp-nav-nm{font-size:14px;font-weight:600;letter-spacing:2px;color:var(--cine-text-2);}
 .lp-nav-links{display:flex;align-items:center;gap:24px;}
 .lp-nav-links a{font-size:13px;color:var(--cine-text-2);text-decoration:none;transition:color .2s;}

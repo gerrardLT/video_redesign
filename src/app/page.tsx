@@ -122,7 +122,8 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="lp-nav">
         <div className="lp-nav-logo">
-          <div className="lp-nav-mark">幕</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="视频重塑" className="lp-nav-mark-img" />
           <span className="lp-nav-nm">视频重塑</span>
         </div>
         <div className="lp-nav-links">
