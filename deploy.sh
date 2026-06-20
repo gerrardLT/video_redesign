@@ -131,13 +131,17 @@ log "等待 app 容器就绪..."
 sleep 8
 
 # ========================
-# 第 5 步：执行数据库迁移（生产专用，不重置数据）
+# 第 5 步：同步数据库 schema（db push，项目原生工作流）
+# 说明：本项目使用 prisma db push（非 migrate），直接对比当前库与 schema.prisma 应用差异，
+#       不依赖 migration 历史，避免 P3005（数据库非空且无 baseline）错误。
+#       --accept-data-loss 用于应用含废弃字段删除的变更；核心数据表仅新增，不丢数据。
+#       数据库已在第 1 步备份，可回滚。
 # ========================
-log "===== 执行数据库迁移 ====="
-if $DC exec -T "$APP_SERVICE" npx prisma migrate deploy; then
-  ok "数据库迁移完成"
+log "===== 同步数据库 schema（prisma db push）====="
+if $DC exec -T "$APP_SERVICE" npx prisma db push --accept-data-loss --skip-generate; then
+  ok "数据库 schema 同步完成"
 else
-  err "数据库迁移失败！请检查日志。数据库已在第 1 步备份，可手动回滚"
+  err "数据库 schema 同步失败！请检查日志。数据库已在第 1 步备份，可手动回滚"
   err "回滚命令示例：$DC cp $BACKUP_FILE $APP_SERVICE:$DB_PATH_IN_CONTAINER"
   exit 1
 fi
