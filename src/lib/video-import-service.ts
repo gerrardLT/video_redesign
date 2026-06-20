@@ -1,43 +1,11 @@
 import { PLATFORM_PATTERNS, type VideoPlatform } from '@/constants/platform-patterns'
 import { prisma } from '@/lib/db'
 import { videoDownloadQueue } from '@/lib/queue'
+import { validateShareLink, type ExtendedPlatform } from '@/lib/validate-share-link'
+export type { ValidateResult, ExtendedPlatform } from '@/lib/validate-share-link'
 
-interface ValidateResult {
-  valid: boolean
-  platform?: VideoPlatform
-  error?: string
-}
-
-/**
- * 验证分享链接格式，匹配支持的平台
- * @param url - 用户粘贴的链接
- * @returns { valid, platform, error }
- */
-export function validateShareLink(url: string): ValidateResult {
-  // 1. 基础验证 - 不为空
-  if (!url || !url.trim()) {
-    return { valid: false, error: '请输入视频链接' }
-  }
-
-  const trimmed = url.trim()
-
-  // 2. 检查是否为有效 URL 格式
-  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-    return { valid: false, error: '请输入有效的视频链接（以 http:// 或 https:// 开头）' }
-  }
-
-  // 3. 匹配平台正则规则
-  for (const { platform, patterns } of PLATFORM_PATTERNS) {
-    for (const pattern of patterns) {
-      if (pattern.test(trimmed)) {
-        return { valid: true, platform }
-      }
-    }
-  }
-
-  // 4. 无匹配 - 不支持的平台
-  return { valid: false, error: '暂不支持该平台，目前支持抖音、快手和微信视频号' }
-}
+// 重新导出 validateShareLink，确保已有导入路径不破坏
+export { validateShareLink }
 
 // ========================
 // 视频导入服务核心逻辑
@@ -46,7 +14,7 @@ export function validateShareLink(url: string): ValidateResult {
 interface ImportResult {
   projectId: string
   taskId: string
-  platform: VideoPlatform
+  platform: ExtendedPlatform
 }
 
 /**
@@ -58,11 +26,14 @@ export async function validateAndImport(
   url: string,
   projectName?: string
 ): Promise<ImportResult> {
-  // 1. 验证链接格式
+  // 1. 验证链接格式（支持从分享文案中自动提取 URL）
   const validation = validateShareLink(url)
   if (!validation.valid || !validation.platform) {
     throw new Error(validation.error || '链接验证失败')
   }
+
+  // 使用提取后的纯净 URL（而非用户原始输入的分享文案）
+  const actualUrl = validation.extractedUrl || url.trim()
 
   // 2. 创建 Project，状态设为 DOWNLOADING
   const project = await prisma.project.create({
@@ -78,7 +49,7 @@ export async function validateAndImport(
     data: {
       projectId: project.id,
       userId,
-      sourceUrl: url.trim(),
+      sourceUrl: actualUrl,
       platform: validation.platform,
       status: 'PENDING',
       progress: 0,
@@ -89,7 +60,7 @@ export async function validateAndImport(
   await videoDownloadQueue.add('download-video', {
     taskId: task.id,
     projectId: project.id,
-    sourceUrl: url.trim(),
+    sourceUrl: actualUrl,
     platform: validation.platform,
   })
 

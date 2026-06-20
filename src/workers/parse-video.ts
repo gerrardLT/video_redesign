@@ -9,10 +9,13 @@ import { redis } from '@/lib/redis'
 import { prisma } from '@/lib/db'
 import { getVideoMetadata, normalizeVideo } from '@/lib/ffmpeg'
 import { parseVideoDirectly } from '@/lib/video-analyzer'
+import type { ParsedShot } from '@/lib/video-analyzer'
 import { groupShots } from '@/lib/grouping-service'
 import { uploadFile } from '@/lib/storage'
-import { estimateParseCreditCost, reserveParseCreditsTx, chargeParseCreditsTx } from '@/lib/credit-service'
+import { estimateParseCreditCost, freezeParseCredits, chargeParseCreditsFromReserve, refundParseCredits } from '@/lib/credit-service'
 import { withCreditLock } from '@/lib/distributed-lock'
+import { publishStateChange, publishCompleted, publishFailed } from '@/lib/progress-publisher'
+import type { CharacterAppearanceRecord, AppearanceDescriptor } from '@/types/appearance'
 import path from 'path'
 import { mkdir, unlink } from 'fs/promises'
 import { execFile } from 'child_process'
@@ -59,6 +62,32 @@ interface TimelineShot {
   orderIndex: number
   startTime: number
   endTime: number
+}
+
+/**
+ * 从分镜的 characters 数组中提取外观详情，转换为 CharacterAppearanceRecord 格式。
+ * - 仅提取包含 appearanceDetail 的角色
+ * - 如果所有角色均无 appearanceDetail，返回空数组
+ * - 纯函数，不抛错
+ */
+function buildCharacterAppearances(
+  characters: ParsedShot['characters']
+): CharacterAppearanceRecord {
+  const records: CharacterAppearanceRecord = []
+  for (const char of characters) {
+    if (char.appearanceDetail) {
+      records.push({
+        name: char.name,
+        appearance: {
+          hair: char.appearanceDetail.hair || '',
+          clothing: char.appearanceDetail.clothing || '',
+          accessories: char.appearanceDetail.accessories || '',
+          makeup: char.appearanceDetail.makeup || '',
+        } satisfies AppearanceDescriptor,
+      })
+    }
+  }
+  return records
 }
 
 /**
@@ -279,6 +308,14 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
   const { projectId, videoUrl } = job.data
   console.log(`[parse-video] 开始解析项目 ${projectId}（attempt ${job.attemptsMade + 1}）`)
 
+  // 查询项目所属用户（用于进度推送）
+  const projectOwnerInfo = await prisma.project.findUniqueOrThrow({
+    where: { id: projectId },
+    select: { userId: true },
+  })
+  const userId = projectOwnerInfo.userId
+  void publishStateChange(userId, 'parse', projectId, 'started', 0)
+
   // 幂等清理：重试时先删除上一次可能残留的解析数据，避免产生重复分镜/人物/分组
   if (job.attemptsMade > 0) {
     console.log(`[parse-video] 第 ${job.attemptsMade + 1} 次尝试，先清理残留数据`)
@@ -291,6 +328,8 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
   // 追踪临时文件路径，确保 finally 里能清理（无论成功或失败）
   let normalizedPath: string | null = null
   let sourceTempDir: string | null = null
+  // parseCost 需在 catch 块中可访问（用于失败退款），初始化为 0
+  let parseCost = 0
 
   try {
     // 1. 解析视频路径
@@ -325,19 +364,21 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
       )
     }
 
-    // 2.2 解析前余额预检（消耗任何重外部资源——Normalize/OSS/AI 多模态分析——之前）
+    // 2.2 解析前积分真实冻结（RESERVE：消耗任何重外部资源前扣减余额 + 写流水）
     //     以真实元数据时长估算成本，余额不足则拒绝继续（抛 ApiError），绝不进入后续外部
-    //     资源消耗、绝不事后兜底扣至 0。实际扣减在步骤 10 成功事务内一次性完成。
-    const parseCost = estimateParseCreditCost(metadata.duration)
+    //     资源消耗。成功时由 chargeParseCreditsFromReserve 记账；失败时由 refundParseCredits 退还。
+    //     幂等：重试时已存在 RESERVE 流水则跳过（不重复冻结）。
+    parseCost = estimateParseCreditCost(metadata.duration)
     const projectOwner = await prisma.project.findUniqueOrThrow({
       where: { id: projectId },
       select: { userId: true },
     })
-    await reserveParseCreditsTx(prisma, projectOwner.userId, parseCost)
+    await freezeParseCredits(projectOwner.userId, projectId, parseCost)
 
     // 3. Normalize 预处理：统一编码格式，消除可变帧率/HEVC 兼容性问题
     normalizedPath = path.join(path.dirname(videoPath), `normalized_${Date.now()}.mp4`)
     console.log(`[parse-video] 开始 Normalize 预处理...`)
+    void publishStateChange(userId, 'parse', projectId, 'splitting', 20)
     let normalizedOssUrl: string
     try {
       await normalizeVideo(videoPath, normalizedPath)
@@ -355,15 +396,28 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
       throw new Error(`视频 Normalize 预处理失败：${reason}`)
     }
 
-    // 4. 调用 AI 视频直传解析（无需抽帧，直接把 OSS 视频 URL 传给多模态模型）
+    // 4. FFmpeg 场景剪辑点检测 + AI 视频直传解析
+    // 先用 FFmpeg 检测真实的画面剪辑/转场点，再将结果传给 AI 约束分镜切分行为
+    const { detectSceneCuts } = await import('@/lib/ffmpeg')
+    let sceneCuts: number[] = []
+    try {
+      sceneCuts = await detectSceneCuts(videoPath)
+      console.log(`[parse-video] FFmpeg 场景检测完成: ${sceneCuts.length} 个剪辑点${sceneCuts.length > 0 ? ` [${sceneCuts.map(t => t.toFixed(1) + 's').join(', ')}]` : '（一镜到底）'}`)
+    } catch (sceneError) {
+      console.warn(`[parse-video] 场景检测失败，继续（AI 将不受剪辑点约束）:`, sceneError instanceof Error ? sceneError.message : String(sceneError))
+    }
+
+    // 调用 AI 视频直传解析（无需抽帧，直接把 OSS 视频 URL 传给多模态模型）
     // 模型能看到完整运动信息+听到音频，输出更精准的分镜脚本和对白
     console.log(`[parse-video] 调用 AI 视频直传分析（${process.env.VISION_MODEL}），视频时长 ${metadata.duration.toFixed(1)}s`)
+    void publishStateChange(userId, 'parse', projectId, 'describing', 40)
     let shots
     let parseResult: Awaited<ReturnType<typeof parseVideoDirectly>> | null = null
     try {
       parseResult = await parseVideoDirectly({
         videoUrl: normalizedOssUrl,
         totalDuration: metadata.duration,
+        sceneCuts,
       })
       shots = parseResult.shots
     } catch (parseError: unknown) {
@@ -381,7 +435,22 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
     validateTimeline(shots, metadata.duration)
 
     // 5. 写入数据库 - 创建分镜记录（视频直传模式无帧图，coverUrl 暂空）
+    //    同时提取角色外观详情并序列化为 JSON 存入 characterAppearances 字段
     for (const shot of shots) {
+      // 从解析结果中提取角色外观四维度描述，转换为 CharacterAppearanceRecord 格式
+      let characterAppearancesJson: string
+      try {
+        const appearances = buildCharacterAppearances(shot.characters)
+        characterAppearancesJson = JSON.stringify(appearances)
+      } catch (appearanceErr) {
+        // 外观提取异常时设为空数组，不阻塞主解析流程（Req 6.4）
+        console.warn(
+          `[parse-video] 分镜 ${shot.orderIndex} 外观数据提取失败，降级为空数组:`,
+          appearanceErr instanceof Error ? appearanceErr.message : String(appearanceErr)
+        )
+        characterAppearancesJson = '[]'
+      }
+
       await prisma.shot.create({
         data: {
           projectId,
@@ -396,6 +465,7 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
           prompt: shot.suggestedPrompt,
           coverUrl: null,
           hasFace: shot.hasFace,
+          characterAppearances: characterAppearancesJson,
         },
       })
     }
@@ -415,32 +485,8 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
       })
     }
 
-    // 5.1.1 解析完成即自动为每个有外貌描述的人物生成人物形象（锚定图）
-    //       用户后续仍可在人物面板「重新生成形象」。失败隔离：入队失败不阻塞主流程。
-    try {
-      const { imageGenerateQueue } = await import('@/lib/queue')
-      const proj = await prisma.project.findUniqueOrThrow({
-        where: { id: projectId },
-        select: { userId: true },
-      })
-      const createdChars = await prisma.character.findMany({
-        where: { projectId, enabled: true, appearance: { not: null } },
-        select: { id: true, appearance: true },
-      })
-      for (const c of createdChars) {
-        if (!c.appearance || c.appearance.trim().length === 0) continue
-        await imageGenerateQueue.add('generate-character-image', {
-          characterId: c.id,
-          projectId,
-          userId: proj.userId,
-          prompt: c.appearance,
-        })
-      }
-      console.log(`[parse-video] 已自动触发 ${createdChars.length} 个人物形象生成`)
-    } catch (charGenErr) {
-      const reason = charGenErr instanceof Error ? charGenErr.message : String(charGenErr)
-      console.warn(`[parse-video] 自动触发人物形象生成失败（不阻塞，用户可手动生成）: ${reason}`)
-    }
+    // 5.1.1 人物形象生成已移至步骤 9 之后（StyleConfig 写入完成后触发），
+    //       确保 buildStylePrompt 能读到项目美术风格前缀。
 
     // 5.2 为所有分镜抽取真实缩略图帧并回填 coverUrl（失败隔离：单个失败不阻塞主流程）
     //     用途：编辑器分镜列表预览 + 无人脸分镜场景帧作为生成阶段 reference_image。
@@ -627,10 +673,26 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
       console.log(`[parse-video] 全局一致性设定已保存（结构化 + 扁平 ${styleDescription.length}字）`)
     }
 
-    // 10. 解析成功：在同一事务内扣除解析积分 + 置项目为可编辑（即使部分音频组失败也允许进入 EDITABLE）
-    //     扣费与状态更新原子化：事务提交即任务完成（不重试），保证扣费恰好一次。
-    //     parseCost 在步骤 2.2 已按真实元数据时长估算（入口已预检余额）。
-    //     关键积分写（缺陷 11）：整笔「扣费 + 置 EDITABLE」经 Redis 全局锁【跨进程】串行化，
+    // 9.1 自动为每个有外貌描述的人物生成人物形象（锚定图）
+    //     移到步骤 10（解析积分扣费）之后触发，确保所有 DB 写操作完成后再入队，
+    //     避免 generate-character Worker 与 parse-video 争 SQLite 写锁导致超时。
+    //     此处仅标记需要生成的角色列表，入队动作在后面执行。
+    let pendingCharGens: Array<{ id: string; appearance: string }> = []
+    try {
+      const createdChars = await prisma.character.findMany({
+        where: { projectId, enabled: true, appearance: { not: null } },
+        select: { id: true, appearance: true },
+      })
+      pendingCharGens = createdChars.filter(c => c.appearance && c.appearance.trim().length > 0) as Array<{ id: string; appearance: string }>
+    } catch (charQueryErr) {
+      const reason = charQueryErr instanceof Error ? charQueryErr.message : String(charQueryErr)
+      console.warn(`[parse-video] 查询待生成角色失败（不阻塞）: ${reason}`)
+    }
+
+    // 10. 解析成功：在同一事务内写 CHARGE 记账 + 置项目为可编辑（即使部分音频组失败也允许进入 EDITABLE）
+    //     积分已在步骤 2.2 通过 freezeParseCredits 真实冻结（余额已扣），此处仅写 CHARGE 流水记账。
+    //     幂等：chargeParseCreditsFromReserve 内部检查已有 CHARGE 流水则跳过。
+    //     关键积分写（缺陷 11）：整笔「记账 + 置 EDITABLE」经 Redis 全局锁【跨进程】串行化，
     //     与 Worker / 应用进程其它积分写互斥，消除 libSQL/SQLite 并发写锁竞争与读-改-写丢失更新。
     await withCreditLock(() => prisma.$transaction(async (tx) => {
       // 查询项目所属用户（job data 不含 userId）
@@ -639,8 +701,8 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
         select: { userId: true },
       })
 
-      // 扣除解析积分：事务内二次校验余额，不允许欠费、不兜底扣至 0
-      await chargeParseCreditsTx(tx, project.userId, projectId, parseCost)
+      // 写入 CHARGE 流水记账（余额在 RESERVE 时已扣，此处不再二次扣减）
+      await chargeParseCreditsFromReserve(tx, project.userId, projectId, parseCost)
 
       // 置项目为可编辑
       await tx.project.update({
@@ -657,10 +719,41 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
     console.log(
       `[parse-video] 项目 ${projectId} 解析完成，共 ${shots.length} 个分镜、${groupPlans.length} 个分镜组`
     )
+    void publishCompleted(userId, 'parse', projectId)
+
+    // 9.1（延迟执行）：所有 DB 写操作已完成，此时安全入队 generate-character jobs
+    // 确保 Worker 拾取 job 时不会与 parse-video 的 DB 写争 SQLite 写锁
+    if (pendingCharGens.length > 0) {
+      try {
+        const { imageGenerateQueue } = await import('@/lib/queue')
+        for (const c of pendingCharGens) {
+          await imageGenerateQueue.add('generate-character-image', {
+            characterId: c.id,
+            projectId,
+            userId,
+            prompt: c.appearance,
+          })
+        }
+        console.log(`[parse-video] 已自动触发 ${pendingCharGens.length} 个人物形象生成（StyleConfig 已就绪）`)
+      } catch (charGenErr) {
+        const reason = charGenErr instanceof Error ? charGenErr.message : String(charGenErr)
+        console.warn(`[parse-video] 自动触发人物形象生成失败（不阻塞，用户可手动生成）: ${reason}`)
+      }
+    }
 
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : '视频解析失败'
     console.error(`[parse-video] 项目 ${projectId} 解析失败:`, errorMsg)
+    void publishFailed(userId, 'parse', projectId, errorMsg)
+
+    // P3 修复：解析失败时退还已冻结的积分（幂等：已退则跳过）
+    // parseCost 可能在步骤 2.2 之前尚未赋值（如 metadata 获取失败），用 0 兜底
+    const refundAmount = typeof parseCost === 'number' && parseCost > 0 ? parseCost : 0
+    if (refundAmount > 0) {
+      await refundParseCredits(userId, projectId, refundAmount).catch((refundErr) => {
+        console.error(`[parse-video] 项目 ${projectId} 解析失败退款异常:`, refundErr instanceof Error ? refundErr.message : String(refundErr))
+      })
+    }
 
     // 更新项目状态为失败
     await prisma.project.update({
@@ -697,10 +790,9 @@ const worker = new Worker<ParseVideoJobData>(
   {
     connection,
     concurrency: 2,
-    limiter: {
-      max: 2,
-      duration: 60000,
-    },
+    // P1 修复：移除 limiter 配置。原 limiter: { max: 2, duration: 60000 } 导致每 60s
+    // 窗口内只能处理 2 个任务——若两个任务快速完成，后续任务须等满 60s 窗口才能派发。
+    // concurrency: 2 已保证同时最多 2 个任务执行，速率保护由下游 AI API 自身 429 + Worker 重试兜底。
   }
 )
 

@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ALLOWED_VIDEO_TYPES, MAX_VIDEO_SIZE, MAX_VIDEO_DURATION } from '@/lib/validators/file-validator'
+import { ImportLinkDialog } from '@/components/project/import-link-dialog'
+import { OnboardingProvider } from '@/components/onboarding/onboarding-provider'
+import { FirstProjectGuide } from '@/components/onboarding/first-project-guide'
 
 type UploadState = 'idle' | 'validating' | 'uploading' | 'completing' | 'done' | 'error'
 
@@ -17,6 +20,16 @@ export default function NewProjectPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
+
+  // P3 前端置灰：查询用户积分余额，余额为 0 时禁用上传/解析
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  useEffect(() => {
+    fetch('/api/credits/balance')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (data) setCreditBalance(data.balance) })
+      .catch(() => {})
+  }, [])
 
   // 验证视频文件
   const validateFile = useCallback((file: File): Promise<number> => {
@@ -181,11 +194,17 @@ export default function NewProjectPage() {
     !selectedFile ||
     uploadState === 'uploading' ||
     uploadState === 'completing' ||
-    uploadState === 'done'
+    uploadState === 'done' ||
+    creditBalance === 0  // P3 前端置灰：余额为 0 禁用提交
 
   return (
     <div className="mx-auto max-w-xl">
       <h1 className="mb-8 text-2xl font-bold text-white">新建项目</h1>
+
+      {/* 首次创建项目流程指引 Banner（不阻塞操作） */}
+      <OnboardingProvider isAuthenticated={true}>
+        <FirstProjectGuide />
+      </OnboardingProvider>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 错误提示 */}
@@ -294,6 +313,36 @@ export default function NewProjectPage() {
             <span>·</span>
             <span>时长: 最长 2 分钟</span>
           </div>
+
+          {/* 链接导入入口 */}
+          <div className="relative flex items-center justify-center py-2">
+            <div className="absolute inset-x-0 top-1/2 h-px bg-[var(--cine-line-2)]" />
+            <span className="relative z-10 bg-[var(--cine-bg,#0a0a0a)] px-3 text-xs text-[var(--cine-text-3)]">
+              或
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowImportDialog(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--cine-line-2)] bg-[var(--cine-surface)] px-4 py-2.5 text-sm text-[var(--cine-text-2)] transition-colors hover:border-[var(--cine-gold)]/50 hover:text-white"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+              />
+            </svg>
+            通过链接导入（抖音/快手/视频号）
+          </button>
         </div>
 
         {/* 上传进度 */}
@@ -325,6 +374,20 @@ export default function NewProjectPage() {
           </div>
         )}
 
+        {/* 余额不足提示（P3 前端置灰） */}
+        {creditBalance === 0 && (
+          <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+            <span>积分余额为 0，无法解析视频。</span>
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/packages')}
+              className="ml-2 underline hover:text-amber-300"
+            >
+              前往充值
+            </button>
+          </div>
+        )}
+
         {/* 提交按钮 */}
         <button
           type="submit"
@@ -340,6 +403,12 @@ export default function NewProjectPage() {
                 : '创建项目并上传'}
         </button>
       </form>
+
+      {/* 链接导入弹窗 */}
+      <ImportLinkDialog
+        open={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+      />
     </div>
   )
 }

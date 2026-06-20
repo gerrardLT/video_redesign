@@ -6,6 +6,9 @@ import { VideoPlayer } from '@/components/video/VideoPlayer'
 import { ScriptEditor } from '@/components/shot/ScriptEditor'
 import { InsufficientCreditsDialog } from '@/components/project/insufficient-credits-dialog'
 import { RegenerateConfirmDialog } from '@/components/shot/RegenerateConfirmDialog'
+import { VersionHistoryPanel } from '@/components/editor/version-history-panel'
+import { VersionCompareView } from '@/components/editor/version-compare-view'
+import { useVersionHistoryStore } from '@/stores/version-history-store'
 
 // 分镜组内分镜的精简结构（与 GET /api/projects/[id] 返回的 shotGroups[].shots 对齐)
 export interface ShotGroupShot {
@@ -369,13 +372,24 @@ interface ShotGroupCardProps {
   onGenerate: (force: boolean) => void
 }
 
-// 单个分镜组卡片：组内分镜列表 + 合并视频 / 状态 / 生成入口 + 本组人物选择
+// 单个分镜组卡片：组内分镜列表 + 合并视频 / 状态 / 生成入口 + 本组人物选择 + 版本历史入口
 function ShotGroupCard({ group, submitting, error, characterLibrary, onGenerate }: ShotGroupCardProps) {
   const statusInfo = groupStatusConfig[group.genStatus] || groupStatusConfig.PENDING
   const inProgress = IN_PROGRESS_STATUSES.includes(group.genStatus)
   const succeeded = group.genStatus === 'SUCCEEDED' && !!group.genVideoUrl
   const failed = group.genStatus === 'FAILED'
   const [showScriptEditor, setShowScriptEditor] = useState(false)
+  // 版本历史面板状态
+  const [showVersionHistory, setShowVersionHistory] = useState(false)
+  const { compareMode, compareVersionIds, versions } = useVersionHistoryStore()
+
+  // 实时视频 URL：版本切换后从 store 中的当前版本获取最新 URL，保证卡片视频即时刷新
+  // 仅当 store 中加载的 versions 属于当前组时才使用（防止跨组污染：全局 store 可能残留其它组的数据）
+  const versionStoreGroupId = useVersionHistoryStore((s) => s.currentShotGroupId)
+  const isVersionsForThisGroup = versionStoreGroupId === group.id
+  const currentVersion = isVersionsForThisGroup ? versions.find((v) => v.isCurrent) : undefined
+  const displayVideoUrl = currentVersion?.videoUrl ?? group.genVideoUrl
+  const displayCoverUrl = currentVersion?.coverUrl ?? group.genCoverUrl
   // 本组选中人物（set 语义，切换即 PUT 保存)
   const isVirtualGroup = group.id.startsWith('virtual-')
   const [selectedCharIds, setSelectedCharIds] = useState<string[]>(group.characterIds || [])
@@ -428,7 +442,34 @@ function ShotGroupCard({ group, submitting, error, characterLibrary, onGenerate 
         </div>
 
         {/* 生成 / 重新生成入口（进行中时禁用) */}
-        <div className="shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          {/* 版本历史入口：仅已生成成功的组显示 */}
+          {succeeded && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowVersionHistory(true)}
+              className="text-[var(--cine-text-2)] border-[var(--cine-line-2)] hover:text-[var(--cine-gold)] hover:border-[var(--cine-gold)]"
+              aria-label="查看版本历史"
+            >
+              <svg
+                className="h-3.5 w-3.5 mr-1"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              版本历史
+            </Button>
+          )}
+
           {inProgress ? (
             <Button
               size="sm"
@@ -481,10 +522,10 @@ function ShotGroupCard({ group, submitting, error, characterLibrary, onGenerate 
       {succeeded && (
         <div className="mt-3">
           <VideoPlayer
-            src={group.genVideoUrl as string}
-            // 使用生成视频封面（genCoverUrl 来自 genVideoUrl 的 ffmpeg 抽帧），
-            // 确保封面与生成视频内容一致，而非原始视频帧（Bug 2 修复 — Req 2.8）
-            poster={group.genCoverUrl || undefined}
+            src={displayVideoUrl as string}
+            // 使用生成视频封面（来自当前版本或 ShotGroup 的封面字段），
+            // 版本切换后即时刷新（通过 version-history-store 同步）
+            poster={displayCoverUrl || undefined}
             className="w-full h-[320px] border border-[var(--cine-line-2)]"
           />
         </div>
@@ -608,6 +649,34 @@ function ShotGroupCard({ group, submitting, error, characterLibrary, onGenerate 
           </div>
         ))}
       </div>
+
+      {/* 版本历史面板（全屏遮罩 + 侧边面板） */}
+      {showVersionHistory && (
+        <div className="fixed inset-0 z-50 flex">
+          {/* 遮罩层 */}
+          <div
+            className="flex-1 bg-black/60"
+            onClick={() => setShowVersionHistory(false)}
+            aria-hidden="true"
+          />
+          {/* 侧边面板内容：对比模式时宽度更大 */}
+          <div className={compareMode && compareVersionIds ? 'w-[720px] max-w-full' : 'w-[380px] max-w-full'}>
+            {compareMode && compareVersionIds ? (
+              <VersionCompareView
+                shotGroupId={group.id}
+                versionAId={compareVersionIds[0]}
+                versionBId={compareVersionIds[1]}
+                onClose={() => setShowVersionHistory(false)}
+              />
+            ) : (
+              <VersionHistoryPanel
+                shotGroupId={group.id}
+                onClose={() => setShowVersionHistory(false)}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

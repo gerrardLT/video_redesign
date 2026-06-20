@@ -18,7 +18,7 @@ export async function DELETE(
       include: { project: { select: { userId: true } } },
     })
 
-    if (!asset || asset.project.userId !== userId) {
+    if (!asset || asset.project?.userId !== userId) {
       return NextResponse.json({ error: '素材不存在' }, { status: 404 })
     }
 

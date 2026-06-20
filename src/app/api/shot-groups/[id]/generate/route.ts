@@ -9,13 +9,13 @@ import { mergeTimelineScript, type MergeInputShot } from '@/lib/script-merger'
 import { computeScriptHash } from '@/lib/script-hash'
 import { MAX_GROUP_DURATION } from '@/lib/grouping-service'
 import { buildGroupGenReference } from '@/lib/group-gen-context'
-import { applySameSceneContinuation, normScene } from '@/lib/frame-continuity'
+import { getPrevGroupVideoUrl, VIDEO_CONTINUATION_PROMPT_SUFFIX } from '@/lib/frame-continuity'
 
 export const dynamic = 'force-dynamic'
 
 // 按组生成请求参数 schema
 // duration 不来自请求体：以 ShotGroup.genDuration 为准（分组算法已约束在 [4,15]）
-// resolution/aspectRatio 可选，缺省沿用 GenerationJob 默认值（720p / 16:9）
+// resolution/aspectRatio 可选，缺省沿用默认值（480p / 16:9）
 // force：抽卡（re-roll）开关。用户主动点「重新生成」时传 true，
 //        跳过 SUCCEEDED 的 scriptHash 幂等短路，强制重新调用 Seedance 拿新结果（正常扣积分）。
 const GenerateSchema = z.object({
@@ -90,7 +90,7 @@ export async function POST(
     }
 
     // 解析分辨率与画幅：请求体优先，其次项目设置，最后回落 GenerationJob 默认值
-    const resolution = parseResult.data.resolution ?? '720p'
+    const resolution = parseResult.data.resolution ?? '480p'
     const aspectRatio =
       parseResult.data.aspectRatio ?? group.project.aspectRatio ?? '16:9'
     // 抽卡开关：用户主动「重新生成」时为 true，强制走真生成
@@ -124,6 +124,7 @@ export async function POST(
         // 传入对白：merger 会把台词以「角色（说话）："…"」嵌入提示词，
         // generate_audio=true 时 Seedance 据此生成配音（与链式路由一致，修复单组台词丢失）
         dialogue: s.dialogue,
+        scene: s.scene,
       }))
       const genDurationForMerge = Math.min(Math.round(group.genDuration), MAX_GROUP_DURATION)
       const timelineScript = mergeTimelineScript(mergeInput, {
@@ -230,55 +231,26 @@ export async function POST(
 
     // 组音频引用：已在 buildGroupReferenceData 中按 Seedance 约束计算（需配合参考图）
 
-    // === 同场景尾帧承接（与一键生成链式路径共用 applySameSceneContinuation，保证两路径行为一致）===
-    // 读取前一组 P（同项目内 groupIndex 小于本组的最大者）。仅当 P 已成功且持有受信尾帧时尝试承接；
-    // 是否真正承接由 applySameSceneContinuation 按「前一组末镜 scene 与本组首镜 scene 同场景 + 参考图未满 9 张」
-    // 判定——同场景则把 P 的受信尾帧（Seedance 产物，作 reference_image 软承接，不触发人脸审核）追加为
-    // 额外参考图并在 prompt 末尾拼接承接指令；跨场景 / scene 缺失 / 无尾帧 / 已满 9 张则原样不变、独立起镜。
-    // 承接仅改写实际提交 Seedance 的 prompt 与 referenceImages，不进入 scriptHash（见上方幂等说明）。
+    // === Reference Video 无缝衔接（取代旧的同场景尾帧承接）===
+    // 无条件查前一组已成功生成的视频 URL，作为 reference_video 传给 Seedance。
+    // 不做场景判定——无论同场景/跨场景，模型都能自行理解如何从前段视频自然过渡。
     let referenceImages = groupRef.referenceImages
-    const prevGroup = await prisma.shotGroup.findFirst({
-      where: { projectId: group.project.id, groupIndex: { lt: group.groupIndex } },
-      orderBy: { groupIndex: 'desc' },
-      select: { id: true, genStatus: true, lastFrameUrl: true },
-    })
-    if (prevGroup && prevGroup.genStatus === 'SUCCEEDED' && prevGroup.lastFrameUrl) {
-      const continuation = await applySameSceneContinuation({
-        prevGroupId: prevGroup.id,
-        currentGroupId: group.id,
-        lastFrameUrl: prevGroup.lastFrameUrl,
-        referenceImages,
-        prompt: seedancePrompt,
-      })
-      referenceImages = continuation.referenceImages
-      seedancePrompt = continuation.prompt
-      if (continuation.applied) {
-        console.log(
-          `[shot-groups/generate] 同场景承接：组 ${group.id} 承接前一组 ${prevGroup.id} 尾帧为图片${continuation.contIndex}（reference_image 软承接）`
-        )
-      } else {
-        console.log(
-          `[shot-groups/generate] 不承接：组 ${group.id} 与前一组 ${prevGroup.id} 跨场景 / scene 缺失 / 参考图已满，独立起镜`
-        )
-      }
+    const prevGroupVideoUrl = await getPrevGroupVideoUrl(group.project.id, group.groupIndex)
+    if (prevGroupVideoUrl) {
+      seedancePrompt = `${seedancePrompt}${VIDEO_CONTINUATION_PROMPT_SUFFIX}`
+      console.log(
+        `[shot-groups/generate] reference_video 衔接：组 ${group.id} 传入前一组视频作衔接参考`
+      )
+    } else {
+      console.log(
+        `[shot-groups/generate] 无前组视频（第一组或前组未成功），独立起镜`
+      )
     }
 
-    // === 决定是否请求返回尾帧（returnLastFrame，Req 2.3）===
-    // 若存在紧邻后继组 N（同项目内 groupIndex 大于本组的最小者）且 N 首镜 scene 与本组末镜 scene 同场景，
-    // 则请求 Seedance 返回本组尾帧（worker 成功事务内持久化到 ShotGroup.lastFrameUrl），
-    // 以支撑后续「单组→单组」同场景承接；否则不请求，避免无谓的尾帧产物。
-    const successorGroup = await prisma.shotGroup.findFirst({
-      where: { projectId: group.project.id, groupIndex: { gt: group.groupIndex } },
-      orderBy: { groupIndex: 'asc' },
-      include: { shots: { orderBy: { orderIndex: 'asc' }, take: 1, select: { scene: true } } },
-    })
-    const currentLastScene = normScene(group.shots[group.shots.length - 1]?.scene)
-    const successorFirstScene = normScene(successorGroup?.shots?.[0]?.scene)
-    const returnLastFrame =
-      !!successorGroup &&
-      currentLastScene !== '' &&
-      successorFirstScene !== '' &&
-      currentLastScene === successorFirstScene
+    // === 决定是否请求返回尾帧（returnLastFrame，保留向后兼容但不再作为主要衔接机制）===
+    // reference_video 方案下尾帧不再是衔接的核心依据，但仍可请求返回以备不时之需。
+    // 保守策略：始终请求返回尾帧（开销可忽略），持久化到 ShotGroup.lastFrameUrl。
+    const returnLastFrame = true
 
     // 事务内保证一致性：冻结积分（RESERVE）+ 创建 GenerationJob + 组状态置 QUEUED
     // + 组内全部 Shot 置 QUEUED + 持久化 timelineScript（Req 8.3）
@@ -342,9 +314,9 @@ export async function POST(
     }), 'shotGroupReserve')
 
     // 入队 video-generate：携带 shotGroupId（按组任务，无 shotId）
-    // 多模态参考：asset:// 人物锚定 + 场景帧 reference_image + 组音频 reference_audio（无 first_frame）
-    // 同场景承接时 referenceImages 末尾已含前一组受信尾帧、prompt 末尾已含承接指令（见上方承接块）。
-    // returnLastFrame：存在同场景后继组时为 true，使 worker 成功后持久化本组尾帧，支撑 单组→单组 承接。
+    // 多模态参考：asset:// 人物锚定 + 场景帧 reference_image + 组音频 reference_audio
+    // reference_video 衔接：无条件传入前一组视频 URL（有则传，无则 undefined）
+    // returnLastFrame：始终请求返回尾帧（保留向后兼容）
     await videoGenerateQueue.add('video-generate', {
       jobId: job.id,
       shotGroupId: group.id,
@@ -356,6 +328,7 @@ export async function POST(
       resolution,
       referenceImages,
       referenceAudioUrl: groupRef.referenceAudioUrl,
+      referenceVideoUrl: prevGroupVideoUrl ?? undefined,
       returnLastFrame,
     })
 

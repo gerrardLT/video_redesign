@@ -5,9 +5,9 @@ import { checkRateLimit } from '@/lib/rate-limiter'
 
 export const dynamic = 'force-dynamic'
 
-// POST /api/projects/import-link - 通过分享链接导入视频
+// POST /api/projects/import-link - 通过分享链接导入视频（支持纯 URL 或带文案的分享文本）
 const ImportLinkSchema = z.object({
-  url: z.string().min(1, '请输入视频链接').url('请输入有效的链接地址'),
+  url: z.string().min(1, '请输入视频链接'),
   name: z.string().max(100, '项目名称不能超过 100 字').optional(),
 })
 

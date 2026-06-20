@@ -1,12 +1,40 @@
 /**
  * 分镜解析结构 Zod Schema 与时间线修正工具
- * 用于校验 Gemini 返回的 JSON 数据结构，以及自动修复时间线问题
+ * 用于校验 Qwen-VL 返回的 JSON 数据结构，以及自动修复时间线问题
  */
 import { z } from 'zod/v4'
 
 // ========================
 // Schema 定义
 // ========================
+
+/**
+ * 角色外观描述 Schema
+ * 四个维度均为可空字符串，空字符串表示该维度无法识别
+ */
+export const AppearanceDescriptorSchema = z.object({
+  /** 发型描述 */
+  hair: z.string().default(''),
+  /** 服装描述 */
+  clothing: z.string().default(''),
+  /** 配饰描述 */
+  accessories: z.string().default(''),
+  /** 妆容描述 */
+  makeup: z.string().default(''),
+})
+
+/**
+ * 包含外观详情的角色 Schema
+ * 在解析阶段扩展 characters 数组中的角色结构
+ */
+export const CharacterWithAppearanceSchema = z.object({
+  /** 角色名称 */
+  name: z.string(),
+  /** 角色整体外观描述（原有字段） */
+  appearance: z.string(),
+  /** 角色外观四维度详细描述（新增，可选） */
+  appearanceDetail: AppearanceDescriptorSchema.optional(),
+})
 
 /** 单个 Shot 的 Zod Schema */
 export const ShotSchema = z.object({
@@ -24,6 +52,8 @@ export const ShotSchema = z.object({
   characters: z.array(z.object({
     name: z.string(),
     appearance: z.string(),
+    /** 角色外观四维度详细描述（AI 模型可能未返回，故为可选） */
+    appearanceDetail: AppearanceDescriptorSchema.optional(),
   })),
   suggestedPrompt: z.string().min(1).max(1000),
   hasFace: z.boolean(),

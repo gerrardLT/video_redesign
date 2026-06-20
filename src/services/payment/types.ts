@@ -1,6 +1,10 @@
 /**
  * 支付网关类型定义
  * Payment Gateway 抽象层的核心接口与数据类型
+ *
+ * 包含：
+ * - 基础支付（单次支付、回调验证、退款）
+ * - 签约代扣（订阅制周期性扣款、协议管理）
  */
 import { z } from 'zod/v4'
 
@@ -90,6 +94,70 @@ export interface RefundResult {
 }
 
 // ========================
+// 签约代扣 - 创建签约支付参数
+// ========================
+
+export interface CreateContractPaymentParams {
+  /** 商户订单号 */
+  orderNo: string
+  /** 支付金额（分） */
+  amount: number
+  /** 商品描述 */
+  description: string
+  /** 支付渠道 */
+  channel: PaymentChannel
+  /** 回调通知地址 */
+  notifyUrl: string
+  /** 签约配置 */
+  contractConfig: {
+    /** 计费周期类型 */
+    periodType: 'MONTH' | 'YEAR'
+    /** 计费周期数量 */
+    periodCount: number
+    /** 单次扣款上限（分） */
+    singleLimit: number
+    /** 签约到期时间 */
+    contractExpireTime: Date
+  }
+}
+
+// ========================
+// 签约代扣 - 代扣参数
+// ========================
+
+export interface ContractDeductionParams {
+  /** 签约协议编号 */
+  contractId: string
+  /** 扣款订单号 */
+  orderNo: string
+  /** 扣款金额（分） */
+  amount: number
+  /** 扣款描述 */
+  description: string
+}
+
+// ========================
+// 签约代扣 - 订阅回调数据
+// ========================
+
+export interface SubscriptionCallbackData {
+  /** 商户订单号 */
+  orderNo: string
+  /** 支付平台交易号 */
+  transactionId: string
+  /** 支付/扣款状态 */
+  status: 'success' | 'failure'
+  /** 签约协议编号（签约成功时返回） */
+  contractId?: string
+  /** 失败原因 */
+  failReason?: string
+  /** 支付金额（分） */
+  amount: number
+  /** 支付/扣款完成时间 */
+  paidAt: Date
+}
+
+// ========================
 // 支付网关接口
 // ========================
 
@@ -105,4 +173,21 @@ export interface IPaymentGateway {
 
   /** 发起退款 */
   refund(params: RefundParams): Promise<RefundResult>
+
+  /** 创建签约+首期扣款（首次订阅开通） */
+  createContractPayment(
+    params: CreateContractPaymentParams
+  ): Promise<PaymentResult & { contractId?: string }>
+
+  /** 通过签约协议发起代扣（自动续费） */
+  executeContractDeduction(params: ContractDeductionParams): Promise<PaymentResult>
+
+  /** 解除签约协议（取消订阅） */
+  cancelContract(contractId: string): Promise<{ success: boolean }>
+
+  /** 验证签约代扣回调（签约成功/扣款结果/签约解除） */
+  verifyContractCallback(
+    body: unknown,
+    headers: Record<string, string>
+  ): Promise<SubscriptionCallbackData>
 }

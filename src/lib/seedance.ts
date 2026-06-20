@@ -54,9 +54,10 @@ export interface SeedanceCreateParams {
   aspectRatio: string
   resolution: string
   referenceImages?: string[]  // 参考图 URL（role=reference_image，最多9张）
-  lastFrameUrl?: string       // 尾帧图 URL（role=last_frame）
+  referenceVideoUrl?: string  // 参考视频 URL（上一组生成视频，用于镜头衔接）
+  lastFrameUrl?: string       // 尾帧图 URL（role=last_frame，已废弃，保留向后兼容）
   referenceAudioUrl?: string  // 参考音频 URL（role=reference_audio）
-  returnLastFrame?: boolean   // 是否返回尾帧图片（用于链式生成）
+  returnLastFrame?: boolean   // 是否返回尾帧图片（已废弃，保留向后兼容）
 }
 
 export interface SeedanceTaskStatus {
@@ -107,6 +108,11 @@ export async function createSeedanceTask(
     content.push({ type: 'audio_url', audio_url: { url: params.referenceAudioUrl! }, role: 'reference_audio' })
   }
 
+  // 参考视频（上一组生成视频，用于跨组无缝衔接，role=reference_video）
+  if (params.referenceVideoUrl) {
+    content.push({ type: 'video_url', video_url: { url: params.referenceVideoUrl }, role: 'reference_video' })
+  }
+
   // 构建请求体
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestBody: Record<string, any> = {
@@ -125,6 +131,7 @@ export async function createSeedanceTask(
   content.forEach((c, i) => {
     if (c.type === 'image_url') console.log(`[seedance]   content[${i}]: image role=${c.role}, url=${c.image_url.url.substring(0, 60)}...`)
     if (c.type === 'audio_url') console.log(`[seedance]   content[${i}]: audio role=${c.role}, url=${c.audio_url.url.substring(0, 60)}...`)
+    if (c.type === 'video_url') console.log(`[seedance]   content[${i}]: video role=${c.role}, url=${c.video_url.url.substring(0, 60)}...`)
   })
 
   const response = await fetch(`${API_BASE_URL}/contents/generations/tasks`, {

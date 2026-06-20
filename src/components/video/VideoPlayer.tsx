@@ -26,8 +26,19 @@ export function VideoPlayer({ src, poster, className = '' }: VideoPlayerProps) {
     if (!video) return
 
     if (video.paused) {
-      video.play()
-      setIsPlaying(true)
+      // play() 返回 Promise，失败时（如被 pause 中断或资源需重新加载）回退状态
+      const playPromise = video.play()
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true)
+          })
+          .catch(() => {
+            // 播放失败（资源被释放、被中断等）—— 尝试重新加载后播放
+            video.load()
+            video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
+          })
+      }
     } else {
       video.pause()
       setIsPlaying(false)
@@ -58,6 +69,42 @@ export function VideoPlayer({ src, poster, className = '' }: VideoPlayerProps) {
     setIsPlaying(false)
   }, [])
 
+  /**
+   * 处理视频加载/播放错误：自动尝试重新加载（解决长时间挂起后连接断开无法播放的问题）
+   * 浏览器在页面空闲时可能关闭 HTTP Range 连接，导致 <video> 进入 error 状态
+   */
+  const handleError = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+    // 尝试重新加载视频资源
+    const currentPos = video.currentTime
+    video.load()
+    // 加载完成后恢复到之前的播放位置
+    const onLoaded = () => {
+      video.currentTime = currentPos
+      video.removeEventListener('loadedmetadata', onLoaded)
+    }
+    video.addEventListener('loadedmetadata', onLoaded)
+    setIsPlaying(false)
+  }, [])
+
+  /**
+   * 处理视频缓冲停滞：当浏览器 3 秒未收到数据时触发
+   * 通常是连接断开或网络抖动，尝试 load() 恢复
+   */
+  const stalledTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleStalled = useCallback(() => {
+    // 延迟 5 秒后如果仍在 stalled 状态则触发重新加载
+    if (stalledTimerRef.current) clearTimeout(stalledTimerRef.current)
+    stalledTimerRef.current = setTimeout(() => {
+      const video = videoRef.current
+      if (!video || !video.paused) return // 如果已经恢复播放则不处理
+      if (video.readyState < 3) { // HAVE_FUTURE_DATA
+        handleError()
+      }
+    }, 5000)
+  }, [handleError])
+
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -65,13 +112,18 @@ export function VideoPlayer({ src, poster, className = '' }: VideoPlayerProps) {
     video.addEventListener('timeupdate', handleTimeUpdate)
     video.addEventListener('loadedmetadata', handleLoadedMetadata)
     video.addEventListener('ended', handleEnded)
+    video.addEventListener('error', handleError)
+    video.addEventListener('stalled', handleStalled)
 
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate)
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
       video.removeEventListener('ended', handleEnded)
+      video.removeEventListener('error', handleError)
+      video.removeEventListener('stalled', handleStalled)
+      if (stalledTimerRef.current) clearTimeout(stalledTimerRef.current)
     }
-  }, [handleTimeUpdate, handleLoadedMetadata, handleEnded])
+  }, [handleTimeUpdate, handleLoadedMetadata, handleEnded, handleError, handleStalled])
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 

@@ -15,7 +15,7 @@ export function HelpEntryLink({ className }: HelpEntryLinkProps) {
   return (
     <div className={cn('flex items-center justify-center', className)}>
       <Link
-        href="/help"
+        href="/dashboard/help"
         className="group inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm text-[var(--cine-text-2)] transition-colors hover:bg-[var(--cine-surface)] hover:text-[var(--cine-text)]"
       >
         {/* 书本图标 */}

@@ -89,7 +89,35 @@ async function startWorkers() {
     console.error('[Workers] ❌ generate-watchdog Worker 启动失败:', err)
   }
 
-  // 注册所有 Repeatable 定时调度任务（资产清理、过期提醒、订单过期、解析看门狗）
+  try {
+    await import('./upscale-video')
+    console.log('[Workers] ✅ upscale-video Worker 已启动')
+  } catch (err) {
+    console.error('[Workers] ❌ upscale-video Worker 启动失败:', err)
+  }
+
+  try {
+    await import('./subscription-renewal-worker')
+    console.log('[Workers] ✅ subscription-renewal Worker 已启动')
+  } catch (err) {
+    console.error('[Workers] ❌ subscription-renewal Worker 启动失败:', err)
+  }
+
+  try {
+    await import('./subscription-expire-worker')
+    console.log('[Workers] ✅ subscription-expire Worker 已启动')
+  } catch (err) {
+    console.error('[Workers] ❌ subscription-expire Worker 启动失败:', err)
+  }
+
+  try {
+    await import('./concurrency-reconcile')
+    console.log('[Workers] ✅ concurrency-reconcile Worker 已启动')
+  } catch (err) {
+    console.error('[Workers] ❌ concurrency-reconcile Worker 启动失败:', err)
+  }
+
+  // 注册所有 Repeatable 定时调度任务（资产清理、过期提醒、订单过期、解析看门狗、订阅到期、并发对账）
   try {
     const { registerCommercializationSchedules } = await import('../lib/queue')
     await registerCommercializationSchedules()

@@ -76,6 +76,16 @@ export const videoMergeQueue = lazyQueue('video-merge', {
 })
 
 // ========================
+// 视频超分队列
+// ========================
+
+export const videoUpscaleQueue = lazyQueue('video-upscale', {
+  attempts: 1, // 不由 BullMQ 自动重试，Worker 内部实现精细重试逻辑
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
+// ========================
 // 商业化功能队列
 // ========================
 
@@ -138,6 +148,38 @@ export const generateWatchdogQueue = lazyQueue('generate-watchdog', {
 })
 
 // ========================
+// 并发控制相关队列
+// ========================
+
+/** 并发对账队列：定时扫描所有活跃用户，修复 Redis 并发计数器与数据库之间的偏差 */
+export const concurrencyReconcileQueue = lazyQueue('concurrency-reconcile', {
+  attempts: 2,
+  backoff: { type: 'fixed', delay: 5000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
+// ========================
+// 订阅会员相关队列
+// ========================
+
+/** 订阅续费队列：处理到期前自动续费扣款与重试 */
+export const subscriptionRenewalQueue = lazyQueue('subscription-renewal', {
+  attempts: 2,
+  backoff: { type: 'exponential', delay: 5000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
+/** 订阅到期队列：定时扫描并过期超期订阅记录 */
+export const subscriptionExpireQueue = lazyQueue('subscription-expire', {
+  attempts: 2,
+  backoff: { type: 'fixed', delay: 5000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
+// ========================
 // 定时任务调度注册
 // ========================
 
@@ -179,5 +221,19 @@ export async function registerCommercializationSchedules() {
     'scan-stuck-generating',
     {},
     { repeat: { pattern: '*/10 * * * *' } }
+  )
+
+  // 订阅到期检测：每小时全量扫描过期订阅记录
+  await subscriptionExpireQueue.add(
+    'scan-expired-subscriptions',
+    {},
+    { repeat: { pattern: '0 * * * *' } }
+  )
+
+  // 并发对账：每 5 分钟扫描所有活跃用户，修复 Redis 并发计数器偏差
+  await concurrencyReconcileQueue.add(
+    'reconcile-counters',
+    {},
+    { repeat: { pattern: '*/5 * * * *' } }
   )
 }

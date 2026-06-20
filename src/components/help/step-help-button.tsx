@@ -5,17 +5,17 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
 /**
- * 步骤名称到帮助文章 slug 的映射
- * 帮助中心的文章按操作步骤组织
+ * 步骤名称到帮助页面锚点的映射
+ * 帮助中心的教程按 section-{id} 锚点定位各步骤内容
  */
-const STEP_HELP_MAP: { label: string; slug: string }[] = [
-  { label: '上传视频', slug: 'upload-video' },
-  { label: 'AI 解析', slug: 'ai-parsing' },
-  { label: '确认形象', slug: 'confirm-character' },
-  { label: '参考素材', slug: 'reference-assets' },
-  { label: '设置风格', slug: 'set-style' },
-  { label: '生成视频', slug: 'generate-video' },
-  { label: '合并导出', slug: 'export-video' },
+const STEP_HELP_MAP: { label: string; slug: string; sectionId: number }[] = [
+  { label: '上传视频', slug: 'upload-video', sectionId: 2 },
+  { label: 'AI 解析', slug: 'ai-parsing', sectionId: 3 },
+  { label: '确认形象', slug: 'confirm-character', sectionId: 6 },
+  { label: '参考素材', slug: 'reference-assets', sectionId: 4 },
+  { label: '设置风格', slug: 'set-style', sectionId: 5 },
+  { label: '生成视频', slug: 'generate-video', sectionId: 7 },
+  { label: '合并导出', slug: 'export-video', sectionId: 9 },
 ]
 
 /**
@@ -80,7 +80,7 @@ export function StepHelpButton() {
             {STEP_HELP_MAP.map((item) => (
               <li key={item.slug}>
                 <Link
-                  href={`/help/${item.slug}`}
+                  href={`/dashboard/help#section-${item.sectionId}`}
                   className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--cine-text-2)] transition-colors hover:bg-[var(--cine-surface)] hover:text-white"
                   onClick={() => setOpen(false)}
                 >
@@ -105,7 +105,7 @@ export function StepHelpButton() {
           </ul>
           <div className="mt-2 border-t border-[var(--cine-line)] pt-2">
             <Link
-              href="/help"
+              href="/dashboard/help"
               className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--cine-gold)] transition-colors hover:bg-[var(--cine-gold-dim)]"
               onClick={() => setOpen(false)}
             >

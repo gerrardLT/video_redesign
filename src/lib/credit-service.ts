@@ -8,6 +8,10 @@ import { prisma } from './db'
 import { ApiError } from './api-error'
 import { withCreditLock } from './distributed-lock'
 
+// 纯计算函数从 credit-calc.ts 重导出（服务端既有 import 不受影响）
+export { estimateUpscaleCreditCost, estimateCreditCost, estimateParseCreditCost } from './credit-calc'
+export type { UpscaleResolution } from './credit-calc'
+
 // ========================
 // Zod 参数校验 Schema
 // ========================
@@ -22,44 +26,205 @@ const topupInputSchema = z.object({
 export type TopupInput = z.infer<typeof topupInputSchema>
 
 /**
- * 估算积分消耗
- * duration × (resolution === '720p' ? 1.5 : 1.0)，向上取整
- */
-export function estimateCreditCost(duration: number, resolution: string): number {
-  const multiplier = resolution === '720p' ? 1.5 : 1.0
-  return Math.ceil(duration * multiplier)
-}
-
-/**
  * 按组时长与分辨率估算积分消耗
  * 复用 estimateCreditCost 公式：ceil(groupDuration × (resolution === '720p' ? 1.5 : 1.0))
- * 纯函数，按 Shot_Group 总时长而非单个 Shot 结算（Req 8.1、8.7）
+ * 纯函数，按 Shot_Group 总时长而非单个 Shot 结算
  */
 export function estimateGroupCreditCost(groupDuration: number, resolution: string): number {
-  return estimateCreditCost(groupDuration, resolution)
+  const multiplier = resolution === '720p' ? 1.5 : 1.0
+  return Math.ceil(groupDuration * multiplier)
 }
 
 /**
- * 估算解析阶段积分消耗
+ * 解析前积分冻结（RESERVE，真实扣减余额 + 写流水）
  *
- * 解析消耗的外部资源为 AI 多模态视频直传分析（成本随时长增长）。
- * 公式：ceil(duration × 0.5)。
+ * 与生成阶段 reserveCredits 同模型：入队后、消耗外部资源前真实冻结积分，
+ * 消除「解析期间余额被其他操作花光→成功后扣费失败→白消耗外部资源」的并发竞态。
  *
- * @param duration 视频时长（秒）
+ * 解析成功时由 chargeParseCreditsFromReserve 记账（余额不再二次变动）；
+ * 解析失败时由 refundParseCredits 退还冻结积分。
+ *
+ * 幂等：按 projectId 关联 RESERVE 流水，重试时已存在则跳过（不重复冻结）。
+ *
+ * @param userId 用户 ID
+ * @param projectId 项目 ID（作为幂等键）
+ * @param amount 冻结额度
  */
-export function estimateParseCreditCost(duration: number): number {
-  return Math.ceil(duration * 0.5)
+export async function freezeParseCredits(
+  userId: string,
+  projectId: string,
+  amount: number
+): Promise<void> {
+  await withCreditLock(() =>
+    prisma.$transaction(async (tx) => {
+      // 幂等：已存在该 projectId 的 RESERVE 则跳过（重试场景）
+      const existing = await tx.creditLedger.findFirst({
+        where: { projectId, action: 'RESERVE' },
+      })
+      if (existing) return
+
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+      if (user.creditBalance < amount) {
+        throw new ApiError(
+          'INSUFFICIENT_CREDITS',
+          `积分不足：解析需 ${amount} 积分，当前余额 ${user.creditBalance}`,
+          402
+        )
+      }
+      const newBalance = user.creditBalance - amount
+      await tx.user.update({
+        where: { id: userId },
+        data: { creditBalance: newBalance },
+      })
+      await tx.creditLedger.create({
+        data: {
+          userId,
+          projectId,
+          action: 'RESERVE',
+          amount: -amount,
+          balanceAfter: newBalance,
+          remark: `解析冻结 ${amount} 积分`,
+        },
+      })
+    })
+  , 'freezeParseCredits')
 }
 
 /**
- * 解析前余额预检（对齐生成阶段「先校验、不允许欠费」的扣费哲学）
+ * 解析成功记账（CHARGE，基于已有 RESERVE，余额不再二次变动）
  *
- * 在消耗任何外部资源（FFmpeg Normalize / OSS 上传 / AI 多模态分析）之前调用：
- * 校验用户余额是否足以支付预估解析成本，不足则抛 ApiError('INSUFFICIENT_CREDITS')
- * 拒绝继续，绝不进入后续外部资源消耗、绝不事后兜底扣至 0 让零余额用户白嫖。
+ * 在 Prisma 事务中写入 CHARGE 流水（projectId 关联）。
+ * 余额已在 freezeParseCredits 时扣减，此处仅记账。
+ * 幂等：已存在该 projectId 的 CHARGE 记录则跳过。
  *
- * 解析采用「成功路径单点扣费」模型：本预检为入口闸门，实际扣减在解析成功事务内由
- * chargeParseCreditsTx 一次性完成（仍二次校验余额），二者共同保证不欠费。
+ * @param tx Prisma 事务客户端（与置 EDITABLE 同事务）
+ * @param userId 用户 ID
+ * @param projectId 项目 ID
+ * @param amount 扣费额度
+ */
+export async function chargeParseCreditsFromReserve(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  projectId: string,
+  amount: number
+): Promise<void> {
+  // 幂等：已扣费则跳过
+  const existing = await tx.creditLedger.findFirst({
+    where: { projectId, action: 'CHARGE' },
+  })
+  if (existing) return
+
+  const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+  await tx.creditLedger.create({
+    data: {
+      userId,
+      projectId,
+      action: 'CHARGE',
+      amount: -amount,
+      balanceAfter: user.creditBalance, // 余额在 RESERVE 时已扣，此处不再变动
+      remark: `解析扣费 ${amount} 积分`,
+    },
+  })
+}
+
+/**
+ * 解析失败退还冻结积分（REFUND，按 projectId 幂等）
+ *
+ * @param userId 用户 ID
+ * @param projectId 项目 ID
+ * @param amount 退还额度
+ */
+export async function refundParseCredits(
+  userId: string,
+  projectId: string,
+  amount: number
+): Promise<void> {
+  await withCreditLock(() =>
+    prisma.$transaction(async (tx) => {
+      // 幂等：已有该 projectId 的 REFUND 则跳过
+      const existing = await tx.creditLedger.findFirst({
+        where: { projectId, action: 'REFUND' },
+      })
+      if (existing) return
+
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+      const newBalance = user.creditBalance + amount
+      await tx.user.update({
+        where: { id: userId },
+        data: { creditBalance: newBalance },
+      })
+      await tx.creditLedger.create({
+        data: {
+          userId,
+          projectId,
+          action: 'REFUND',
+          amount,
+          balanceAfter: newBalance,
+          remark: `解析失败退还 ${amount} 积分`,
+        },
+      })
+    })
+  , 'refundParseCredits')
+}
+
+/**
+ * 导出阶段积分冻结（RESERVE，按 projectId 关联，无 jobId 外键）
+ *
+ * 与 freezeParseCredits 同模型：入队前真实冻结积分，成功时由 merge Worker 记账，失败时退还。
+ * 幂等：按 projectId + action='RESERVE' + remark 含「导出」关键字 去重，重试不重复冻结。
+ *
+ * 注意：不能使用 reserveCredits（该函数写 jobId 字段，有 GenerationJob 外键约束），
+ * 导出阶段无 GenerationJob，必须走 projectId 关联。
+ *
+ * @param userId 用户 ID
+ * @param projectId 项目 ID（幂等键）
+ * @param amount 冻结额度
+ */
+export async function freezeExportCredits(
+  userId: string,
+  projectId: string,
+  amount: number
+): Promise<void> {
+  await withCreditLock(() =>
+    prisma.$transaction(async (tx) => {
+      // 幂等：已存在该 projectId 的导出 RESERVE 则跳过（重试场景）
+      const existing = await tx.creditLedger.findFirst({
+        where: { projectId, action: 'RESERVE', remark: { contains: '导出' } },
+      })
+      if (existing) return
+
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+      if (user.creditBalance < amount) {
+        throw new ApiError(
+          'INSUFFICIENT_CREDITS',
+          `积分不足：导出超分需 ${amount} 积分，当前余额 ${user.creditBalance}`,
+          402
+        )
+      }
+      const newBalance = user.creditBalance - amount
+      await tx.user.update({
+        where: { id: userId },
+        data: { creditBalance: newBalance },
+      })
+      await tx.creditLedger.create({
+        data: {
+          userId,
+          projectId,
+          action: 'RESERVE',
+          amount: -amount,
+          balanceAfter: newBalance,
+          remark: `导出超分冻结 ${amount} 积分`,
+        },
+      })
+    })
+  , 'freezeExportCredits')
+}
+
+/**
+ * 解析前余额预检（仅校验，不冻结）——供 API 入口快速拒绝余额为 0 的请求
+ *
+ * 真实冻结由 Worker 内的 freezeParseCredits 执行（拿到精确视频时长后）。
+ * 本函数仅作前端/API 层的快速卡死入口，防止明显余额为 0 的用户进入队列。
  *
  * @param client Prisma 客户端或事务客户端（仅需 user.findUniqueOrThrow）
  * @param userId 用户 ID

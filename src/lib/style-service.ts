@@ -124,11 +124,26 @@ export async function buildStylePrompt(projectId: string): Promise<string> {
 
   const parts: string[] = []
 
+  // 优先从模板读画风前缀
   if (config.template?.promptPrefix) {
     parts.push(config.template.promptPrefix)
   }
 
-  if (config.customDescription) {
+  // 从结构化设定中提取 artStyle（精确的画风关键词，如"古风仙侠3D写实，CG高清渲染"）
+  if (config.structuredStyle) {
+    try {
+      const structured = JSON.parse(config.structuredStyle as string) as { artStyle?: string; colorTone?: string }
+      if (structured.artStyle?.trim()) {
+        parts.push(structured.artStyle.trim())
+      }
+    } catch {
+      // structuredStyle 解析失败，回退到 customDescription
+      if (config.customDescription) {
+        parts.push(config.customDescription)
+      }
+    }
+  } else if (config.customDescription) {
+    // 无结构化数据时用扁平文本兜底
     parts.push(config.customDescription)
   }
 

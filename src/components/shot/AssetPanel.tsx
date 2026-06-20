@@ -1,6 +1,16 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface Asset {
   id: string
@@ -56,14 +66,21 @@ export default function AssetPanel({
   const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [clearingAll, setClearingAll] = useState(false)
+  const [showClearAllDialog, setShowClearAllDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const displayNumbers = computeDisplayNumbers(assets)
 
   // 清空全部素材
-  const handleClearAll = useCallback(async () => {
-    if (!confirm('确定要清空全部素材吗？此操作不可撤销。')) return
+  const handleClearAll = useCallback(() => {
+    setShowClearAllDialog(true)
+  }, [])
 
+  // 确认清空全部素材
+  const confirmClearAll = useCallback(async () => {
+    setShowClearAllDialog(false)
     setClearingAll(true)
     try {
       for (const asset of assets) {
@@ -158,12 +175,19 @@ export default function AssetPanel({
   }, [projectId, onUpdate])
 
   // 删除素材
-  const handleDelete = useCallback(async (assetId: string) => {
-    if (!confirm('确定要删除此素材吗？')) return
+  const handleDelete = useCallback((assetId: string) => {
+    setPendingDeleteId(assetId)
+    setShowDeleteDialog(true)
+  }, [])
 
-    setDeleting(assetId)
+  // 确认删除单个素材
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDeleteId) return
+    setShowDeleteDialog(false)
+
+    setDeleting(pendingDeleteId)
     try {
-      const res = await fetch(`/api/assets/${assetId}`, {
+      const res = await fetch(`/api/assets/${pendingDeleteId}`, {
         method: 'DELETE',
       })
       if (res.ok) {
@@ -173,8 +197,9 @@ export default function AssetPanel({
       console.error('删除素材失败:', error)
     } finally {
       setDeleting(null)
+      setPendingDeleteId(null)
     }
-  }, [onUpdate])
+  }, [pendingDeleteId, onUpdate])
 
   // 点击素材插入 [图N]
   const handleAssetClick = useCallback((assetId: string) => {
@@ -271,6 +296,42 @@ export default function AssetPanel({
           })}
         </div>
       )}
+
+      {/* 清空全部素材确认对话框 */}
+      <AlertDialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>清空全部素材</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要清空全部素材吗？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowClearAllDialog(false)}>取消</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmClearAll}>
+              确认清空
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 删除单个素材确认对话框 */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除素材</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除此素材吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowDeleteDialog(false); setPendingDeleteId(null) }}>取消</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmDelete}>
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

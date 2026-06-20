@@ -3,8 +3,9 @@
  * 负责资产过期检测、批量标记、文件清理和统计查询
  *
  * 核心规则：
- * - 只有 type='AI_GENERATED' 的资产才设置过期时间
- * - 过期判断：expiresAt <= now() AND status != 'EXPIRED'
+ * - 永久资产保护：category 有值的资产视为永久资产，不设置过期时间、不续期
+ * - 只有 type='AI_GENERATED' 且 category 为空的资产才设置过期时间
+ * - 过期判断：expiresAt IS NOT NULL AND expiresAt <= now() AND status != 'EXPIRED'
  * - 文件清理先标记状态再删除文件（确保即使删除失败也不会重复处理）
  * - 批量处理避免一次性加载过多数据
  */
@@ -60,8 +61,9 @@ export interface CleanupResult {
 
 /**
  * 为资产设置过期时间
- * 仅对 type='AI_GENERATED' 的资产生效
- * expiresAt = createdAt + days 天
+ * - 永久资产保护：category 有值的资产跳过过期设置
+ * - 仅对 type='AI_GENERATED' 的资产生效
+ * - expiresAt = createdAt + days 天
  */
 export async function setExpiry(
   assetId: string,
@@ -75,6 +77,12 @@ export async function setExpiry(
 
   if (!asset) {
     throw new Error(`资产不存在: ${params.assetId}`)
+  }
+
+  // 永久资产保护：category 有值则跳过过期设置
+  if (asset.category) {
+    logger.info('永久资产，跳过过期设置', { assetId: params.assetId, category: asset.category })
+    return
   }
 
   if (asset.type !== 'AI_GENERATED') {
@@ -96,8 +104,9 @@ export async function setExpiry(
 }
 
 /**
- * 查询已过期但未标记删除的资产列表
- * 过期判断：expiresAt <= now() AND status != 'EXPIRED'
+ * 查询已过期但未标记删除的资产列表（排除永久资产）
+ * - 排除永久资产：expiresAt 为 null 的记录不会被扫描
+ * - 过期判断：expiresAt IS NOT NULL AND expiresAt <= now() AND status != 'EXPIRED'
  */
 export async function getExpiredAssets(batchSize: number = 100) {
   const params = getExpiredAssetsSchema.parse({ batchSize })
@@ -106,7 +115,10 @@ export async function getExpiredAssets(batchSize: number = 100) {
 
   const assets = await prisma.asset.findMany({
     where: {
-      expiresAt: { lte: now },
+      expiresAt: {
+        not: null,   // 排除永久资产（expiresAt 为 null 的记录）
+        lte: now,    // 已过期
+      },
       status: { not: 'EXPIRED' },
     },
     take: params.batchSize,
@@ -262,7 +274,8 @@ export function isAssetExpired(expiresAt: Date | null): boolean {
 
 /**
  * 续期资产：从当前时间起重新延长有效期
- * 仅对 status != 'EXPIRED' 的资产生效（已清理的无法续期）。
+ * - 永久资产无需续期：category 有值的资产跳过续期
+ * - 仅对 status != 'EXPIRED' 的资产生效（已清理的无法续期）
  *
  * @param assetId 资产 ID
  * @param days 续期天数（默认 14 天）
@@ -277,6 +290,12 @@ export async function renewExpiry(assetId: string, days: number = 14): Promise<v
 
   if (asset.status === 'EXPIRED') {
     throw new Error(`资产已过期清理，无法续期: ${assetId}`)
+  }
+
+  // 永久资产无需续期
+  if (asset.category) {
+    logger.info('永久资产，跳过续期', { assetId, category: asset.category })
+    return
   }
 
   if (asset.type !== 'AI_GENERATED') {

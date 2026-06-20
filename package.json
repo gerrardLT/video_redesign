@@ -78,5 +78,8 @@
       "prisma",
       "sharp"
     ]
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

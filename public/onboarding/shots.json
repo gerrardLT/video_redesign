@@ -1,0 +1,20 @@
+[
+  {
+    "order": 1,
+    "prompt": "一只金色拉布拉多在阳光下奔跑",
+    "duration": 3,
+    "coverUrl": "/onboarding/assets/shot-1-cover.jpg"
+  },
+  {
+    "order": 2,
+    "prompt": "切换为近景，狗狗转头看向镜头微笑",
+    "duration": 4,
+    "coverUrl": "/onboarding/assets/shot-2-cover.jpg"
+  },
+  {
+    "order": 3,
+    "prompt": "慢镜头，狗狗在草地上打滚",
+    "duration": 3,
+    "coverUrl": "/onboarding/assets/shot-3-cover.jpg"
+  }
+]

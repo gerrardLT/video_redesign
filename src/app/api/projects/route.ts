@@ -29,12 +29,12 @@ export async function POST(request: NextRequest) {
 
     const { name, videoFileName, videoDuration } = parsed.data
 
-    // 创建项目记录
+    // 创建项目记录（初始状态 UPLOADING，并发检查不含此状态，避免上传阶段就占用 parse 并发额度）
     const project = await prisma.project.create({
       data: {
         userId,
         name,
-        status: 'PARSING',
+        status: 'UPLOADING',
         duration: videoDuration,
       },
     })
@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
       name: p.name,
       coverUrl: p.coverUrl,
       status: p.status,
+      isSample: p.isSample,
       createdAt: p.createdAt.toISOString(),
       shotCount: p._count.shots,
       completedCount: p.shots.length,

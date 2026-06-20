@@ -74,7 +74,7 @@ export async function GET(
 
     // 分镜组数据：兼容新旧两种模式
     // 旧模式：解析阶段创建了 ShotGroup，前端通过 shotGroups 嵌套展示
-    // 新模式（Gemini 帧分析）：解析阶段不创建 ShotGroup，Shot.shotGroupId = null
+    // 新模式（Qwen-VL 帧分析）：解析阶段不创建 ShotGroup，Shot.shotGroupId = null
     // 兼容策略：如果 shotGroups 为空但存在未分组的 Shot，按 ≤15s 虚拟分组返回
     let shotGroupsResponse = project.shotGroups.map((g) => ({
       id: g.id,

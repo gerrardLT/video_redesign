@@ -24,11 +24,14 @@ model User {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   lastLoginAt   DateTime? @map("last_login_at")
 
-  projects      Project[]
-  jobs          GenerationJob[]
-  ledger        CreditLedger[]
-  orders        PackageOrder[]
-  notifications Notification[]
+  projects           Project[]
+  jobs               GenerationJob[]
+  ledger             CreditLedger[]
+  orders             PackageOrder[]
+  notifications      Notification[]
+  onboardingProgress OnboardingProgress?
+  subscriptionRecords SubscriptionRecord[]
+  subscriptionOrders  SubscriptionOrder[]
 
   @@map("users")
 }
@@ -42,12 +45,21 @@ model Project {
   name        String
   videoUrl    String?  @map("video_url")
   coverUrl    String?  @map("cover_url")
-  status      String   @default("PARSING") // DOWNLOADING|PARSING|EDITABLE|GENERATING|EXPORTED|MERGE_FAILED|FAILED（MERGE_FAILED：合并失败，区别于生成 FAILED，可只重试合并）
+  status      String   @default("UPLOADING") // UPLOADING|DOWNLOADING|PARSING|EDITABLE|GENERATING|EXPORTED|MERGE_FAILED|FAILED
   duration    Float?
   aspectRatio String?  @map("aspect_ratio")
   errorMsg    String?  @map("error_msg")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // 导出超分相关字段
+  exportStatus     String?   @map("export_status") // MERGING | UPSCALING | COMPLETED | FAILED
+  exportResolution String?   @map("export_resolution") // 480p | 720p | 1080p
+  exportVideoUrl   String?   @map("export_video_url") // 最终导出视频 URL
+  exportError      String?   @map("export_error") // 导出失败原因
+  exportCreatedAt  DateTime? @map("export_created_at") // 导出任务创建时间
+
+  isSample Boolean @default(false) @map("is_sample") // 标记是否为新手引导示例项目
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   shots       Shot[]
@@ -79,8 +91,9 @@ model Shot {
   genStatus   String   @default("PENDING") @map("gen_status") // PENDING|QUEUED|GENERATING|SUCCEEDED|FAILED|CANCELED
   genVideoUrl String?  @map("gen_video_url")
   hasFace     Boolean  @default(true) @map("has_face")
-  shotGroupId String?  @map("shot_group_id") // 新增可空：归属的分镜组
-  createdAt   DateTime @default(now()) @map("created_at")
+  shotGroupId          String?  @map("shot_group_id") // 新增可空：归属的分镜组
+  characterAppearances String?  @map("character_appearances") // 角色外观描述 JSON，格式: [{name: string, appearance: {hair, clothing, accessories, makeup}}]
+  createdAt            DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   project    Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -112,14 +125,15 @@ model ShotGroup {
   clipVideoUrl   String?  @map("clip_video_url") // 按组裁切的视频片段 OSS URL（修复风险14）
   timelineScript String?  @map("timeline_script") // 最近一次合并的 Timeline_Script 快照
   scriptEdited   Boolean  @default(false) @map("script_edited") // 用户是否手动编辑过脚本：true 固定复用 timelineScript；false 每次按最新规则重合并（含对白/台词）
-  scriptHash     String?  @map("script_hash")     // 最近一次生成请求的幂等哈希
+  scriptHash     String?  @map("script_hash") // 最近一次生成请求的幂等哈希
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  shots   Shot[]
-  jobs    GenerationJob[]
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  shots           Shot[]
+  jobs            GenerationJob[]
   groupCharacters ShotGroupCharacter[]
+  versions        GenerationVersion[] // 版本历史反向关系
 
   @@unique([projectId, groupIndex])
   @@index([projectId])
@@ -132,13 +146,13 @@ model ShotGroup {
 // 生成时仅注入本组选中人物的锚定图作 reference_image
 // ========================
 model ShotGroupCharacter {
-  id          String   @id @default(cuid())
-  shotGroupId String   @map("shot_group_id")
-  characterId String   @map("character_id")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id               String   @id @default(cuid())
+  shotGroupId      String   @map("shot_group_id")
+  characterId      String   @map("character_id")
+  createdAt        DateTime @default(now()) @map("created_at")
 
-  shotGroup ShotGroup @relation(fields: [shotGroupId], references: [id], onDelete: Cascade)
-  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  shotGroup      ShotGroup       @relation(fields: [shotGroupId], references: [id], onDelete: Cascade)
+  character      Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
 
   @@unique([shotGroupId, characterId])
   @@index([shotGroupId])
@@ -156,14 +170,14 @@ model Character {
   appearance     String?
   enabled        Boolean  @default(true)
   imageUrl       String?  @map("image_url")
-  avatarAssetUrl String?  @map("avatar_asset_url")   // asset://asset-xxxxx 格式
-  avatarGroupId  String?  @map("avatar_group_id")    // 素材组 ID
-  avatarAssetId  String?  @map("avatar_asset_id")    // 素材 ID
+  avatarAssetUrl String?  @map("avatar_asset_url") // asset://asset-xxxxx 格式
+  avatarGroupId  String?  @map("avatar_group_id") // 素材组 ID
+  avatarAssetId  String?  @map("avatar_asset_id") // 素材 ID
   avatarStatus   String   @default("NONE") @map("avatar_status") // NONE | REGISTERING | ACTIVE | FAILED
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project    Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   groupLinks ShotGroupCharacter[]
 
   @@index([projectId])
@@ -171,13 +185,15 @@ model Character {
 }
 
 // ========================
-// 素材表
+// 素材表（资产库扩展：支持用户级跨项目资产管理）
 // ========================
 model Asset {
   id           String    @id @default(cuid())
-  projectId    String    @map("project_id")
+  projectId    String?   @map("project_id") // 可选：用户级资产可不绑定项目
   userId       String    @map("user_id")
   type         String // CHARACTER_IMAGE | UPLOADED_IMAGE | AI_GENERATED
+  category     String?   @map("category") // 资产库分类: CHARACTER | MATERIAL | AUDIO
+  displayName  String?   @map("display_name") // 资产显示名称（用于搜索和展示）
   url          String
   thumbUrl     String?   @map("thumb_url")
   fileName     String?   @map("file_name")
@@ -189,10 +205,12 @@ model Asset {
   expiresAt    DateTime? @map("expires_at") // 过期时间，AI 生成资产创建时设置为 +14 天
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project    Project?    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   shotAssets ShotAsset[]
 
   @@index([projectId])
+  @@index([userId]) // 按用户查询索引
+  @@index([userId, category]) // 按用户+分类复合索引
   @@map("assets")
 }
 
@@ -228,7 +246,7 @@ model GenerationJob {
   assetSnapshot  String?  @map("asset_snapshot") // JSON 字符串
   duration       Int      @default(5)
   aspectRatio    String   @default("16:9") @map("aspect_ratio")
-  resolution     String   @default("720p")
+  resolution     String   @default("480p")
   seedanceTaskId String?  @map("seedance_task_id")
   resultVideoUrl String?  @map("result_video_url")
   errorCode      String?  @map("error_code")
@@ -238,10 +256,11 @@ model GenerationJob {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  user   User           @relation(fields: [userId], references: [id])
-  shot   Shot?          @relation(fields: [shotId], references: [id], onDelete: SetNull)
-  shotGroup ShotGroup?  @relation(fields: [shotGroupId], references: [id], onDelete: SetNull)
-  ledger CreditLedger[]
+  user      User               @relation(fields: [userId], references: [id])
+  shot      Shot?              @relation(fields: [shotId], references: [id], onDelete: SetNull)
+  shotGroup ShotGroup?         @relation(fields: [shotGroupId], references: [id], onDelete: SetNull)
+  ledger    CreditLedger[]
+  version   GenerationVersion? // 版本历史反向关系（1:1，一个 job 最多产生一个 version）
 
   @@index([userId])
   @@index([shotId])
@@ -254,25 +273,28 @@ model GenerationJob {
 // 积分流水表
 // ========================
 model CreditLedger {
-  id           String   @id @default(cuid())
-  userId       String   @map("user_id")
-  jobId        String?  @map("job_id")
-  orderId      String?  @map("order_id") // 充值订单关联
-  projectId    String?  @map("project_id") // 解析阶段扣费关联（无 GenerationJob 时使用）
-  action       String // RESERVE | CHARGE | REFUND | TOPUP | ADMIN_ADJUST
-  amount       Int // 正数为增加，负数为减少
-  balanceAfter Int      @map("balance_after")
-  remark       String?
-  createdAt    DateTime @default(now()) @map("created_at")
+  id                  String   @id @default(cuid())
+  userId              String   @map("user_id")
+  jobId               String?  @map("job_id")
+  orderId             String?  @map("order_id") // 充值订单关联
+  projectId           String?  @map("project_id") // 解析阶段扣费关联（无 GenerationJob 时使用）
+  subscriptionOrderId String?  @map("subscription_order_id") // 订阅积分发放关联
+  action              String // RESERVE | CHARGE | REFUND | TOPUP | ADMIN_ADJUST | SUBSCRIPTION_GRANT
+  amount              Int // 正数为增加，负数为减少
+  balanceAfter        Int      @map("balance_after")
+  remark              String?
+  createdAt           DateTime @default(now()) @map("created_at")
 
-  user  User           @relation(fields: [userId], references: [id])
-  job   GenerationJob? @relation(fields: [jobId], references: [id])
-  order PackageOrder?  @relation(fields: [orderId], references: [id])
+  user              User               @relation(fields: [userId], references: [id])
+  job               GenerationJob?     @relation(fields: [jobId], references: [id])
+  order             PackageOrder?      @relation(fields: [orderId], references: [id])
+  subscriptionOrder SubscriptionOrder? @relation(fields: [subscriptionOrderId], references: [id])
 
   @@index([userId])
   @@index([jobId])
   @@index([orderId])
   @@index([projectId])
+  @@index([subscriptionOrderId])
   @@map("credit_ledger")
 }
 
@@ -328,7 +350,7 @@ model StyleConfig {
   projectId         String   @unique @map("project_id")
   templateId        String?  @map("template_id")
   customDescription String?  @map("custom_description") // 扁平文本版风格描述（向后兼容 merger 读取）
-  structuredStyle   String?  @map("structured_style")   // 结构化 JSON：{artStyle, colorTone, characters: [{name, appearance, props}], subtitleDeclaration}
+  structuredStyle   String?  @map("structured_style") // 结构化 JSON：{artStyle, colorTone, characters: [{name, appearance, props}], subtitleDeclaration}
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -375,7 +397,6 @@ model Notification {
   @@map("notifications")
 }
 
-
 // ========================
 // 案例展示表
 // ========================
@@ -420,15 +441,15 @@ model HelpArticle {
 // 内容安全审核记录表
 // ========================
 model ContentSafetyLog {
-  id           String    @id @default(cuid())
-  assetId      String    @map("asset_id")
-  userId       String    @map("user_id")
-  checkType    String    @default("face_detection") @map("check_type") // face_detection
-  result       String // pass | reject | error
-  detail       String? // JSON detail from API
-  reviewedBy   String?   @map("reviewed_by") // admin userId if manually reviewed
-  reviewedAt   DateTime? @map("reviewed_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  id         String    @id @default(cuid())
+  assetId    String    @map("asset_id")
+  userId     String    @map("user_id")
+  checkType  String    @default("face_detection") @map("check_type") // face_detection
+  result     String // pass | reject | error
+  detail     String? // JSON detail from API
+  reviewedBy String?   @map("reviewed_by") // admin userId if manually reviewed
+  reviewedAt DateTime? @map("reviewed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   @@index([assetId])
   @@index([userId])
@@ -456,3 +477,136 @@ model VideoDownloadTask {
   @@index([status])
   @@map("video_download_tasks")
 }
+
+// ========================
+// 生成版本记录表
+// 每条记录对应一次成功的视频生成结果快照，用于版本历史管理
+// ========================
+model GenerationVersion {
+  id              String   @id @default(cuid())
+  shotGroupId     String   @map("shot_group_id")
+  generationJobId String   @unique @map("generation_job_id")
+  versionNumber   Int      @map("version_number") // 组内顺序号，从 1 开始递增
+  videoUrl        String   @map("video_url") // OSS 视频 URL
+  coverUrl        String?  @map("cover_url") // 封面 URL
+  lastFrameUrl    String?  @map("last_frame_url") // 尾帧 URL
+  promptSnapshot  String   @map("prompt_snapshot") // 生成时使用的完整 prompt
+  costEstimate    Int      @map("cost_estimate") // 本次生成消耗的积分
+  isCurrent       Boolean  @default(false) @map("is_current") // 是否为当前使用版本
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  shotGroup     ShotGroup     @relation(fields: [shotGroupId], references: [id], onDelete: Cascade)
+  generationJob GenerationJob @relation(fields: [generationJobId], references: [id])
+
+  @@unique([shotGroupId, versionNumber])
+  @@index([shotGroupId])
+  @@index([generationJobId])
+  @@map("generation_versions")
+}
+
+// ========================
+// 新手引导进度表
+// 存储每个用户的引导步骤完成/跳过状态，用于跨设备同步引导进度
+// ========================
+model OnboardingProgress {
+  id                String   @id @default(cuid())
+  userId            String   @unique @map("user_id")
+  welcomeWizard     String   @default("NOT_COMPLETED") @map("welcome_wizard") // 欢迎向导步骤状态
+  sampleProject     String   @default("NOT_COMPLETED") @map("sample_project") // 示例项目创建步骤状态
+  dashboardTooltip  String   @default("NOT_COMPLETED") @map("dashboard_tooltip") // Dashboard 提示引导状态
+  editorGuide       String   @default("NOT_COMPLETED") @map("editor_guide") // 编辑器引导状态
+  firstProjectGuide String   @default("NOT_COMPLETED") @map("first_project_guide") // 首次创建项目引导状态
+  rewardGranted     Boolean  @default(false) @map("reward_granted") // 是否已发放完成奖励
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_progress")
+}
+
+
+// ========================
+// 订阅套餐定义表（种子数据）
+// ========================
+model SubscriptionPlan {
+  id             String   @id @default(cuid())
+  name           String // 月卡会员、年卡会员
+  type           String // monthly | yearly
+  price          Int // 价格（分）：月卡2990，年卡24900
+  monthlyCredits Int      @map("monthly_credits") // 每月到账积分：500
+  bonusCredits   Int      @default(0) @map("bonus_credits") // 额外奖励积分（年卡1000）
+  description    String?
+  privileges     String // JSON: 特权描述列表
+  sortOrder      Int      @default(0) @map("sort_order")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  records SubscriptionRecord[]
+  orders  SubscriptionOrder[]
+
+  @@map("subscription_plans")
+}
+
+// ========================
+// 用户订阅记录表
+// ========================
+model SubscriptionRecord {
+  id                  String    @id @default(cuid())
+  userId              String    @map("user_id")
+  planId              String    @map("plan_id")
+  status              String    @default("ACTIVE") // ACTIVE | CANCELED | EXPIRED
+  renewalType         String    @default("AUTO") @map("renewal_type") // AUTO | MANUAL | CANCELED
+  contractId          String?   @map("contract_id") // 支付平台签约协议编号
+  payMethod           String    @map("pay_method") // wechat | alipay
+  startDate           DateTime  @map("start_date") // 订阅开始日期
+  endDate             DateTime  @map("end_date") // 当期到期日期
+  lastRenewalDate     DateTime? @map("last_renewal_date") // 最近一次续费日期
+  totalCreditsGranted Int       @default(0) @map("total_credits_granted") // 累计已发放积分
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  user   User               @relation(fields: [userId], references: [id])
+  plan   SubscriptionPlan   @relation(fields: [planId], references: [id])
+  orders SubscriptionOrder[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([endDate])
+  @@map("subscription_records")
+}
+
+// ========================
+// 订阅订单表
+// ========================
+model SubscriptionOrder {
+  id            String    @id @default(cuid())
+  userId        String    @map("user_id")
+  planId        String    @map("plan_id")
+  recordId      String?   @map("record_id") // 续费时关联已有记录
+  type          String // FIRST_SUBSCRIBE | RENEWAL | MANUAL_RENEWAL
+  amount        Int // 支付金额（分）
+  credits       Int // 本次应发放积分
+  status        String    @default("PENDING") // PENDING | PAID | FAILED | EXPIRED
+  payMethod     String    @map("pay_method") // wechat | alipay
+  transactionId String?   @map("transaction_id") // 支付平台交易号
+  contractId    String?   @map("contract_id") // 签约协议编号
+  paidAt        DateTime? @map("paid_at")
+  expireAt      DateTime  @map("expire_at") // 订单超时时间（30分钟）
+  failReason    String?   @map("fail_reason") // 扣款失败原因
+  retryCount    Int       @default(0) @map("retry_count") // 扣款重试次数
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user          User                @relation(fields: [userId], references: [id])
+  plan          SubscriptionPlan    @relation(fields: [planId], references: [id])
+  record        SubscriptionRecord? @relation(fields: [recordId], references: [id])
+  creditLedgers CreditLedger[]
+
+  @@index([userId])
+  @@index([recordId])
+  @@index([status])
+  @@map("subscription_orders")
+}
+
+

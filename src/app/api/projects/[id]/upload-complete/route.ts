@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
 import { prisma } from '@/lib/db'
 import { estimateParseCreditCost, getBalance } from '@/lib/credit-service'
+import { getUserPrivileges } from '@/lib/privilege-engine'
+import { buildRejectionResponse } from '@/lib/concurrency-controller'
+import { scheduleWithPriority } from '@/lib/priority-scheduler'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +49,20 @@ export async function POST(
       )
     }
 
+    // 并发控制：P0 修复——改为 DB 查询门控（与 generate 路由一致），
+    // 不再使用 Redis 原子计数器（checkAndIncrement），消除 Worker 完成后未 decrement 导致的计数漂移。
+    // DB 是唯一真相源：项目状态变更（EDITABLE/FAILED）时并发额度自然释放。
+    const privileges = await getUserPrivileges(userId)
+    const activeParseCount = await prisma.project.count({
+      where: { userId, status: { in: ['DOWNLOADING', 'PARSING'] } },
+    })
+    if (activeParseCount >= privileges.concurrency.parse) {
+      return NextResponse.json(
+        buildRejectionResponse(privileges.tier, 'parse', privileges.concurrency.parse),
+        { status: 429 }
+      )
+    }
+
     // 更新项目 videoUrl（存 OSS 公网 URL）
     await prisma.project.update({
       where: { id },
@@ -56,12 +73,24 @@ export async function POST(
     // 如果没有 localUrl，降级使用 videoUrl（兼容旧逻辑，只有本地路径才能被 FFmpeg 处理）
     const parseVideoUrl = parsed.data.localUrl || parsed.data.videoUrl
 
-    // 添加解析任务到队列；入队失败时不静默吞掉，标记项目 FAILED 并返回错误
+    // 带优先级的解析任务入队；入队失败时不静默吞掉，标记项目 FAILED 并返回错误
     try {
       const { videoParseQueue } = await import('@/lib/queue')
-      await videoParseQueue.add('parse-video', {
-        projectId: id,
-        videoUrl: parseVideoUrl,
+      await scheduleWithPriority(
+        videoParseQueue,
+        'parse-video',
+        { projectId: id, videoUrl: parseVideoUrl },
+        privileges.tier,
+        {
+          attempts: 2,
+          backoff: { type: 'exponential', delay: 5000 },
+        }
+      )
+
+      // 入队成功后将项目状态置为 PARSING（此时才占用并发额度）
+      await prisma.project.update({
+        where: { id },
+        data: { status: 'PARSING' },
       })
     } catch (queueError) {
       const reason = queueError instanceof Error ? queueError.message : String(queueError)

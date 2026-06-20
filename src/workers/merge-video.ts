@@ -2,7 +2,7 @@
  * 视频合并 Worker
  * 处理 video-merge 队列任务
  *
- * 流程：下载各分镜视频 → FFmpeg concat 合并 → 输出本地文件 → 更新数据库
+ * 流程：下载各分镜视频 → 收集段信息 → 计算转场计划 → FFmpeg concat 合并（含转场 filter）→ 输出本地文件 → 更新数据库
  */
 import { Worker, type Job } from 'bullmq'
 import { redis } from '@/lib/redis'
@@ -10,6 +10,8 @@ import { prisma } from '@/lib/db'
 import { setExpiry } from '@/lib/asset-lifecycle-service'
 import { uploadFile, getPublicUrl, isOSSConfigured } from '@/lib/storage'
 import { logger } from '@/lib/logger'
+import { publishStateChange, publishCompleted, publishFailed } from '@/lib/progress-publisher'
+import { computeTransitionPlan, buildTransitionFilters, type SegmentInfo } from '@/lib/transition-engine'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { writeFile, mkdir, unlink, readdir } from 'fs/promises'
@@ -31,6 +33,12 @@ interface VideoMergeJobData {
   }>
   outputAspectRatio: string
   outputResolution: string
+  /** 导出超分目标分辨率（由 Export API 传入），为 720p/1080p 时合并后入队超分 Worker */
+  targetResolution?: '480p' | '720p' | '1080p'
+  /** 冻结的超分积分数（480p 时为 0） */
+  reservedCredits?: number
+  /** 视频总时长（秒） */
+  videoDuration?: number
 }
 
 const connection = redis as unknown as ConnectionOptions
@@ -360,8 +368,144 @@ async function resolveSegmentAudioPlans(
  *   ③ 原视频整段按时间范围提取，详见 resolveSegmentAudioPlans），不再三源叠加混音。
  * 音画同步对齐规则：每段所选音轨一律按该段视频时长对齐——超出截断、不足以静音补齐（apad+atrim），
  *   并统一重采样到 44100/stereo/fltp，使逐段 A/V 一一对应，拼接后整体不串味、不错位。
+ *
+ * 转场增强（Transition Engine 集成）：
+ * 合并前收集各段 SegmentInfo（ffprobe 时长 + scene 字段），调用 computeTransitionPlan +
+ * buildTransitionFilters 生成 xfade/acrossfade filter。FFmpeg xfade 执行失败时回退到
+ * 无转场的 concat 合并（现有逻辑），ffprobe 获取时长失败时该段 duration 设为 0，跳过相关转场。
  */
 async function ffmpegConcat(
+  segments: MergeSegment[],
+  outputPath: string,
+  aspectRatio: string,
+  resolution: string,
+  projectId: string,
+  tempDir: string
+): Promise<void> {
+  if (segments.length === 0) {
+    throw new Error('没有可合并的视频文件')
+  }
+
+  // 收集转场所需的 SegmentInfo（时长 + 场景）
+  const segmentInfos = await collectSegmentInfos(segments, projectId)
+
+  // 计算转场计划
+  const transitionPlan = computeTransitionPlan(segmentInfos)
+  const { videoFilter: transitionVideoFilter, audioFilter: transitionAudioFilter } =
+    buildTransitionFilters(segmentInfos, transitionPlan)
+
+  // 如果有有效的转场 filter，尝试使用带转场的合并
+  if (transitionVideoFilter && transitionAudioFilter) {
+    try {
+      await ffmpegConcatWithTransitions(
+        segments, outputPath, aspectRatio, resolution, projectId, tempDir,
+        transitionVideoFilter, transitionAudioFilter
+      )
+      console.log(`[merge-video] 带转场合并成功（${transitionPlan.transitions.filter(t => t.type !== 'none').length} 个转场）`)
+      return
+    } catch (transitionError) {
+      console.warn(
+        `[merge-video] 带转场合并失败，回退到无转场 concat:`,
+        transitionError instanceof Error ? transitionError.message : String(transitionError)
+      )
+      // 回退到无转场合并
+    }
+  }
+
+  // 无转场或转场失败：使用原有 concat filter 逻辑
+  await ffmpegConcatFallback(segments, outputPath, aspectRatio, resolution, projectId, tempDir)
+}
+
+/**
+ * 收集各段的 SegmentInfo（ffprobe 时长 + DB scene 字段）
+ * ffprobe 失败时 duration 设为 0，跳过相关转场
+ */
+async function collectSegmentInfos(segments: MergeSegment[], projectId: string): Promise<SegmentInfo[]> {
+  // 批量查询各组的 scene 字段
+  const groups = await prisma.shotGroup.findMany({
+    where: { projectId },
+    include: {
+      shots: {
+        orderBy: { orderIndex: 'asc' },
+        take: 1,
+        select: { scene: true },
+      },
+    },
+  })
+  const sceneByGroupIndex = new Map(
+    groups.map((g) => [g.groupIndex, g.shots[0]?.scene ?? null])
+  )
+
+  // 获取各段视频时长
+  const infos: SegmentInfo[] = []
+  for (const seg of segments) {
+    const duration = await getMediaDuration(seg.videoPath)
+    const scene = sceneByGroupIndex.get(seg.groupIndex) ?? null
+    infos.push({ groupIndex: seg.groupIndex, duration, scene })
+  }
+  return infos
+}
+
+/**
+ * 带转场的 FFmpeg 合并（使用 xfade + acrossfade filter）
+ */
+async function ffmpegConcatWithTransitions(
+  segments: MergeSegment[],
+  outputPath: string,
+  aspectRatio: string,
+  resolution: string,
+  projectId: string,
+  tempDir: string,
+  transitionVideoFilter: string,
+  transitionAudioFilter: string
+): Promise<void> {
+  const { width, height } = parseResolution(resolution, aspectRatio)
+
+  // 输入参数
+  const inputArgs: string[] = []
+  for (const seg of segments) {
+    inputArgs.push('-i', seg.videoPath)
+  }
+
+  // 视频预处理：先统一缩放各段，再串联 xfade
+  const scaleParts: string[] = []
+  for (let i = 0; i < segments.length; i++) {
+    scaleParts.push(
+      `[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,` +
+      `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1[sv${i}]`
+    )
+  }
+
+  // 替换 xfade filter 中的输入标签为缩放后标签
+  let modifiedVideoFilter = transitionVideoFilter
+  for (let i = 0; i < segments.length; i++) {
+    modifiedVideoFilter = modifiedVideoFilter.replace(`[${i}:v]`, `[sv${i}]`)
+  }
+
+  const filterComplex = [...scaleParts, modifiedVideoFilter, transitionAudioFilter].join(';')
+
+  const args = [
+    ...inputArgs,
+    '-filter_complex', filterComplex,
+    '-map', '[outv]',
+    '-map', '[outa]',
+    '-c:v', 'libx264',
+    '-preset', 'fast',
+    '-crf', '23',
+    '-c:a', 'aac',
+    '-b:a', '128k',
+    '-movflags', '+faststart',
+    '-y',
+    outputPath,
+  ]
+
+  await execFileAsync('ffmpeg', args, { timeout: 5 * 60 * 1000 })
+}
+
+/**
+ * 无转场 FFmpeg concat 合并（原有逻辑，作为回退方案）
+ */
+async function ffmpegConcatFallback(
   segments: MergeSegment[],
   outputPath: string,
   aspectRatio: string,
@@ -510,15 +654,26 @@ async function cleanupTempDir(tempDir: string): Promise<void> {
 // ========================
 
 async function processMergeVideo(job: Job<VideoMergeJobData>) {
-  const { projectId, userId, shotVideoUrls, outputAspectRatio, outputResolution } = job.data
+  const { projectId, userId, shotVideoUrls, outputAspectRatio } = job.data
+  // 合并阶段统一使用 480p 输出（超分场景由后续 Upscale Worker 处理分辨率提升）
+  const mergeResolution = '480p'
 
-  // 幂等防重：如果项目已为 EXPORTED，说明合并已完成（可能被重复入队），直接跳过
+  // 幂等防重：如果项目已为 EXPORTED 且已有导出视频 URL，说明合并已完成（可能被重复入队）
+  // 此时需确保 exportStatus 为 COMPLETED（修复：export API 重入队后 Worker 跳过但 exportStatus 卡在 MERGING）
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { status: true },
+    select: { status: true, exportStatus: true, exportVideoUrl: true },
   })
-  if (project?.status === 'EXPORTED') {
-    console.log(`[merge-video] 项目 ${projectId} 已为 EXPORTED，幂等跳过`)
+  if (project?.status === 'EXPORTED' && project.exportVideoUrl) {
+    // 确保 exportStatus 为 COMPLETED（修复卡 MERGING 的脏状态）
+    if (project.exportStatus !== 'COMPLETED') {
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { exportStatus: 'COMPLETED' },
+      })
+    }
+    console.log(`[merge-video] 项目 ${projectId} 已有导出视频，幂等跳过`)
+    void publishCompleted(userId, 'merge', projectId)
     return
   }
 
@@ -528,8 +683,9 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
   console.log(`[merge-video] 开始合并项目 ${projectId}:`, {
     shotCount: sortedShots.length,
     aspectRatio: outputAspectRatio,
-    resolution: outputResolution,
+    resolution: mergeResolution,
   })
+  void publishStateChange(userId, 'merge', projectId, 'started', 0)
 
   // 创建临时工作目录
   const tempDir = path.join(process.cwd(), 'public', 'uploads', 'temp', `merge-${projectId}-${Date.now()}`)
@@ -585,6 +741,7 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
 
     // 2. FFmpeg 合并
     console.log(`[merge-video] 开始 FFmpeg 合并...`)
+    void publishStateChange(userId, 'merge', projectId, 'merging', 40)
     const outputDir = path.join(process.cwd(), 'public', 'uploads', 'merged', userId, projectId)
     await mkdir(outputDir, { recursive: true })
 
@@ -592,16 +749,61 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
     const outputPath = path.join(outputDir, outputFileName)
     mergedOutputPath = outputPath
 
-    await ffmpegConcat(segments, outputPath, outputAspectRatio, outputResolution, projectId, tempDir)
+    await ffmpegConcat(segments, outputPath, outputAspectRatio, mergeResolution, projectId, tempDir)
     await job.updateProgress(85)
 
     console.log(`[merge-video] FFmpeg 合并完成: ${outputPath}`)
 
     // 3. 上传合并视频到 OSS（Req 3）
+    void publishStateChange(userId, 'merge', projectId, 'uploading', 85)
     const ossVideoUrl = await uploadMergedVideoToOSS(outputPath, userId, projectId)
     console.log(`[merge-video] 合并视频已上传到 OSS: ${ossVideoUrl}`)
 
-    // 4. 在事务中创建 Asset + 更新项目状态（Req 3.2）
+    // 4. 导出超分分支决策：根据 targetResolution 决定后续流程
+    const targetRes = job.data.targetResolution
+
+    if (targetRes === '720p' || targetRes === '1080p') {
+      // 超分流程：入队 videoUpscaleQueue，更新 exportStatus 为 UPSCALING
+      const { videoUpscaleQueue } = await import('@/lib/queue')
+      await videoUpscaleQueue.add('upscale-video', {
+        projectId,
+        userId,
+        mergedVideoOssUrl: ossVideoUrl,
+        targetResolution: targetRes,
+        reservedCredits: job.data.reservedCredits || 0,
+        videoDuration: job.data.videoDuration || 0,
+      })
+
+      await prisma.project.update({
+        where: { id: projectId },
+        data: {
+          status: 'EXPORTED',
+          exportStatus: 'UPSCALING',
+        },
+      })
+
+      // 查询首个生成成功组的 genCoverUrl 更新封面
+      const firstSucceededGroup = await prisma.shotGroup.findFirst({
+        where: { projectId, genStatus: 'SUCCEEDED', genCoverUrl: { not: null } },
+        orderBy: { groupIndex: 'asc' },
+        select: { genCoverUrl: true },
+      })
+      if (firstSucceededGroup?.genCoverUrl) {
+        await prisma.project.update({
+          where: { id: projectId },
+          data: { coverUrl: firstSucceededGroup.genCoverUrl },
+        })
+      }
+
+      await job.updateProgress(100)
+      console.log(`[merge-video] 项目 ${projectId} 合并完成，已入队超分任务 (${targetRes})`)
+      void publishCompleted(userId, 'merge', projectId)
+
+      return
+    }
+
+    // 非超分流程（480p 或无 targetResolution）：保持原有逻辑
+    // 5. 在事务中创建 Asset + 更新项目状态（Req 3.2）
     // 合并成功后，将项目展示封面更新为首个生成成功组的 genCoverUrl（生成视频抽帧封面），
     // 使导出后的项目封面对应生成内容而非原始视频帧（Bug 2 修复 — Req 2.7）
     try {
@@ -616,11 +818,14 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
       })
 
       await prisma.$transaction(async (tx) => {
-        // 更新项目状态为已导出，同时更新展示封面为生成视频封面
+        // 更新项目状态为已导出 + 导出状态为完成，同时更新展示封面为生成视频封面
         await tx.project.update({
           where: { id: projectId },
           data: {
             status: 'EXPORTED',
+            exportStatus: 'COMPLETED',
+            exportVideoUrl: ossVideoUrl,
+            exportError: null,
             ...(firstSucceededGroup?.genCoverUrl ? { coverUrl: firstSucceededGroup.genCoverUrl } : {}),
           },
         })
@@ -664,10 +869,24 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
 
     await job.updateProgress(100)
     console.log(`[merge-video] 项目 ${projectId} 合并导出完成: ${ossVideoUrl}`)
+    void publishCompleted(userId, 'merge', projectId)
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '合并失败'
     console.error(`[merge-video] 项目 ${projectId} 合并失败:`, errorMessage)
+    void publishFailed(userId, 'merge', projectId, errorMessage)
+
+    // 合并失败时更新导出状态为 FAILED（720p/1080p 超分均免费，无需退还积分）
+    const targetRes = job.data.targetResolution
+    if (targetRes === '720p' || targetRes === '1080p') {
+      await prisma.project.update({
+        where: { id: projectId },
+        data: {
+          exportStatus: 'FAILED',
+          exportError: `视频合并失败: ${errorMessage}`,
+        },
+      })
+    }
 
     // 更新项目状态为 MERGE_FAILED（区别于生成 FAILED，允许用户重新触发合并而不需要重新生成）
     // 各组的生成视频（14 天过期 Asset）仍然有效，用户可在过期前只重试合并

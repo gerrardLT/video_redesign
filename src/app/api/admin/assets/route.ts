@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     prisma.asset.count({ where }),
   ])
 
-  // 将 user 信息提取到顶层
+  // 将 user 信息提取到顶层（project 可能为 null，用户级资产不绑定项目）
   const result = assets.map((asset) => ({
     id: asset.id,
     projectId: asset.projectId,
@@ -76,10 +76,10 @@ export async function GET(request: NextRequest) {
     expiresAt: asset.expiresAt,
     createdAt: asset.createdAt,
     project: {
-      name: asset.project.name,
+      name: asset.project?.name ?? null,
     },
     user: {
-      email: asset.project.user.email,
+      email: asset.project?.user?.email ?? null,
     },
   }))
 

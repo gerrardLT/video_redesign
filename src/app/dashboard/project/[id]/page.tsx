@@ -12,6 +12,17 @@ import { StepHelpButton } from '@/components/help/step-help-button'
 import ShotGroupList, { type ShotGroupData } from '@/components/shot/ShotGroupList'
 import CharacterPanel, { type Character } from '@/components/shot/CharacterPanel'
 import { StyleConfigEditor } from '@/components/project/style-config-editor'
+import { EditorGuide } from '@/components/onboarding/editor-guide'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface ProjectDetail {
   id: string
@@ -42,6 +53,7 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [reparsing, setReparsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showReparseDialog, setShowReparseDialog] = useState(false)
   const isMounted = useRef(true)
 
   useEffect(() => {
@@ -80,9 +92,9 @@ export default function ProjectDetailPage() {
     return () => { active = false }
   }, [params.id])
 
-  // 解析中状态轮询
+  // 解析中/下载中状态轮询（覆盖 DOWNLOADING → PARSING → EDITABLE 全流程）
   useEffect(() => {
-    if (project?.status !== 'PARSING') return
+    if (project?.status !== 'PARSING' && project?.status !== 'DOWNLOADING') return
 
     const interval = setInterval(async () => {
       try {
@@ -103,11 +115,15 @@ export default function ProjectDetailPage() {
   // 重新解析（needConfirm=true 时弹确认，用于已解析成功的项目——会清空分镜/编辑/风格并重新扣积分)
   async function handleReparse(needConfirm = false) {
     if (needConfirm) {
-      const ok = window.confirm(
-        '重新解析将删除当前所有分镜、人物、分组、风格设定和你的手动编辑，并重新消耗解析积分。确定继续吗？'
-      )
-      if (!ok) return
+      setShowReparseDialog(true)
+      return
     }
+    await executeReparse()
+  }
+
+  // 执行重新解析
+  async function executeReparse() {
+    setShowReparseDialog(false)
     setReparsing(true)
     try {
       const res = await fetch(`/api/projects/${params.id}/reparse`, {
@@ -174,6 +190,9 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-6">
+      {/* 新手引导 - Editor 引导组件（不阻塞编辑器正常功能） */}
+      <EditorGuide />
+
       {/* 顶部项目信息 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -215,6 +234,24 @@ export default function ProjectDetailPage() {
       {!['PARSING', 'FAILED', 'EDITABLE'].includes(project.status) && (
         <EditableState project={project} onReparse={() => handleReparse(true)} reparsing={reparsing} />
       )}
+
+      {/* 重新解析确认对话框 */}
+      <AlertDialog open={showReparseDialog} onOpenChange={setShowReparseDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>重新解析</AlertDialogTitle>
+            <AlertDialogDescription>
+              重新解析将删除当前所有分镜、人物、分组、风格设定和你的手动编辑，并重新消耗解析积分。确定继续吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowReparseDialog(false)}>取消</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={executeReparse}>
+              确认重新解析
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -413,7 +450,7 @@ function EditableState({ project, onReparse, reparsing }: { project: ProjectDeta
       </div>
 
       {/* 操作按钮栏 */}
-      <div id="generate-section" className="flex items-center gap-3">
+      <div id="generate-section" className="flex items-center gap-3" data-onboarding="generate-btn">
         <Button
           variant="outline"
           disabled={!allGroupsSucceeded}
@@ -452,33 +489,39 @@ function EditableState({ project, onReparse, reparsing }: { project: ProjectDeta
         )}
 
         {/* 全局一致性设定（风格/色调/人物外貌，AI 自动提取，用户可手动编辑) */}
-        <StyleConfigEditor
-          projectId={project.id}
-          initialStructured={
-            project.styleConfig?.structuredStyle
-              ? (() => { try { return JSON.parse(project.styleConfig.structuredStyle) } catch { return null } })()
-              : null
-          }
-          initialDescription={project.styleConfig?.customDescription ?? null}
-          editable={project.status === 'EDITABLE' || project.status === 'FAILED'}
-        />
+        <div data-onboarding="prompt-editor">
+          <StyleConfigEditor
+            projectId={project.id}
+            initialStructured={
+              project.styleConfig?.structuredStyle
+                ? (() => { try { return JSON.parse(project.styleConfig.structuredStyle) } catch { return null } })()
+                : null
+            }
+            initialDescription={project.styleConfig?.customDescription ?? null}
+            editable={project.status === 'EDITABLE' || project.status === 'FAILED'}
+          />
+        </div>
 
         {/* 人物形象（确认形象)：生成全片唯一人物锚定图，作每组生成的 reference_image */}
-        <CharacterPanel
-          projectId={project.id}
-          characters={characters}
-          onUpdate={fetchCharacters}
-        />
+        <div data-onboarding="character-panel">
+          <CharacterPanel
+            projectId={project.id}
+            characters={characters}
+            onUpdate={fetchCharacters}
+          />
+        </div>
 
         {/* 分镜组列表（唯一视图) */}
-        <ShotGroupList
-          projectId={project.id}
-          initialGroups={project.shotGroups ?? []}
-          aspectRatio={project.aspectRatio}
-          onAllSucceededChange={setLiveAllSucceeded}
-          anchorMissing={anchorMissing}
-          characterLibrary={characters}
-        />
+        <div data-onboarding="shot-list">
+          <ShotGroupList
+            projectId={project.id}
+            initialGroups={project.shotGroups ?? []}
+            aspectRatio={project.aspectRatio}
+            onAllSucceededChange={setLiveAllSucceeded}
+            anchorMissing={anchorMissing}
+            characterLibrary={characters}
+          />
+        </div>
       </div>
 
       {/* 底部帮助入口 */}

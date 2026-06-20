@@ -257,6 +257,59 @@ export async function getVideoMetadata(videoPath: string): Promise<VideoMetadata
 }
 
 /**
+ * 检测视频中的真实剪辑点（场景切换时间戳）
+ *
+ * 使用 FFmpeg scene detection filter 检测画面突变点。
+ * 返回时间戳数组（秒），每个时间戳代表一个真实的剪辑/转场发生点。
+ * 如果返回空数组，说明视频是「一镜到底」（无剪辑点）。
+ *
+ * @param videoPath 视频文件绝对路径
+ * @param threshold 场景变化阈值 0-1，默认使用环境变量 SCENE_THRESHOLD 或 0.32
+ * @returns 剪辑点时间戳数组（秒），不含视频起点 0
+ */
+export async function detectSceneCuts(
+  videoPath: string,
+  threshold?: number
+): Promise<number[]> {
+  const sceneThreshold = threshold ?? parseFloat(process.env.SCENE_THRESHOLD || '0.32')
+  console.log(`[ffmpeg] 开始场景剪辑点检测 - threshold: ${sceneThreshold}, file: ${videoPath}`)
+
+  try {
+    // 使用 showinfo filter 配合 scene 检测，输出到 stderr
+    const { stderr } = await execFileAsync('ffmpeg', [
+      '-i', videoPath,
+      '-filter:v', `select='gt(scene,${sceneThreshold})',showinfo`,
+      '-an', '-f', 'null', '-',
+    ], { timeout: 120000, maxBuffer: 10 * 1024 * 1024 })
+
+    // 从 stderr 中解析 pts_time
+    const timestamps: number[] = []
+    const ptsMatches = stderr.matchAll(/pts_time:([\d.]+)/g)
+    for (const match of ptsMatches) {
+      const t = parseFloat(match[1])
+      if (Number.isFinite(t) && t > 0.5) {
+        timestamps.push(Math.round(t * 100) / 100)
+      }
+    }
+
+    // 去重（相隔 <0.5s 的合并）
+    const deduped: number[] = []
+    for (const t of timestamps.sort((a, b) => a - b)) {
+      if (deduped.length === 0 || t - deduped[deduped.length - 1] >= 0.5) {
+        deduped.push(t)
+      }
+    }
+
+    console.log(`[ffmpeg] 场景检测完成 - 检测到 ${deduped.length} 个剪辑点${deduped.length > 0 ? ': ' + deduped.map(t => t.toFixed(2) + 's').join(', ') : '（一镜到底）'}`)
+    return deduped
+  } catch (error) {
+    // 场景检测失败不阻塞主流程，返回空数组（等同于一镜到底）
+    console.warn('[ffmpeg] 场景剪辑点检测失败，视为一镜到底:', error instanceof Error ? error.message : String(error))
+    return []
+  }
+}
+
+/**
  * 视频 Normalize 预处理：统一编码为 h264/yuv420p，消除可变帧率/HEVC 兼容性问题
  * @param inputPath 原始视频路径
  * @param outputPath 输出 normalized 视频路径

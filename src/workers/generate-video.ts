@@ -7,6 +7,7 @@
  * 2. 从生成视频抽取封面帧（ffmpeg，0.1s）并上传 OSS → genCoverUrl
  * 3. 上传生成视频到 OSS → ossVideoUrl
  * 4. atomicSuccessUpdate 事务内一并写入 genStatus/genVideoUrl/genCoverUrl/lastFrameUrl
+ * 5. 创建版本历史记录（best-effort，失败仅记录日志不回滚生成结果）
  */
 import { Worker, type Job, UnrecoverableError } from 'bullmq'
 import { redis } from '@/lib/redis'
@@ -21,6 +22,8 @@ import { videoGenerateQueue } from '@/lib/queue'
 import { buildGroupGenReference } from '@/lib/group-gen-context'
 import { applySameSceneContinuation } from '@/lib/frame-continuity'
 import { logger } from '@/lib/logger'
+import { publishStateChange, publishCompleted, publishFailed, publishChainProgress } from '@/lib/progress-publisher'
+import { createVersion } from '@/lib/version-history-service'
 import { writeFile, unlink } from 'fs/promises'
 import path from 'path'
 import { execFile } from 'child_process'
@@ -44,6 +47,7 @@ interface VideoGenerateJobData {
   shotGroupId?: string
   referenceImages?: string[]
   referenceAudioUrl?: string
+  referenceVideoUrl?: string  // 前一组生成视频 OSS URL，用于 reference_video 无缝衔接
   // 显式请求返回尾帧（单组路径使用）：存在同场景后继组时置 true，使本组尾帧被持久化以支撑 单组→单组 承接。
   // 链式路径不设此字段（undefined），由 chainMode + 非最后一组判定，结果与现状相同。
   returnLastFrame?: boolean
@@ -207,23 +211,21 @@ async function extractAndUploadGenCover(
 // ========================
 
 /**
- * 生成成功后的原子化更新（单一 Prisma 事务，超时 10s）
- * 在一个事务内完成：
- * 1. ShotGroup.genStatus = SUCCEEDED, genVideoUrl = ossUrl, genCoverUrl = genCoverUrl, lastFrameUrl = lastFrameUrl ?? null
- * 2. 组内所有 Shot.genStatus = SUCCEEDED, genVideoUrl = ossUrl
- * 3. GenerationJob.status = SUCCEEDED, resultVideoUrl = ossUrl
- * 4. chargeCreditsTx（统一幂等扣费：existingCharge 幂等 + RESERVE 差额 REFUND）
+ * 生成成功后的原子化更新（P2 优化：拆分积分锁与状态写入）
  *
- * 生成视频封面抽帧并持久化：genCoverUrl 来源于生成视频自身（ffmpeg 抽帧），
- * 在事务外完成 I/O，仅在事务内写入 ShotGroup.genCoverUrl，保持原子性/幂等性。
- * 抽帧失败时 genCoverUrl 为 undefined，事务内不写该字段（不阻塞主流程、不写伪造 URL）。
+ * 拆为两步：
+ *   Step 1: 在 withCreditLock 内仅执行 chargeCreditsTx（积分操作，亚秒级）
+ *   Step 2: 在锁外执行状态更新（ShotGroup/Shot/GenerationJob → SUCCEEDED）
  *
- * 尾帧持久化（同场景承接）：成功且 Seedance 返回尾帧时把受信尾帧 URL 写入 ShotGroup.lastFrameUrl，
- * 供后续同场景组（链式 / 单组）承接复用；本次无尾帧（未请求或未返回）则写 null，确保持久化尾帧始终
- * 对应当前最新视频内容，避免 force 重生成后残留陈旧尾帧。链式与单组组生成都经此函数，一处写覆盖两路径。
+ * 好处：积分锁持有时间从 ~1-2s 压缩到 <100ms，5 个并发生成任务在锁上排队等待总时间大幅缩短，
+ *       消除极端情况下的 30s 等待超时风险。
  *
- * 关键积分写（缺陷 11）：整笔成功事务经 Redis 全局锁【跨进程】串行化，与应用进程/其它 Worker
- * 分支的积分写互斥，消除 libSQL/SQLite 并发写锁竞争与读-改-写丢失更新（锁内复用 db-retry 兜底）。
+ * 风险容忍：扣费成功但状态更新失败时，组仍为 GENERATING。这是可接受的——
+ *   - chargeCreditsTx 内置幂等（existingCharge 检查），后续重试不会重复扣费
+ *   - 看门狗 Worker 会检测卡死的 GENERATING 任务并修复状态
+ *   - 用户视角视频已生成成功（OSS 已有文件），仅卡片状态需刷新
+ *
+ * 封面与尾帧持久化：genCoverUrl/lastFrameUrl 在 Step 2 状态更新事务中写入。
  */
 async function atomicSuccessUpdate(params: {
   jobId: string
@@ -235,12 +237,18 @@ async function atomicSuccessUpdate(params: {
   lastFrameUrl?: string
   genCoverUrl?: string
 }): Promise<void> {
-  const { jobId, shotGroupId, userId, ossVideoUrl, costEstimate, lastFrameUrl, genCoverUrl } = params
-  const maxRetries = 3
+  const { jobId, shotGroupId, userId, projectId, ossVideoUrl, costEstimate, lastFrameUrl, genCoverUrl } = params
 
+  // Step 1: 积分锁内仅做扣费（亚秒级，最大化锁吞吐）
+  await withCreditLock(() => prisma.$transaction(async (tx) => {
+    await chargeCreditsTx(tx, { userId, jobId, actualAmount: costEstimate })
+  }, { timeout: 10000 }), 'groupCharge')
+
+  // Step 2: 锁外状态更新（不竞争积分锁，降低锁排队时间）
+  const maxRetries = 3
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await withCreditLock(() => prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx) => {
         // 1. 更新 ShotGroup（持久化受信尾帧；生成封面；无尾帧写 null 覆盖陈旧值）
         await tx.shotGroup.update({
           where: { id: shotGroupId },
@@ -248,7 +256,6 @@ async function atomicSuccessUpdate(params: {
             genStatus: 'SUCCEEDED',
             genVideoUrl: ossVideoUrl,
             lastFrameUrl: lastFrameUrl ?? null,
-            // genCoverUrl 来源于生成视频 ffmpeg 抽帧，抽帧失败时为 undefined 不写入（保留旧值）
             ...(genCoverUrl !== undefined ? { genCoverUrl } : {}),
           },
         })
@@ -264,34 +271,25 @@ async function atomicSuccessUpdate(params: {
           where: { id: jobId },
           data: { status: 'SUCCEEDED', resultVideoUrl: ossVideoUrl },
         })
+      }, { timeout: 10000 })
 
-        // 4. 幂等扣费：收敛为统一的 chargeCreditsTx（existingCharge 幂等 + RESERVE 差额 REFUND）
-        await chargeCreditsTx(tx, { userId, jobId, actualAmount: costEstimate })
-      }, { timeout: 10000 }), 'groupChargeSuccess')
-
-      return // 事务成功
+      return // 状态更新成功
     } catch (txError: unknown) {
       const reason = txError instanceof Error ? txError.message : String(txError)
       if (attempt < maxRetries) {
-        logger.error(`原子化事务第 ${attempt} 次失败，重试中`, { jobId, shotGroupId, reason })
+        logger.error(`状态更新第 ${attempt} 次失败，重试中`, { jobId, shotGroupId, reason })
         await new Promise(resolve => setTimeout(resolve, 1000))
       } else {
-        // 3 次重试仍失败 → FAILED + 退还积分
-        logger.error(`原子化事务 ${maxRetries} 次全部失败`, { jobId, shotGroupId, reason })
+        // 3 次重试仍失败 → 积分已扣但状态未更新
+        // 不退款（视频已生成成功，用户可使用），由看门狗修复状态
+        logger.error(`状态更新 ${maxRetries} 次全部失败（积分已扣，视频已生成，等待看门狗修复状态）`, {
+          jobId, shotGroupId, reason,
+        })
+        // 尝试单独更新 GenerationJob 标记为 SUCCEEDED（最低限度保证 Job 状态正确）
         await prisma.generationJob.update({
           where: { id: jobId },
-          data: { status: 'FAILED', errorCode: 'TX_FAILED', errorMessage: reason },
+          data: { status: 'SUCCEEDED', resultVideoUrl: ossVideoUrl },
         }).catch(() => {})
-        await prisma.shotGroup.update({
-          where: { id: shotGroupId },
-          data: { genStatus: 'FAILED' },
-        }).catch(() => {})
-        await prisma.shot.updateMany({
-          where: { shotGroupId },
-          data: { genStatus: 'FAILED' },
-        }).catch(() => {})
-        await refundCredits(userId, jobId, costEstimate).catch(() => {})
-        throw new Error(`原子化事务全部重试失败: ${reason}`)
       }
     }
   }
@@ -343,6 +341,7 @@ async function processProjectSegmentGenerate(job: Job<VideoGenerateJobData>) {
       where: { id: jobId },
       data: { status: 'GENERATING' },
     })
+    void publishStateChange(userId, 'generation', jobId, 'GENERATING', 10)
 
     // 调用 Seedance 生成（first_frame 已废弃，统一走文本 + asset:// 多模态参考）
     const { taskId } = await createSeedanceTask({
@@ -351,6 +350,7 @@ async function processProjectSegmentGenerate(job: Job<VideoGenerateJobData>) {
       aspectRatio,
       resolution,
     })
+    void publishStateChange(userId, 'generation', jobId, 'SUBMITTED', 20)
 
     // 轮询 Seedance 结果
     const startTime = Date.now()
@@ -429,12 +429,14 @@ async function processProjectSegmentGenerate(job: Job<VideoGenerateJobData>) {
     await setExpiry(asset.id, 14)
 
     logger.info('项目级分段生成成功', { jobId, projectId, ossUrl })
+    void publishCompleted(userId, 'generation', jobId)
 
     // 检查是否全部段完成，触发拼合
     await checkAndConcatProjectSegments(projectId)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     logger.error('项目级分段生成失败', { jobId, projectId, error: errorMessage })
+    void publishFailed(userId, 'generation', jobId, errorMessage)
 
     // 标记 GenerationJob 为 FAILED
     await prisma.generationJob.update({
@@ -522,6 +524,7 @@ async function processGroupVideoGenerate(job: Job<VideoGenerateJobData>) {
         where: { id: jobId },
         data: { status: 'SUBMITTED' },
       })
+      void publishStateChange(userId, 'generation', shotGroupId!, 'SUBMITTED', 10)
 
       const result = await createSeedanceTask({
         prompt,
@@ -530,6 +533,7 @@ async function processGroupVideoGenerate(job: Job<VideoGenerateJobData>) {
         resolution,
         referenceImages: job.data.referenceImages,
         referenceAudioUrl: job.data.referenceAudioUrl,
+        referenceVideoUrl: job.data.referenceVideoUrl, // reference_video 无缝衔接
         // 请求返回尾帧的两条来源：
         // - 单组路径：路由显式置 job.data.returnLastFrame===true（存在同场景后继组时），用于持久化本组尾帧；
         // - 链式路径：job.data.returnLastFrame 为 undefined，沿用「chainMode 且非最后一组」判定，结果与现状相同。
@@ -544,6 +548,7 @@ async function processGroupVideoGenerate(job: Job<VideoGenerateJobData>) {
         where: { id: jobId },
         data: { status: 'GENERATING', seedanceTaskId: taskId },
       })
+      void publishStateChange(userId, 'generation', shotGroupId!, 'GENERATING', 20)
     }
 
     // 分镜组置 GENERATING，并同步组内全部 Shot 置 GENERATING
@@ -599,7 +604,24 @@ async function processGroupVideoGenerate(job: Job<VideoGenerateJobData>) {
     }
 
     if (tokenUsage) {
-      console.log(`[generate-video] 组任务 ${jobId} Token 消耗: ${tokenUsage.completionTokens} tokens`)
+      // doubao-seedance-2.0 火山方舟官方定价（元/百万 completion_tokens）：
+      // 输入包含视频（reference_video 衔接）480p/720p：¥28.0/M = ¥0.028/千tokens
+      // 输入不含视频（第一组独立起镜）480p/720p：¥46.0/M = ¥0.046/千tokens
+      // 此处统一按含视频参考计算（大多数组都有 reference_video），第一组的微小误差可接受
+      const seedanceCostRMB = (tokenUsage.completionTokens / 1_000_000) * 28.0
+      console.log(
+        `[generate-video] 组 ${shotGroupId} Seedance Token: completion=${tokenUsage.completionTokens} total=${tokenUsage.totalTokens} | ` +
+        `成本: ¥${seedanceCostRMB.toFixed(4)}（按 ¥28/M tokens 计）`
+      )
+
+      // 累加到 Redis（用于链式结束时汇总，key 60 分钟过期）
+      const tokenKey = `token_usage:${projectId}`
+      try {
+        await redis.incrby(`${tokenKey}:completion`, tokenUsage.completionTokens)
+        await redis.incrby(`${tokenKey}:total`, tokenUsage.totalTokens)
+        await redis.expire(`${tokenKey}:completion`, 3600)
+        await redis.expire(`${tokenKey}:total`, 3600)
+      } catch { /* 非关键路径，失败不阻塞 */ }
     }
 
     // === 视频回存 OSS（Req 1）===
@@ -630,6 +652,26 @@ async function processGroupVideoGenerate(job: Job<VideoGenerateJobData>) {
         // 生成视频封面 URL（从 genVideoUrl 抽帧得到，事务内写入保证原子性）
         genCoverUrl,
       })
+      void publishCompleted(userId, 'generation', shotGroupId)
+
+      // === 版本历史：生成成功后创建版本记录（best-effort，失败仅记录日志不回滚生成结果）===
+      try {
+        await createVersion({
+          shotGroupId,
+          videoUrl: ossVideoUrl,
+          coverUrl: genCoverUrl,
+          lastFrameUrl,
+          promptSnapshot: prompt,
+          costEstimate: actualCost,
+          generationJobId: jobId,
+        })
+      } catch (versionError) {
+        logger.error('生成成功后创建版本记录失败（best-effort，不影响生成结果）', {
+          jobId,
+          shotGroupId,
+          error: versionError instanceof Error ? versionError.message : String(versionError),
+        })
+      }
 
       // 创建 AI_GENERATED 类型 Asset 并设置 14 天过期
       try {
@@ -654,18 +696,23 @@ async function processGroupVideoGenerate(job: Job<VideoGenerateJobData>) {
       }
 
       // === 链式生成续接：触发下一组 ===
-      if (job.data.chainMode) {
-        await triggerNextChainGroup({
-          projectId,
-          userId,
-          currentGroupId: shotGroupId,
-          currentIndex: job.data.chainCurrentIndex ?? 0,
-          totalGroups: job.data.chainTotalGroups ?? 1,
-          lastFrameUrl,
-          aspectRatio,
-          resolution,
-        })
-      }
+      void publishChainProgress(userId, projectId, {
+        totalGroups: job.data.chainTotalGroups ?? 1,
+        currentGroup: (job.data.chainCurrentIndex ?? 0) + 1,
+        completedGroups: (job.data.chainCurrentIndex ?? 0) + 1,
+        currentJobStatus: 'SUCCEEDED',
+      })
+      await triggerNextChainGroup({
+        projectId,
+        userId,
+        currentGroupId: shotGroupId,
+        currentIndex: job.data.chainCurrentIndex ?? 0,
+        totalGroups: job.data.chainTotalGroups ?? 1,
+        lastFrameUrl,
+        prevGroupVideoUrl: ossVideoUrl, // 当前组刚生成的视频，传给下一组作 reference_video 衔接
+        aspectRatio,
+        resolution,
+      })
     } finally {
       // 清理临时文件
       await unlink(tempVideoPath).catch(() => {})
@@ -674,6 +721,16 @@ async function processGroupVideoGenerate(job: Job<VideoGenerateJobData>) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '未知错误'
     const errorCode = 'GENERATION_ERROR'
+    void publishFailed(userId, 'generation', shotGroupId!, errorMessage)
+
+    // 判断是否为最终失败：确定性错误（不可重试）或已耗尽 BullMQ 重试次数
+    const isDeterministic =
+      errorMessage.includes('(400)') ||
+      errorMessage.includes('InvalidParameter') ||
+      errorMessage.includes('生成超时') ||
+      errorMessage.includes('Seedance 生成失败')
+    const attemptsLimit = job.opts.attempts ?? 1
+    const isFinalFailure = isDeterministic || job.attemptsMade + 1 >= attemptsLimit
 
     try {
       await prisma.generationJob.update({
@@ -706,19 +763,10 @@ async function processGroupVideoGenerate(job: Job<VideoGenerateJobData>) {
       await refundCredits(userId, jobId, genJob.costEstimate)
     }
 
-    // 判断是否为最终失败：确定性错误（不可重试）或已耗尽 BullMQ 重试次数
-    const isDeterministic =
-      errorMessage.includes('(400)') ||
-      errorMessage.includes('InvalidParameter') ||
-      errorMessage.includes('生成超时') ||
-      errorMessage.includes('Seedance 生成失败')
-    const attemptsLimit = job.opts.attempts ?? 1
-    const isFinalFailure = isDeterministic || job.attemptsMade + 1 >= attemptsLimit
-
-    // 链式模式且确为最终失败时整体收口：退还所有下游未运行组的冻结积分并置项目 FAILED，
+    // 链式最终失败时整体收口：退还所有下游未运行组的冻结积分并置项目 FAILED，
     // 避免下游 QUEUED 组的积分永久锁死、项目永久卡在 GENERATING（修复 A/D）。
     // 仅在最终失败时触发，避免瞬时错误重试场景下误杀本可成功的下游组。
-    if (job.data.chainMode && isFinalFailure) {
+    if (isFinalFailure) {
       await failProjectChain(
         projectId,
         userId,
@@ -767,10 +815,11 @@ async function triggerNextChainGroup(params: {
   currentIndex: number
   totalGroups: number
   lastFrameUrl?: string
+  prevGroupVideoUrl?: string  // 当前组生成的视频 URL，传给下一组作 reference_video 衔接
   aspectRatio: string
   resolution: string
 }): Promise<void> {
-  const { projectId, userId, currentIndex, currentGroupId, lastFrameUrl, aspectRatio, resolution } = params
+  const { projectId, userId, currentIndex, currentGroupId, lastFrameUrl, prevGroupVideoUrl, aspectRatio, resolution } = params
 
   // 查找 groupIndex 大于当前组、且仍有待生成（QUEUED）任务的下一个分镜组（按 groupIndex 升序）
   // 已 SUCCEEDED 的组没有 QUEUED 任务，会被自然跳过。
@@ -783,7 +832,8 @@ async function triggerNextChainGroup(params: {
     orderBy: { groupIndex: 'asc' },
   })
 
-  // 在候选组中找到第一个确实存在 QUEUED GenerationJob 的组
+  // 在候选组中找到第一个有待执行 GenerationJob 的组
+  // 链式模式下，后续组的 job 创建时直接为 QUEUED
   let nextGroup: (typeof pendingGroups)[number] | null = null
   let nextJob: Awaited<ReturnType<typeof prisma.generationJob.findFirst>> = null
   for (const candidate of pendingGroups) {
@@ -798,44 +848,48 @@ async function triggerNextChainGroup(params: {
     }
   }
 
-  // 无更多待生成组 → 全部完成，触发合并
+  // 无更多待生成组 → 全部完成，标记项目可编辑（等用户确认后手动导出，不自动合并）
   if (!nextGroup || !nextJob) {
-    logger.info('链式生成无更多待生成组，触发合并', { projectId, currentIndex })
-    await triggerChainMerge(projectId, userId)
+    logger.info('链式生成全部完成，项目回到可编辑状态（等用户手动导出）', { projectId, currentIndex })
+    await markChainCompleted(projectId, userId)
     return
   }
 
-  // 入队下一组：多模态参考模式——人物身份由 asset:// 锚定资产承载，每组独立装配参考图（promptSnapshot 已 baked 角色引用前缀）。
+  // 入队下一组：多模态参考模式——人物身份由 asset:// 锚定资产承载，每组独立装配参考图
   const nextRef = await buildGroupGenReference(nextGroup.id)
   let referenceImages = nextRef.referenceImages
-  let nextPrompt = nextJob.promptSnapshot || ''
 
-  // 链式镜头承接（同场景软承接）：调用共享函数 applySameSceneContinuation，与单组路径共用同一实现，
-  // 保证两路径产出完全一致。函数内部判定上一组末镜 scene 与下一组首镜 scene 是否同场景，
-  // 同场景且参考图未满 9 张时把上一组受信尾帧（Seedance 产物，作 reference_image 不触发人脸审核）
-  // 追加为额外参考图，并以提示词指定其为本组「起始承接画面」（软承接，非 role=first_frame）；
-  // lastFrameUrl 为空 / 已满 9 张 / 跨场景或 scene 缺失则不承接、下一组独立起镜（保守，宁跳变不糊连）。
-  const continuation = await applySameSceneContinuation({
-    prevGroupId: currentGroupId,
-    currentGroupId: nextGroup.id,
-    lastFrameUrl,
-    referenceImages,
-    prompt: nextPrompt,
+  // 构建下一组的完整 prompt：characterPrefix + 组内所有分镜 prompt 合并
+  const nextGroupShots = await prisma.shot.findMany({
+    where: { shotGroupId: nextGroup.id },
+    orderBy: { orderIndex: 'asc' },
+    select: { prompt: true },
   })
-  referenceImages = continuation.referenceImages
-  nextPrompt = continuation.prompt
-  if (continuation.applied) {
-    logger.info('链式续接：同场景，启用上一组尾帧作承接参考', {
+  const nextShotsPromptText = nextGroupShots.map(s => s.prompt || '').filter(p => p.trim()).join('\n')
+  let nextPrompt = nextRef.characterPrefix + (nextJob.promptSnapshot || nextShotsPromptText)
+
+  // 链式镜头衔接（reference_video 方案）：无条件将当前组生成视频传给下一组作 reference_video，
+  // 由 Seedance 模型分析前段视频的运动轨迹、光线、构图来自然续接，不再做场景判定。
+  const { VIDEO_CONTINUATION_PROMPT_SUFFIX } = await import('@/lib/frame-continuity')
+  if (prevGroupVideoUrl) {
+    nextPrompt = `${nextPrompt}${VIDEO_CONTINUATION_PROMPT_SUFFIX}`
+    logger.info('链式续接：传入上一组视频作 reference_video 衔接', {
       projectId,
       nextGroupId: nextGroup.id,
-      contIndex: continuation.contIndex,
+      prevGroupVideoUrl: prevGroupVideoUrl.substring(0, 60),
     })
   } else {
-    logger.info('链式续接：不承接尾帧（无受信尾帧 / 参考图已满 / 跨场景或 scene 缺失），下一组独立起镜', {
+    logger.info('链式续接：无前组视频（第一组或前组未成功），独立起镜', {
       projectId,
       nextGroupId: nextGroup.id,
     })
   }
+
+  // 保存 promptSnapshot（生成时使用的完整 prompt，便于调试和版本历史）
+  await prisma.generationJob.update({
+    where: { id: nextJob.id },
+    data: { promptSnapshot: nextPrompt },
+  })
 
   await videoGenerateQueue.add('video-generate', {
     jobId: nextJob.id,
@@ -846,9 +900,11 @@ async function triggerNextChainGroup(params: {
     duration: nextJob.duration,
     aspectRatio,
     resolution,
-    // 多模态参考：asset:// 人物锚定 + 场景帧 + 组音频（同场景时末尾含上一组尾帧承接参考）
+    // 多模态参考：asset:// 人物锚定 + 场景帧 + 组音频
     referenceImages,
     referenceAudioUrl: nextRef.referenceAudioUrl,
+    // reference_video 无缝衔接：无条件传入当前组生成视频，由模型自行续接
+    referenceVideoUrl: prevGroupVideoUrl,
     // 链式参数传递：currentIndex 用下一组的真实 groupIndex（非数组下标，兼容跳过已成功组）
     chainMode: true,
     chainTotalGroups: params.totalGroups,
@@ -888,7 +944,7 @@ export async function failProjectChain(
     const pendingJobs = await prisma.generationJob.findMany({
       where: {
         projectId,
-        status: { in: ['QUEUED', 'CREDIT_RESERVED', 'SUBMITTED', 'GENERATING'] },
+        status: { in: ['QUEUED', 'SUBMITTED', 'GENERATING'] },
       },
       select: { id: true, costEstimate: true, shotGroupId: true },
     })
@@ -946,62 +1002,71 @@ export async function failProjectChain(
 }
 
 /**
- * 链式生成全部完成后，触发全项目视频合并
+ * 链式生成全部完成后，标记项目为可编辑状态
+ *
+ * 不再自动触发合并——用户需要先预览各组生成视频、可能微调后再手动点击导出。
+ * 项目状态从 GENERATING 回到 EXPORTED（表示所有组已生成完毕，可以导出）。
  */
-async function triggerChainMerge(projectId: string, userId: string): Promise<void> {
+async function markChainCompleted(projectId: string, userId: string): Promise<void> {
   try {
-    // 查询所有分镜组（按 groupIndex 排序），收集生成的视频 URL
-    const groups = await prisma.shotGroup.findMany({
-      where: { projectId, genStatus: 'SUCCEEDED' },
-      orderBy: { groupIndex: 'asc' },
-      select: { groupIndex: true, genVideoUrl: true, genDuration: true, startTime: true, endTime: true },
+    // 汇总本项目全部组的积分消耗（从已成功的 GenerationJob 的 costEstimate 汇总）
+    const allJobs = await prisma.generationJob.findMany({
+      where: { projectId, status: 'SUCCEEDED' },
+      select: { costEstimate: true },
     })
+    const totalCostCredits = allJobs.reduce((sum, j) => sum + (j.costEstimate ?? 0), 0)
 
-    if (groups.length === 0) {
-      logger.error('链式合并触发但无成功的分镜组', { projectId })
-      await failProjectChain(projectId, userId, '链式合并失败：无成功生成的分镜组')
-      return
-    }
+    // 汇总 Seedance Token 消耗（从 Redis 累加器读取）
+    const tokenKey = `token_usage:${projectId}`
+    let totalCompletionTokens = 0
+    let totalTokens = 0
+    try {
+      const completion = await redis.get(`${tokenKey}:completion`)
+      const total = await redis.get(`${tokenKey}:total`)
+      totalCompletionTokens = parseInt(completion || '0', 10)
+      totalTokens = parseInt(total || '0', 10)
+      // 读取后清理
+      await redis.del(`${tokenKey}:completion`, `${tokenKey}:total`)
+    } catch { /* 非关键路径 */ }
 
-    const shotVideoUrls = groups
-      .filter((g) => g.genVideoUrl)
-      .map((g) => ({
-        orderIndex: g.groupIndex,
-        videoUrl: g.genVideoUrl!,
-        targetDuration: g.endTime - g.startTime,
-        genDuration: g.genDuration,
-      }))
-
-    if (shotVideoUrls.length === 0) {
-      logger.error('链式合并无可用视频 URL', { projectId })
-      await failProjectChain(projectId, userId, '链式合并失败：无可用的分镜组视频 URL')
-      return
-    }
-
-    // 获取项目画幅信息
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { aspectRatio: true },
-    })
-
-    // 入队 video-merge
-    const { videoMergeQueue } = await import('@/lib/queue')
-    await videoMergeQueue.add('video-merge', {
+    const seedanceTotalCostRMB = (totalCompletionTokens / 1_000_000) * 28.0
+    logger.info('═══ 链式生成完成汇总 ═══', {
       projectId,
-      userId,
-      shotVideoUrls,
-      outputAspectRatio: project?.aspectRatio || '16:9',
-      outputResolution: '720p',
+      totalGroups: allJobs.length,
+      totalCostCredits,
+      seedanceTokens: { completion: totalCompletionTokens, total: totalTokens },
+      seedanceCostRMB: `¥${seedanceTotalCostRMB.toFixed(4)}`,
+    })
+    console.log(
+      `[generate-video] ═══ 项目 ${projectId} 生成总计 ═══ ` +
+      `${allJobs.length} 组 | Seedance Token: completion=${totalCompletionTokens} total=${totalTokens} | ` +
+      `Token 成本: ¥${seedanceTotalCostRMB.toFixed(4)} | 积分消耗: ${totalCostCredits}`
+    )
+
+    // 查询首个生成成功组的 genCoverUrl 更新项目封面
+    const firstSucceededGroup = await prisma.shotGroup.findFirst({
+      where: { projectId, genStatus: 'SUCCEEDED', genCoverUrl: { not: null } },
+      orderBy: { groupIndex: 'asc' },
+      select: { genCoverUrl: true },
     })
 
-    logger.info('链式合并已入队', { projectId, segmentCount: shotVideoUrls.length })
+    // 标记项目状态为 EDITABLE（生成完毕，等用户手动导出）
+    await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        status: 'EDITABLE',
+        ...(firstSucceededGroup?.genCoverUrl ? { coverUrl: firstSucceededGroup.genCoverUrl } : {}),
+      },
+    })
+
+    logger.info('链式生成完成，项目已回到 EDITABLE 状态', { projectId })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
-    logger.error('触发链式合并失败', { projectId, error: msg })
+    logger.error('标记链式生成完成状态失败', { projectId, error: msg })
 
     await prisma.project.update({
       where: { id: projectId },
-      data: { status: 'FAILED', errorMsg: `合并触发失败: ${msg}` },
+      data: { status: 'FAILED', errorMsg: `标记完成失败: ${msg}` },
     }).catch(() => {})
   }
 }

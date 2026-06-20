@@ -1,7 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+/**
+ * 导出页面
+ *
+ * 集成 ResolutionSelector 和 ExportStatusDisplay 组件，
+ * 实现 3 秒间隔轮询 export-status API，连续 3 次失败后展示连接异常提示。
+ * 导出按钮点击后调用 Export API 并携带 target_resolution。
+ */
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { ResolutionSelector, type Resolution } from '@/components/export/ResolutionSelector'
+import { ExportStatusDisplay, type ExportStatus } from '@/components/export/ExportStatusDisplay'
 
 interface ShotGroupInfo {
   id: string
@@ -21,6 +30,15 @@ interface ProjectInfo {
   shotGroups: ShotGroupInfo[]
 }
 
+interface ExportStatusData {
+  status: ExportStatus | null
+  resolution: string | null
+  videoUrl: string | null
+  errorMessage: string | null
+  refundedCredits: number | null
+  createdAt: string | null
+}
+
 export default function ExportPage() {
   const params = useParams()
   const projectId = params.id as string
@@ -28,9 +46,14 @@ export default function ExportPage() {
   const [project, setProject] = useState<ProjectInfo | null>(null)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
-  const [polling, setPolling] = useState(false)
+  const [selectedResolution, setSelectedResolution] = useState<Resolution>('480p')
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [exportStatus, setExportStatus] = useState<ExportStatusData | null>(null)
+  const [connectionError, setConnectionError] = useState(false)
+  const consecutiveFailsRef = useRef(0)
+  const pollingRef = useRef(false)
 
-  // 加载项目信息（含 shotGroups)
+  // 加载项目信息
   const loadProject = useCallback(async () => {
     try {
       const res = await fetch(`/api/projects/${projectId}`)
@@ -43,42 +66,105 @@ export default function ExportPage() {
     }
   }, [projectId])
 
-  useEffect(() => {
-    loadProject()
-  }, [loadProject])
+  // 加载用户余额
+  const loadBalance = useCallback(async () => {
+    try {
+      const res = await fetch('/api/credits/balance')
+      if (res.ok) {
+        const data = await res.json()
+        setCreditBalance(data.balance)
+      }
+    } catch {
+      // 余额查询失败不阻塞
+    }
+  }, [])
 
   // 轮询导出状态
-  useEffect(() => {
-    if (!polling) return
+  const pollExportStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/export-status`)
+      if (res.ok) {
+        const data = await res.json()
+        setExportStatus(data)
+        consecutiveFailsRef.current = 0
+        setConnectionError(false)
 
-    const interval = setInterval(async () => {
-      await loadProject()
-      if (project?.status === 'EXPORTED' || project?.status === 'FAILED') {
-        setPolling(false)
+        // 状态为终态时停止轮询
+        if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+          pollingRef.current = false
+        }
+      } else {
+        consecutiveFailsRef.current++
+        if (consecutiveFailsRef.current >= 3) {
+          setConnectionError(true)
+        }
+      }
+    } catch {
+      consecutiveFailsRef.current++
+      if (consecutiveFailsRef.current >= 3) {
+        setConnectionError(true)
+      }
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    loadProject()
+    loadBalance()
+  }, [loadProject, loadBalance])
+
+  // 初始加载时也获取一次导出状态
+  useEffect(() => {
+    pollExportStatus()
+  }, [pollExportStatus])
+
+  // 3 秒轮询
+  useEffect(() => {
+    if (!pollingRef.current) return
+
+    const interval = setInterval(() => {
+      if (pollingRef.current) {
+        pollExportStatus()
       }
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [polling, project?.status, loadProject])
+  }, [pollExportStatus, exportStatus?.status])
+
+  // 当 exportStatus 变为活跃状态时启动轮询
+  useEffect(() => {
+    if (exportStatus?.status === 'MERGING' || exportStatus?.status === 'UPSCALING') {
+      pollingRef.current = true
+    }
+  }, [exportStatus?.status])
 
   // 触发导出
   const handleExport = async () => {
     setExporting(true)
     setError('')
+    setConnectionError(false)
+    consecutiveFailsRef.current = 0
 
     try {
       const res = await fetch(`/api/projects/${projectId}/export`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_resolution: selectedResolution }),
       })
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || '导出失败')
+        if (res.status === 402) {
+          setError(`积分不足：需要 ${data.required} 积分，当前余额 ${data.current}`)
+          await loadBalance()
+        } else {
+          setError(data.message || '导出失败')
+        }
         return
       }
 
-      setPolling(true)
-      await loadProject()
+      // 导出已入队，开始轮询
+      pollingRef.current = true
+      setExportStatus({ status: 'MERGING', resolution: selectedResolution, videoUrl: null, errorMessage: null, refundedCredits: null, createdAt: null })
     } catch {
       setError('网络错误，请重试')
     } finally {
@@ -87,17 +173,28 @@ export default function ExportPage() {
   }
 
   // 重试导出
-  const handleRetry = async () => {
+  const handleRetry = () => {
+    setExportStatus(null)
     setError('')
-    await handleExport()
   }
 
-  // 统计（基于分镜组)
+  // 统计
   const groups = project?.shotGroups || []
   const totalGroups = groups.length
   const completedGroups = groups.filter((g) => g.genStatus === 'SUCCEEDED').length
   const allCompleted = totalGroups > 0 && completedGroups === totalGroups
   const progressPercent = totalGroups > 0 ? Math.round((completedGroups / totalGroups) * 100) : 0
+
+  // 计算总时长
+  const totalDuration = groups
+    .filter((g) => g.genStatus === 'SUCCEEDED')
+    .reduce((sum, g) => sum + (g.genDuration || 0), 0)
+
+  // 720p/1080p 超分统一免费，不做积分阻断
+  const insufficientCredits = false
+
+  // 是否正在导出中（有活跃状态）
+  const isExportActive = exportStatus?.status === 'MERGING' || exportStatus?.status === 'UPSCALING'
 
   return (
     <div className="min-h-screen bg-[#09090b] p-6">
@@ -108,7 +205,6 @@ export default function ExportPage() {
           <p className="mt-1 text-sm text-[var(--cine-text-2)]">
             {project?.name || '加载中...'} — 将所有分镜组视频按顺序合并为一个完整视频
           </p>
-          <p className="mt-1 text-xs text-[var(--cine-text-3)]">合并导出免费，不消耗积分</p>
         </div>
 
         {/* 分镜组时间线 */}
@@ -174,81 +270,51 @@ export default function ExportPage() {
           </div>
         </div>
 
-        {/* 导出状态/操作 */}
-        <div className="rounded-xl border border-[var(--cine-line-2)] bg-[var(--cine-surface)] p-4">
-          {project?.status === 'EXPORTED' && project.exportedVideoUrl ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-green-500/10 px-2 py-1 text-xs font-medium text-[var(--cine-green)]">
-                  导出完成
-                </span>
-              </div>
-              {/* 视频预览 */}
-              <div className="overflow-hidden rounded-lg bg-black">
-                <video
-                  src={project.exportedVideoUrl}
-                  controls
-                  className="w-full"
-                  playsInline
-                />
-              </div>
-              {/* 下载按钮 */}
-              <a
-                href={project.exportedVideoUrl}
-                download
-                className="inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)]"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                下载视频
-              </a>
-            </div>
-          ) : project?.status === 'GENERATING' || polling ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-purple-500/10 px-2 py-1 text-xs font-medium text-purple-400 animate-pulse">
-                  合并中...
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-[var(--cine-surface)]">
-                <div className="h-full w-1/2 animate-pulse rounded-full bg-purple-500/50" />
-              </div>
-              <p className="text-xs text-[var(--cine-text-3)]">正在合并分镜组视频，请稍候...</p>
-            </div>
-          ) : project?.status === 'FAILED' ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-red-500/10 px-2 py-1 text-xs font-medium text-red-400">
-                  导出失败
-                </span>
-              </div>
-              <p className="text-xs text-red-400/70">{project.errorMsg || '合并过程中出现错误'}</p>
-              <button
-                onClick={handleRetry}
-                className="rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)]"
-              >
-                重试导出
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {!allCompleted && (
-                <p className="text-xs text-yellow-400/70">
-                  还有 {totalGroups - completedGroups} 个分镜组未完成生成，请先完成所有分镜组
-                </p>
-              )}
-              {error && <p className="text-xs text-red-400">{error}</p>}
-              <button
-                onClick={handleExport}
-                disabled={!allCompleted || exporting}
-                className="rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)] disabled:cursor-not-allowed disabled:bg-[var(--cine-gold)]/50 disabled:text-[var(--cine-text-2)]"
-              >
-                {exporting ? '提交中...' : '开始合并导出'}
-              </button>
-            </div>
-          )}
-        </div>
+        {/* 导出状态展示（活跃/已完成/已失败时） */}
+        {exportStatus?.status && (
+          <ExportStatusDisplay
+            status={exportStatus.status}
+            resolution={exportStatus.resolution ?? undefined}
+            videoUrl={exportStatus.videoUrl ?? undefined}
+            errorMessage={exportStatus.errorMessage ?? undefined}
+            refundedCredits={exportStatus.refundedCredits}
+            onRetry={handleRetry}
+          />
+        )}
+
+        {/* 连接异常提示 */}
+        {connectionError && (
+          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3">
+            <p className="text-sm text-yellow-400">连接异常：无法获取导出状态，请检查网络连接</p>
+          </div>
+        )}
+
+        {/* 分辨率选择器 + 导出按钮（无活跃导出时展示，已完成也可重新选择分辨率导出） */}
+        {!isExportActive && (
+          <div className="rounded-xl border border-[var(--cine-line-2)] bg-[var(--cine-surface)] p-4 space-y-4">
+            <ResolutionSelector
+              totalDuration={totalDuration}
+              onSelect={setSelectedResolution}
+              selectedResolution={selectedResolution}
+              creditBalance={creditBalance}
+            />
+
+            {!allCompleted && (
+              <p className="text-xs text-yellow-400/70">
+                还有 {totalGroups - completedGroups} 个分镜组未完成生成，请先完成所有分镜组
+              </p>
+            )}
+            {error && <p className="text-xs text-red-400">{error}</p>}
+
+            <button
+              onClick={handleExport}
+              disabled={!allCompleted || exporting || insufficientCredits}
+              className="rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)] disabled:cursor-not-allowed disabled:bg-[var(--cine-gold)]/50 disabled:text-[var(--cine-text-2)]"
+            >
+              {exporting ? '提交中...' : insufficientCredits ? '积分不足' : exportStatus?.status === 'COMPLETED' ? '重新导出（选择新分辨率）' : '开始导出'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

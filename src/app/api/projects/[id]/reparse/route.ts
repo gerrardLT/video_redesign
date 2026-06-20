@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { estimateParseCreditCost, getBalance } from '@/lib/credit-service'
+import { getUserPrivileges } from '@/lib/privilege-engine'
+import { buildRejectionResponse } from '@/lib/concurrency-controller'
+import { scheduleWithPriority } from '@/lib/priority-scheduler'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,6 +55,18 @@ export async function POST(
       )
     }
 
+    // 并发控制：P0 修复——改为 DB 查询门控，不再使用 Redis 原子计数器
+    const privileges = await getUserPrivileges(userId)
+    const activeParseCount = await prisma.project.count({
+      where: { userId, status: { in: ['DOWNLOADING', 'PARSING'] } },
+    })
+    if (activeParseCount >= privileges.concurrency.parse) {
+      return NextResponse.json(
+        buildRejectionResponse(privileges.tier, 'parse', privileges.concurrency.parse),
+        { status: 429 }
+      )
+    }
+
     // 删除已有的解析数据（分镜 / 人物 / 分组 / 风格设定），避免重复
     await prisma.shot.deleteMany({ where: { projectId: id } })
     await prisma.character.deleteMany({ where: { projectId: id } })
@@ -67,13 +82,19 @@ export async function POST(
       },
     })
 
-    // 添加新的解析任务到队列
+    // 带优先级的解析任务入队
     try {
       const { videoParseQueue } = await import('@/lib/queue')
-      await videoParseQueue.add('parse-video', {
-        projectId: id,
-        videoUrl: project.videoUrl,
-      })
+      await scheduleWithPriority(
+        videoParseQueue,
+        'parse-video',
+        { projectId: id, videoUrl: project.videoUrl },
+        privileges.tier,
+        {
+          attempts: 2,
+          backoff: { type: 'exponential', delay: 5000 },
+        }
+      )
     } catch (queueError) {
       console.error('[reparse] 无法添加解析任务到队列:', queueError)
       // 队列不可用时回滚状态

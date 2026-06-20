@@ -48,6 +48,8 @@ export interface MergeInputShot {
   prompt: string | null
   /** 对白内容（JSON 字符串，如 [{"speaker":"角色A","text":"你好"}]） */
   dialogue?: string | null
+  /** 场景描述（如"白色背景直播间"），用于在 prompt 中声明场景环境 */
+  scene?: string | null
 }
 
 /** 合并算法的输出 */
@@ -385,6 +387,14 @@ export function mergeTimelineScript(
     parts.push(compressedStyle)
   }
 
+  // 1.5 场景描述行：取组内首个分镜的 scene 字段，作为环境背景文字声明。
+  //     帧图（reference_image）提供视觉锚定，此行提供语义强化，二者协同使 Seedance 准确理解"在哪个场景"。
+  //     无 scene 时不写（不伪造），仅靠帧图和 prompt 内零散描述承载。
+  const sceneDesc = sorted[0]?.scene?.trim()
+  if (sceneDesc) {
+    parts.push(`场景：${sceneDesc}`)
+  }
+
   // 2. 时间轴分段 —— 全部分镜行完整保留（≤MAX_SHOTS_PER_GROUP=3段），绝不丢段
   parts.push(...timelineLines)
 
@@ -403,6 +413,10 @@ export function mergeTimelineScript(
     const compressedParts: string[] = []
     if (compressedStyle) {
       compressedParts.push(compressedStyle)
+    }
+    // 场景描述行保留（不可省略，是场景锚定的关键文字信号）
+    if (sceneDesc) {
+      compressedParts.push(`场景：${sceneDesc}`)
     }
     compressedParts.push(...compressedLines)
     if (options?.addNegativeConstraints !== false) {

@@ -5,6 +5,8 @@ import Link from 'next/link'
 
 export default function LandingPage() {
   const heroTitleRef = useRef<HTMLHeadingElement>(null)
+  const videoOriginalRef = useRef<HTMLVideoElement>(null)
+  const videoRedesignRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
     // Hero title per-character animation with organic timing
@@ -86,6 +88,35 @@ export default function LandingPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // 两段视频同步播放：仅在循环时重新对齐，不干扰浏览器原生 autoPlay
+  useEffect(() => {
+    const vOrig = videoOriginalRef.current
+    const vRedo = videoRedesignRef.current
+    if (!vOrig || !vRedo) return
+
+    // 当较短的视频 loop 回到起点时，同步较长的那个也回起点
+    const handleTimeUpdate = () => {
+      // 如果其中一个回到了开头附近（loop 触发），把另一个也拉回起点
+      if (vOrig.currentTime < 0.1 && vRedo.currentTime > 0.5) {
+        vRedo.currentTime = 0
+      }
+    }
+
+    const handleTimeUpdateRedo = () => {
+      if (vRedo.currentTime < 0.1 && vOrig.currentTime > 0.5) {
+        vOrig.currentTime = 0
+      }
+    }
+
+    vOrig.addEventListener('seeked', handleTimeUpdate)
+    vRedo.addEventListener('seeked', handleTimeUpdateRedo)
+
+    return () => {
+      vOrig.removeEventListener('seeked', handleTimeUpdate)
+      vRedo.removeEventListener('seeked', handleTimeUpdateRedo)
+    }
+  }, [])
+
   return (
     <div className="lp-root">
       {/* Nav */}
@@ -117,7 +148,7 @@ export default function LandingPage() {
             <span className="lp-line-reveal"><span className="lp-line-inner" style={{ animationDelay: '1.2s' }}>上传你的原始视频，AI 保持人物一致、分镜级精细控制——几分钟后，拿到完全重塑的新版本。</span></span>
           </p>
           <div className="lp-hero-ctas">
-            <Link href="/showcase" className="lp-btn-primary">查看真实案例</Link>
+            <Link href="/dashboard/showcase" className="lp-btn-primary">查看真实案例</Link>
             <a href="#contact" className="lp-btn-ghost">联系我们</a>
           </div>
         </div>
@@ -125,11 +156,29 @@ export default function LandingPage() {
         <div className="lp-hero-right">
           <div className="lp-video-compare">
             <div className="lp-vc-item">
-              <div className="lp-vc-placeholder"><div className="lp-vc-play">▶</div><span className="lp-vc-label">原视频</span></div>
+              <video
+                ref={videoOriginalRef}
+                className="lp-vc-video"
+                src="https://video-redesign-sh.oss-cn-shanghai.aliyuncs.com/34af8c2ba42b86d5a4f9f66fe9371f19.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+              <span className="lp-vc-label">原视频</span>
             </div>
             <div className="lp-vc-divider"><div className="lp-vc-divider-line" /><div className="lp-vc-divider-badge">VS</div></div>
             <div className="lp-vc-item lp-vc-after">
-              <div className="lp-vc-placeholder lp-vc-after"><div className="lp-vc-play">▶</div><span className="lp-vc-label">AI 重塑</span></div>
+              <video
+                ref={videoRedesignRef}
+                className="lp-vc-video"
+                src="https://video-redesign-sh.oss-cn-shanghai.aliyuncs.com/exported/cmqg0pi140000z05iali2xz9z/cmql4fkqe000c485i19jwrfkr/upscaled_1781949930605.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+              <span className="lp-vc-label">AI 重塑</span>
             </div>
           </div>
         </div>
@@ -143,14 +192,17 @@ export default function LandingPage() {
         <div className="lp-stat" data-lp-reveal><div className="lp-stat-n" data-count="7">0</div><div className="lp-stat-l">步全流程可控</div></div>
       </section>
 
-      {/* Features */}
+      {/* Features — 6 张功能卡片，3列2行 */}
       <section className="lp-features" id="features">
         <div className="lp-features-glow" />
         <h2 data-lp-reveal>为什么选择视频重塑</h2>
         <div className="lp-feat-grid">
-          <div className="lp-feat-card" data-lp-reveal><div className="lp-feat-num">01</div><h3>人物一致性</h3><p>锚定图 + 角色参考，所有分镜保持同一人物的面容、服装一致。告别&ldquo;每帧换脸&rdquo;。</p></div>
-          <div className="lp-feat-card" data-lp-reveal><div className="lp-feat-num">02</div><h3>分镜级控制</h3><p>每个镜头独立编辑提示词、时长、参考人物——导演级精细掌控每一帧。</p></div>
-          <div className="lp-feat-card" data-lp-reveal><div className="lp-feat-num">03</div><h3>一键合并出片</h3><p>全部分镜组并行生成，自动合并为完整视频。传统数天流程，现在分钟级完成。</p></div>
+          <div className="lp-feat-card" data-lp-reveal><div className="lp-feat-num">01</div><h3>人物一致性</h3><p>上传角色参考图，AI 在所有分镜中保持同一人物的面容、服装一致。告别&ldquo;每帧换脸&rdquo;。</p></div>
+          <div className="lp-feat-card" data-lp-reveal><div className="lp-feat-num">02</div><h3>分镜级控制</h3><p>每个镜头独立编辑提示词、时长、参考角色——导演级精细掌控每一帧。</p></div>
+          <div className="lp-feat-card" data-lp-reveal><div className="lp-feat-num">03</div><h3>链式连贯生成</h3><p>同场景尾帧衔接技术，前一组最后一帧作为下一组起始参考，镜头间自然过渡。</p></div>
+          <div className="lp-feat-card" data-lp-reveal><div className="lp-feat-num">04</div><h3>智能视频解析</h3><p>AI 多模态分析，自动拆分镜头、识别场景切换、生成分镜描述词。</p></div>
+          <div className="lp-feat-card" data-lp-reveal><div className="lp-feat-num">05</div><h3>多分辨率导出</h3><p>480p 快速预览，720p/1080p 超分输出。一次生成，多档交付。</p></div>
+          <div className="lp-feat-card" data-lp-reveal><div className="lp-feat-num">06</div><h3>资产复用</h3><p>角色图跨项目应用，资产库统一管理，同一人物多项目复用无需重新生成。</p></div>
         </div>
       </section>
 
@@ -163,21 +215,25 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 人物一致性深度 */}
+      {/* 人物一致性深度 — 真实视频对比 */}
       <section className="lp-deep">
         <div className="lp-deep-light" />
         <div className="lp-deep-inner" data-lp-reveal>
           <div className="lp-deep-visual">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="https://picsum.photos/seed/face-before/560/420" alt="对比" className="lp-deep-img" />
-            <span className="lp-deep-tag lp-left">普通 AI</span>
+            <div className="lp-deep-videos">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="https://video-redesign-sh.oss-cn-shanghai.aliyuncs.com/cover/cmqllhs62000h485ifn8riuj9/shot_0.jpg" alt="原视频人物" className="lp-deep-video" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="https://video-redesign-sh.oss-cn-shanghai.aliyuncs.com/characters/cmqllhs62000h485ifn8riuj9/f705721a-30ed-4281-92d6-52164416fb8d.png" alt="生成人物形象" className="lp-deep-video" />
+            </div>
+            <span className="lp-deep-tag lp-left">原视频</span>
             <span className="lp-deep-tag lp-right">视频重塑</span>
             <div className="lp-deep-split" />
           </div>
           <div className="lp-deep-text">
             <div className="lp-sec-kicker">核心技术</div>
             <h2>为什么人物一致性很重要？</h2>
-            <p>传统 AI 视频工具的致命问题：同一个人物在不同帧里长相完全不同。</p>
+            <p>原始视频重塑后，同一人物在不同镜头中始终保持面容、服装、体态的高度一致。</p>
             <p>视频重塑通过<strong>角色锚定技术</strong>解决：上传参考图，AI 在全部分镜中保持人物一致。</p>
             <ul>
               <li>面容一致 — 五官结构跨镜头保持</li>
@@ -221,7 +277,7 @@ export default function LandingPage() {
           <div className="lp-faq-item" data-lp-reveal><h3>视频时长有限制吗？</h3><p>目前支持最长 2 分钟。更长视频可分段处理。</p></div>
           <div className="lp-faq-item" data-lp-reveal><h3>生成要多久？</h3><p>一般 3-5 分钟完成全部生成+合并。</p></div>
           <div className="lp-faq-item" data-lp-reveal><h3>生成失败怎么办？</h3><p>失败的分镜组积分自动退还，不静默扣费。</p></div>
-          <div className="lp-faq-item" data-lp-reveal><h3>支持哪些输出？</h3><p>9:16 竖屏、16:9 横屏、1:1 方形。480p/720p MP4。</p></div>
+          <div className="lp-faq-item" data-lp-reveal><h3>支持哪些输出？</h3><p>480p 快速预览，720p/1080p 超分导出，三档均免费。支持 9:16 竖屏、16:9 横屏、1:1 方形。</p></div>
         </div>
       </section>
 
@@ -231,7 +287,7 @@ export default function LandingPage() {
         <h2 data-lp-reveal>亲眼看见，才会相信</h2>
         <p data-lp-reveal>查看真实案例，或联系我们了解企业方案。</p>
         <div className="lp-bottom-btns" data-lp-reveal>
-          <Link href="/showcase" className="lp-btn-primary">查看案例</Link>
+          <Link href="/dashboard/showcase" className="lp-btn-primary">查看案例</Link>
           <a href="mailto:hello@example.com" className="lp-btn-ghost">联系我们</a>
         </div>
       </section>

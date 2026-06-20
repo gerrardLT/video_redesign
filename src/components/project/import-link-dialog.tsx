@@ -5,7 +5,7 @@ import { Dialog } from '@base-ui/react/dialog'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { validateShareLink } from '@/lib/video-import-service'
+import { validateShareLink, type ExtendedPlatform } from '@/lib/validate-share-link'
 import { PLATFORM_PATTERNS, type VideoPlatform } from '@/constants/platform-patterns'
 
 interface ImportLinkDialogProps {
@@ -14,8 +14,8 @@ interface ImportLinkDialogProps {
 }
 
 /** 平台图标 SVG 组件 */
-function PlatformIcon({ platform }: { platform: VideoPlatform | null }) {
-  if (!platform) return null
+function PlatformIcon({ platform }: { platform: ExtendedPlatform | null }) {
+  if (!platform || platform === 'other') return null
 
   switch (platform) {
     case 'douyin':
@@ -53,7 +53,7 @@ export function ImportLinkDialog({ open, onClose }: ImportLinkDialogProps) {
   const [url, setUrl] = useState('')
   const [projectName, setProjectName] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [detectedPlatform, setDetectedPlatform] = useState<VideoPlatform | null>(null)
+  const [detectedPlatform, setDetectedPlatform] = useState<ExtendedPlatform | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // 重置表单
@@ -92,19 +92,23 @@ export function ImportLinkDialog({ open, onClose }: ImportLinkDialogProps) {
   }, [])
 
   // 获取平台中文名
-  const getPlatformLabel = (platform: VideoPlatform): string => {
+  const getPlatformLabel = (platform: ExtendedPlatform): string => {
+    if (platform === 'other') return '其他平台'
     const found = PLATFORM_PATTERNS.find((p) => p.platform === platform)
     return found?.label || platform
   }
 
   // 提交导入
   const handleSubmit = async () => {
-    // 客户端预验证
+    // 客户端预验证（支持从分享文案中自动提取 URL）
     const validation = validateShareLink(url)
     if (!validation.valid) {
       setError(validation.error || '链接格式不正确')
       return
     }
+
+    // 使用提取后的纯净 URL（而非用户粘贴的原始文案）
+    const actualUrl = validation.extractedUrl || url.trim()
 
     setIsSubmitting(true)
     setError(null)
@@ -114,7 +118,7 @@ export function ImportLinkDialog({ open, onClose }: ImportLinkDialogProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          url: url.trim(),
+          url: actualUrl,
           name: projectName.trim() || undefined,
         }),
       })
@@ -130,7 +134,7 @@ export function ImportLinkDialog({ open, onClose }: ImportLinkDialogProps) {
       // 成功
       toast.success('视频导入任务已创建，正在下载中...')
       onClose()
-      router.push(`/dashboard/projects/${data.projectId}`)
+      router.push(`/dashboard/project/${data.projectId}`)
     } catch {
       setError('网络请求失败，请检查网络连接后重试')
       setIsSubmitting(false)
@@ -181,6 +185,9 @@ export function ImportLinkDialog({ open, onClose }: ImportLinkDialogProps) {
                 >
                   视频链接 <span className="text-red-400">*</span>
                 </label>
+                <p className="mb-1.5 text-xs text-[var(--cine-text-3)]">
+                  支持平台：抖音 · 快手 · 微信视频号 · B站 · 小红书等，可直接粘贴分享文案
+                </p>
                 <div className="relative">
                   <input
                     id="import-url"
@@ -194,7 +201,7 @@ export function ImportLinkDialog({ open, onClose }: ImportLinkDialogProps) {
                         setTimeout(() => handleUrlChange(pasted), 0)
                       }
                     }}
-                    placeholder="粘贴视频分享链接..."
+                    placeholder="粘贴视频分享链接或分享文案..."
                     className="w-full rounded-lg border border-[var(--cine-line-2)] bg-[var(--cine-surface)] px-3 py-2.5 pr-10 text-sm text-white placeholder:text-[var(--cine-text-3)] focus:border-[var(--cine-gold)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--cine-gold)]/50 transition-colors"
                     disabled={isSubmitting}
                     autoFocus
@@ -209,7 +216,9 @@ export function ImportLinkDialog({ open, onClose }: ImportLinkDialogProps) {
                 {/* 识别到的平台提示 */}
                 {detectedPlatform && !error && (
                   <p className="mt-1.5 text-xs text-[var(--cine-gold)]">
-                    已识别为{getPlatformLabel(detectedPlatform)}链接
+                    {detectedPlatform === 'other'
+                      ? '已识别到视频链接，将尝试下载'
+                      : `已识别为${getPlatformLabel(detectedPlatform)}链接`}
                   </p>
                 )}
                 {/* 错误提示 */}
@@ -260,7 +269,7 @@ export function ImportLinkDialog({ open, onClose }: ImportLinkDialogProps) {
                 />
               </svg>
               <span className="text-xs text-[var(--cine-text-3)]">
-                支持抖音、快手、微信视频号的分享链接
+                支持抖音、快手、微信视频号等平台，可直接粘贴分享文案
               </span>
             </div>
 

@@ -23,6 +23,11 @@ const {
   mockEstimateGroupCreditCost,
   mockRefundCredits,
   mockBuildGroupGenReference,
+  mockGetUserPrivileges,
+  mockCheckAndIncrement,
+  mockBuildRejectionResponse,
+  mockDecrement,
+  mockOrchestrateGeneration,
 } = vi.hoisted(() => {
   const mockPrisma = {
     project: {
@@ -46,6 +51,9 @@ const {
     shot: {
       updateMany: vi.fn().mockResolvedValue({}),
     },
+    subscriptionRecord: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
   }
 
   const mockQueue = {
@@ -66,12 +74,39 @@ const {
     referenceAudioUrl: undefined,
   })
 
+  // 并发控制相关 mock
+  const mockGetUserPrivileges = vi.fn().mockResolvedValue({
+    queuePriority: 5,
+    allowedResolutions: ['480p', '720p'],
+    watermarkEnabled: true,
+    historyRetentionDays: 7,
+    isActiveMember: false,
+    tier: 'FREE' as const,
+    concurrency: { parse: 1, generate: 1, merge: 1 },
+  })
+
+  const mockCheckAndIncrement = vi.fn().mockResolvedValue({
+    allowed: true,
+    currentCount: 1,
+    limit: 1,
+  })
+
+  const mockBuildRejectionResponse = vi.fn()
+  const mockDecrement = vi.fn().mockResolvedValue(undefined)
+
+  const mockOrchestrateGeneration = vi.fn()
+
   return {
     mockPrisma,
     mockQueue,
     mockEstimateGroupCreditCost,
     mockRefundCredits,
     mockBuildGroupGenReference,
+    mockGetUserPrivileges,
+    mockCheckAndIncrement,
+    mockBuildRejectionResponse,
+    mockDecrement,
+    mockOrchestrateGeneration,
   }
 })
 
@@ -92,9 +127,21 @@ vi.mock('@/lib/distributed-lock', () => ({
 vi.mock('@/lib/group-gen-context', () => ({
   buildGroupGenReference: (...args: unknown[]) => mockBuildGroupGenReference(...args),
 }))
+vi.mock('@/lib/privilege-engine', () => ({
+  getUserPrivileges: (...args: unknown[]) => mockGetUserPrivileges(...args),
+}))
+vi.mock('@/lib/concurrency-controller', () => ({
+  checkAndIncrement: (...args: unknown[]) => mockCheckAndIncrement(...args),
+  buildRejectionResponse: (...args: unknown[]) => mockBuildRejectionResponse(...args),
+  decrement: (...args: unknown[]) => mockDecrement(...args),
+}))
+vi.mock('@/lib/generation-orchestrator', () => ({
+  orchestrateGeneration: (...args: unknown[]) => mockOrchestrateGeneration(...args),
+}))
 
 // 导入路由 handler（mock 必须先于导入）
 import { POST } from '@/app/api/projects/[id]/generate/route'
+import { ApiError } from '@/lib/api-error'
 
 // ========================
 // 辅助函数
@@ -176,43 +223,6 @@ function makeProject(overrides: Partial<Record<string, unknown>> = {}) {
   }
 }
 
-/**
- * 安装一个真实模拟事务行为的 $transaction：
- * 调用传入的回调并提供 tx mock（findUniqueOrThrow 返回指定余额，job.create 递增 id）。
- */
-function installTransaction(balance: number) {
-  let jobSeq = 0
-  mockPrisma.$transaction.mockImplementation(
-    async (fn: (tx: unknown) => Promise<unknown>) => {
-      const tx = {
-        user: {
-          findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'user-1', creditBalance: balance }),
-          update: vi.fn().mockResolvedValue({}),
-        },
-        generationJob: {
-          create: vi.fn().mockImplementation(async ({ data }: { data: { shotGroupId: string } }) => {
-            jobSeq += 1
-            return { id: `job-${jobSeq}`, shotGroupId: data.shotGroupId, status: 'QUEUED' }
-          }),
-        },
-        creditLedger: {
-          create: vi.fn().mockResolvedValue({}),
-        },
-        project: {
-          update: vi.fn().mockResolvedValue({}),
-        },
-        shotGroup: {
-          update: vi.fn().mockResolvedValue({}),
-        },
-        shot: {
-          updateMany: vi.fn().mockResolvedValue({}),
-        },
-      }
-      return fn(tx)
-    }
-  )
-}
-
 // ========================
 // 测试
 // ========================
@@ -228,6 +238,21 @@ describe('POST /api/projects/[id]/generate', () => {
     mockEstimateGroupCreditCost.mockImplementation((duration: number, resolution: string) => {
       const multiplier = resolution === '720p' ? 1.5 : 1.0
       return Math.ceil(duration * multiplier)
+    })
+    // 默认并发控制放行
+    mockGetUserPrivileges.mockResolvedValue({
+      queuePriority: 5,
+      allowedResolutions: ['480p', '720p'],
+      watermarkEnabled: true,
+      historyRetentionDays: 7,
+      isActiveMember: false,
+      tier: 'FREE' as const,
+      concurrency: { parse: 1, generate: 1, merge: 1 },
+    })
+    mockCheckAndIncrement.mockResolvedValue({
+      allowed: true,
+      currentCount: 1,
+      limit: 1,
     })
   })
 
@@ -292,17 +317,25 @@ describe('POST /api/projects/[id]/generate', () => {
 
   it('正常生成 → 返回 202 + chain 模式，且仅第一组入队', async () => {
     mockPrisma.project.findFirst.mockResolvedValue(makeProject())
-    // 余额充足：2 组 × ceil(12×1.5)=18 → totalCost=36
-    mockPrisma.user.findUniqueOrThrow.mockResolvedValue({ id: 'user-1', creditBalance: 100 })
-    installTransaction(100)
+    // orchestrateGeneration 返回 chain 模式结果
+    mockOrchestrateGeneration.mockResolvedValue({
+      mode: 'chain',
+      enqueuedGroups: 1,
+      totalGroups: 2,
+      totalCost: 36,
+      jobs: [
+        { id: 'job-1', groupIndex: 0, status: 'QUEUED' },
+        { id: 'job-2', groupIndex: 1, status: 'WAITING' },
+      ],
+    })
 
     const res = await POST(createRequest(), createParams())
     const body = await res.json()
 
     expect(res.status).toBe(202)
     expect(body.mode).toBe('chain')
-    expect(body.totalJobs).toBe(2)
-    expect(body.costEstimate).toBe(36)
+    expect(body.totalGroups).toBe(2)
+    expect(body.totalCost).toBe(36)
     expect(body.jobs).toHaveLength(2)
     expect(body.jobs[0]).toHaveProperty('id')
     expect(body.jobs[0]).toHaveProperty('groupIndex', 0)
@@ -310,36 +343,28 @@ describe('POST /api/projects/[id]/generate', () => {
     expect(body.jobs[1]).toHaveProperty('groupIndex', 1)
     expect(body.jobs[1].status).toBe('WAITING')
 
-    // 仅入队第一组（链式：后续组由 Worker 触发）
-    expect(mockQueue.add).toHaveBeenCalledTimes(1)
-    expect(mockQueue.add).toHaveBeenCalledWith(
-      'video-generate',
+    // 确认调用了 orchestrateGeneration
+    expect(mockOrchestrateGeneration).toHaveBeenCalledTimes(1)
+    expect(mockOrchestrateGeneration).toHaveBeenCalledWith(
       expect.objectContaining({
-        projectId: 'proj-1',
         userId: 'user-1',
-        shotGroupId: 'group-1',
-        chainMode: true,
-        chainTotalGroups: 2,
-        chainCurrentIndex: 0,
+        projectId: 'proj-1',
+        tier: 'FREE',
       })
     )
   })
 
-  it('积分余额不足 → 返回 400 + required/available', async () => {
+  it('积分余额不足 → 返回 402 + INSUFFICIENT_CREDITS', async () => {
     mockPrisma.project.findFirst.mockResolvedValue(makeProject())
-    // 余额不足：totalCost=36，余额仅 10
-    mockPrisma.user.findUniqueOrThrow.mockResolvedValue({ id: 'user-1', creditBalance: 10 })
+    // orchestrateGeneration 抛出 INSUFFICIENT_CREDITS 错误
+    mockOrchestrateGeneration.mockRejectedValue(
+      new ApiError('INSUFFICIENT_CREDITS', '积分不足：生成需 36 积分，当前余额 10', 402)
+    )
 
     const res = await POST(createRequest(), createParams())
     const body = await res.json()
 
-    expect(res.status).toBe(400)
-    expect(body.error).toBe('积分余额不足')
-    expect(body.required).toBe(36)
-    expect(body.available).toBe(10)
-
-    // 余额不足时不应进入事务、不应入队
-    expect(mockPrisma.$transaction).not.toHaveBeenCalled()
-    expect(mockQueue.add).not.toHaveBeenCalled()
+    expect(res.status).toBe(402)
+    expect(body.code).toBe('INSUFFICIENT_CREDITS')
   })
 })

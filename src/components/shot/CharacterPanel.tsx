@@ -72,8 +72,15 @@ export default function CharacterPanel({ projectId, characters, onUpdate }: Char
     }
   }, [onUpdate])
 
-  // 生成参考图
-  const generateImage = useCallback(async (charId: string) => {
+  // 生成参考图（二次确认后执行）
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'generate' | 'upload'
+    charId: string
+    charName: string
+    file?: File
+  } | null>(null)
+
+  const executeGenerate = useCallback(async (charId: string) => {
     setGenerating(charId)
     try {
       const res = await fetch(`/api/characters/${charId}/generate-image`, {
@@ -91,8 +98,12 @@ export default function CharacterPanel({ projectId, characters, onUpdate }: Char
     }
   }, [onUpdate])
 
-  // 上传自有形象图（直接作为人物锚定图，替代文生图生成)
-  const uploadImage = useCallback(async (charId: string, file: File) => {
+  const generateImage = useCallback((charId: string, charName: string) => {
+    setConfirmAction({ type: 'generate', charId, charName })
+  }, [])
+
+  // 上传自有形象图（二次确认后执行）
+  const executeUpload = useCallback(async (charId: string, file: File) => {
     setUploading(charId)
     try {
       const formData = new FormData()
@@ -112,6 +123,10 @@ export default function CharacterPanel({ projectId, characters, onUpdate }: Char
       setUploading(null)
     }
   }, [onUpdate])
+
+  const uploadImage = useCallback((charId: string, charName: string, file: File) => {
+    setConfirmAction({ type: 'upload', charId, charName, file })
+  }, [])
 
   // 隐藏 projectId lint warning
   void projectId
@@ -224,7 +239,7 @@ export default function CharacterPanel({ projectId, characters, onUpdate }: Char
                   )}
                   <div className="flex flex-col gap-1">
                     <button
-                      onClick={() => generateImage(char.id)}
+                      onClick={() => generateImage(char.id, char.name)}
                       disabled={generating === char.id || uploading === char.id || !char.appearance}
                       className="rounded bg-[var(--cine-gold-dim)] border border-[var(--cine-gold)]/30 px-2 py-1 text-[11px] text-[var(--cine-gold)] hover:bg-[var(--cine-gold-dim)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
@@ -247,7 +262,7 @@ export default function CharacterPanel({ projectId, characters, onUpdate }: Char
                         disabled={uploading === char.id || generating === char.id}
                         onChange={(e) => {
                           const file = e.target.files?.[0]
-                          if (file) uploadImage(char.id, file)
+                          if (file) uploadImage(char.id, char.name, file)
                           // 重置 value，允许重复选择同一文件再次上传
                           e.target.value = ''
                         }}
@@ -286,6 +301,50 @@ export default function CharacterPanel({ projectId, characters, onUpdate }: Char
             alt="人物形象预览"
             className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
           />
+        </div>
+      )}
+
+      {/* 生成/上传人物形象二次确认弹窗（积分提示） */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-[#333] bg-[var(--cine-surface)] p-6 shadow-2xl">
+            <h3 className="text-center text-base font-semibold text-white">
+              {confirmAction.type === 'generate' ? '生成人物形象' : '上传并风格化形象'}
+            </h3>
+            <p className="mt-3 text-center text-sm text-[var(--cine-text-2)]">
+              {confirmAction.type === 'generate'
+                ? `将为「${confirmAction.charName}」AI 生成一张风格化人物锚定图。`
+                : `将基于上传图片为「${confirmAction.charName}」生成风格化人物锚定图。`}
+            </p>
+            <div className="mt-4 rounded-lg bg-[var(--cine-gold-dim)] border border-[var(--cine-gold)]/20 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--cine-text-2)]">本次消耗</span>
+                <span className="font-semibold text-[var(--cine-gold)]">2 积分</span>
+              </div>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="flex-1 rounded-lg border border-[#444] py-2 text-sm text-gray-300 hover:text-white hover:border-[#666] transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  const { type, charId, file } = confirmAction
+                  setConfirmAction(null)
+                  if (type === 'generate') {
+                    executeGenerate(charId)
+                  } else if (file) {
+                    executeUpload(charId, file)
+                  }
+                }}
+                className="flex-1 rounded-lg bg-[var(--cine-gold)] py-2 text-sm font-medium text-[var(--cine-ink)] hover:bg-[var(--cine-gold-2)] transition-colors"
+              >
+                确认（扣 2 积分）
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

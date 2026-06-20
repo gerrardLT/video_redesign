@@ -170,11 +170,14 @@ export async function getUnread(userId: string) {
 
 /**
  * 创建资产即将过期通知
+ * 通知内容包含资产名称、项目名称、剩余天数
+ * meta 中提供 bookmarkLink 收藏操作入口，便于用户一键将临时资产升级为永久资产
  */
 export async function createAssetExpiringNotification(
   userId: string,
   assetInfo: {
     assetId: string
+    assetName?: string
     projectId: string
     projectName: string
     expiresAt: Date
@@ -182,11 +185,12 @@ export async function createAssetExpiringNotification(
   }
 ) {
   const title = '资产即将过期'
-  const content = `您的项目「${assetInfo.projectName}」中的视频资产将在 ${assetInfo.daysLeft} 天后过期，请及时下载保存。`
+  const content = `您的项目「${assetInfo.projectName}」中的资产「${assetInfo.assetName || '视频资产'}」将在 ${assetInfo.daysLeft} 天后过期，请及时下载保存或收藏到资产库。`
   const meta: Record<string, string> = {
     assetId: assetInfo.assetId,
     projectId: assetInfo.projectId,
     link: `/dashboard/projects/${assetInfo.projectId}`,
+    bookmarkLink: `/api/assets/${assetInfo.assetId}/bookmark`,
     expiresAt: assetInfo.expiresAt.toISOString(),
   }
 

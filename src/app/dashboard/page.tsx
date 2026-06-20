@@ -1,14 +1,40 @@
 'use client'
 
+/**
+ * Dashboard 主页面
+ *
+ * 显示用户项目列表，集成新手引导组件：
+ * - WelcomeWizard：WELCOME_WIZARD 步骤为 NOT_COMPLETED 时显示
+ * - DashboardGuide：自管理激活条件（WELCOME_WIZARD 完成后、DASHBOARD_TOOLTIP 未完成时）
+ * - 示例项目显示"示例项目"Badge
+ * - "新建项目"按钮添加 data-onboarding 属性供引导定位
+ *
+ * Requirements: 1.2, 2.3, 3.1, 6.3, 9.4
+ */
+
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { HelpEntryLink } from '@/components/help/help-entry-link'
+import { WelcomeWizard } from '@/components/onboarding/welcome-wizard'
+import { DashboardGuide } from '@/components/onboarding/dashboard-guide'
+import { useOnboardingContext } from '@/components/onboarding/onboarding-provider'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface ProjectItem {
   id: string
   name: string
   coverUrl: string | null
   status: string
+  isSample: boolean
   createdAt: string
   shotCount: number
   completedCount: number
@@ -38,6 +64,12 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
+  const { progress } = useOnboardingContext()
+
+  // 根据引导进度确定是否显示 WelcomeWizard
+  const showWelcomeWizard = progress?.steps.WELCOME_WIZARD === 'NOT_COMPLETED'
 
   function loadProjects() {
     fetch('/api/projects')
@@ -51,16 +83,22 @@ export default function DashboardPage() {
     loadProjects()
   }, [])
 
-  async function handleDelete(e: React.MouseEvent, projectId: string, projectName: string) {
+  function handleDelete(e: React.MouseEvent, projectId: string, projectName: string) {
     e.preventDefault()
     e.stopPropagation()
-    if (!confirm(`确定删除项目名?{projectName}」？此操作不可撤销。`)) return
+    setPendingDelete({ id: projectId, name: projectName })
+    setDeleteDialogOpen(true)
+  }
 
-    setDeletingId(projectId)
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setDeleteDialogOpen(false)
+
+    setDeletingId(pendingDelete.id)
     try {
-      const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
+      const res = await fetch(`/api/projects/${pendingDelete.id}`, { method: 'DELETE' })
       if (res.ok) {
-        setProjects((prev) => prev.filter((p) => p.id !== projectId))
+        setProjects((prev) => prev.filter((p) => p.id !== pendingDelete.id))
       } else {
         const data = await res.json()
         alert(data.error || '删除失败')
@@ -69,16 +107,24 @@ export default function DashboardPage() {
       alert('网络错误')
     } finally {
       setDeletingId(null)
+      setPendingDelete(null)
     }
   }
 
   return (
     <div>
-      {/* 标题目?*/}
+      {/* 新手引导 - WelcomeWizard */}
+      <WelcomeWizard open={!!showWelcomeWizard} />
+
+      {/* 新手引导 - DashboardGuide（自管理激活条件） */}
+      <DashboardGuide />
+
+      {/* 标题区 */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">我的项目</h1>
         <Link
           href="/dashboard/project/new"
+          data-onboarding="new-project"
           className="inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)]"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +134,7 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* 加载状态?*/}
+      {/* 加载状态 */}
       {loading && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
@@ -97,7 +143,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* 空状态?*/}
+      {/* 空状态 */}
       {!loading && projects.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--cine-line-2)] py-20">
           <svg
@@ -113,7 +159,7 @@ export default function DashboardPage() {
               d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
             />
           </svg>
-          <p className="mb-2 text-lg font-medium text-[var(--cine-text-2)]">还没有项</p>
+          <p className="mb-2 text-lg font-medium text-[var(--cine-text-2)]">还没有项目</p>
           <p className="mb-6 text-sm text-[var(--cine-text-3)]">上传一段视频开始创作</p>
           <Link
             href="/dashboard/project/new"
@@ -144,6 +190,13 @@ export default function DashboardPage() {
               >
                 {/* 封面 */}
                 <div className="relative aspect-video w-full bg-[var(--cine-bg)]">
+                  {/* 示例项目 Badge */}
+                  {project.isSample && (
+                    <span className="absolute left-2 top-2 z-10 rounded-md bg-[var(--cine-gold)] px-2 py-0.5 text-xs font-medium text-[var(--cine-ink)]">
+                      示例项目
+                    </span>
+                  )}
+
                   {/* 删除按钮 */}
                   <button
                     onClick={(e) => handleDelete(e, project.id, project.name)}
@@ -195,7 +248,7 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between text-xs text-[var(--cine-text-3)]">
                     <span>{formatDate(project.createdAt)}</span>
                     <span>
-                      {project.completedCount}/{project.shotCount} ?
+                      {project.completedCount}/{project.shotCount} 镜
                     </span>
                   </div>
                 </div>
@@ -207,6 +260,24 @@ export default function DashboardPage() {
 
       {/* 底部帮助入口 */}
       <HelpEntryLink className="mt-10" />
+
+      {/* 删除项目确认对话框 */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定删除项目「{pendingDelete?.name}」？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setDeleteDialogOpen(false); setPendingDelete(null) }}>取消</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmDelete}>
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

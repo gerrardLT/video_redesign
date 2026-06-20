@@ -41,6 +41,59 @@ const packages = [
 ]
 
 // ========================
+// 订阅套餐种子数据
+// ========================
+const subscriptionPlans = [
+  {
+    type: 'monthly',
+    name: '月卡会员',
+    price: 2990, // ¥29.9
+    monthlyCredits: 500,
+    bonusCredits: 0,
+    description: '按月订阅，每月自动到账500积分，享受会员特权',
+    privileges: JSON.stringify([
+      '优先生成队列',
+      '支持1080p分辨率',
+      '去除水印',
+      '30天版本历史',
+    ]),
+    sortOrder: 1,
+  },
+  {
+    type: 'quarterly',
+    name: '季卡会员',
+    price: 7990, // ¥79.9（vs 月卡 ¥29.9×3=¥89.7，省约11%）
+    monthlyCredits: 500,
+    bonusCredits: 300, // 开通赠送300积分
+    description: '按季订阅，每月自动到账500积分，开通赠送300积分',
+    privileges: JSON.stringify([
+      '优先生成队列',
+      '支持1080p分辨率',
+      '去除水印',
+      '30天版本历史',
+      '季卡专属300积分奖励',
+    ]),
+    sortOrder: 2,
+  },
+  {
+    type: 'yearly',
+    name: '年卡会员',
+    price: 24900, // ¥249
+    monthlyCredits: 500,
+    bonusCredits: 1000,
+    description: '按年订阅，每月自动到账500积分，额外赠送1000积分奖励，享受全部会员特权',
+    privileges: JSON.stringify([
+      '优先生成队列',
+      '支持1080p分辨率',
+      '去除水印',
+      '30天版本历史',
+      '年卡专属1000积分奖励',
+    ]),
+    sortOrder: 3,
+  },
+]
+
+// ========================
 // 风格模板种子数据
 // ========================
 const styleTemplates = [
@@ -124,9 +177,40 @@ async function main() {
     console.log(`  ✅ 风格模板: ${template.name}`)
   }
 
+  // 插入订阅套餐种子数据（幂等：按 type 作为 ID 进行 upsert）
+  for (const plan of subscriptionPlans) {
+    await prisma.subscriptionPlan.upsert({
+      where: { id: plan.type }, // 使用 type 作为 ID 确保幂等
+      update: {
+        name: plan.name,
+        price: plan.price,
+        monthlyCredits: plan.monthlyCredits,
+        bonusCredits: plan.bonusCredits,
+        description: plan.description,
+        privileges: plan.privileges,
+        sortOrder: plan.sortOrder,
+        isActive: true,
+      },
+      create: {
+        id: plan.type, // 使用 type 作为 ID 方便 upsert 幂等
+        name: plan.name,
+        type: plan.type,
+        price: plan.price,
+        monthlyCredits: plan.monthlyCredits,
+        bonusCredits: plan.bonusCredits,
+        description: plan.description,
+        privileges: plan.privileges,
+        sortOrder: plan.sortOrder,
+        isActive: true,
+      },
+    })
+    console.log(`  ✅ 订阅套餐: ${plan.name} (¥${(plan.price / 100).toFixed(1)}/期, ${plan.monthlyCredits}积分/月${plan.bonusCredits > 0 ? `, +${plan.bonusCredits}积分奖励` : ''})`)
+  }
+
   console.log('\n🎉 种子数据插入完成！')
-  console.log(`   - ${packages.length} 个套餐`)
+  console.log(`   - ${packages.length} 个积分套餐`)
   console.log(`   - ${styleTemplates.length} 个风格模板`)
+  console.log(`   - ${subscriptionPlans.length} 个订阅套餐`)
 }
 
 main()

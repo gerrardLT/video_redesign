@@ -42,6 +42,9 @@ export type {
   PaymentCallbackData,
   RefundParams,
   RefundResult,
+  CreateContractPaymentParams,
+  ContractDeductionParams,
+  SubscriptionCallbackData,
 } from './types'
 
 // 导出 Zod schema（供 API 路由做参数校验）

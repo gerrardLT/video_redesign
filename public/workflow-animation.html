@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <!--
-  工作流程动画 · 循环自动播放
-  模拟产品流程：上传→AI解析→分镜生成→合并出片
-  20s 一个循环，纯 CSS + JS 时间轴驱动
-  后续嵌入 Landing Page 的 How it works 区域
+  工作流程动画 V2 · 高端版
+  使用真实产品截图 + 电影级动效
+  流程：上传视频 → AI 解析分镜 → 逐组生成 → 合并导出
+  24s 循环，CSS 动画 + JS 时间轴驱动
 -->
 <html lang="zh-CN">
 <head>
@@ -12,224 +12,581 @@
 <title>工作流程动画</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-:root{--bg:#0B0C0E;--surface:#141619;--surface-2:#181B1F;--line:rgba(255,255,255,0.06);--text:#E9E6DF;--text-2:#8C8B85;--text-3:#5A5B57;--gold:#C7A877;--gold-dim:rgba(199,168,119,0.12);--green:#7E9B86;--amber:#C2965A;}
-body{background:var(--bg);font-family:-apple-system,'Noto Sans SC',sans-serif;color:var(--text);display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;}
+:root{
+  --bg:#0B0C0E;
+  --surface:#141619;
+  --surface-2:#1A1D21;
+  --line:rgba(255,255,255,0.06);
+  --text:#E9E6DF;
+  --text-2:#8C8B85;
+  --text-3:#5A5B57;
+  --gold:#C7A877;
+  --gold-dim:rgba(199,168,119,0.12);
+  --green:#7E9B86;
+  --amber:#C2965A;
+  --blue:#6B8FBF;
+}
+body{
+  background:var(--bg);
+  font-family:-apple-system,'Noto Sans SC',sans-serif;
+  color:var(--text);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  overflow:hidden;
+}
 
-.stage{width:900px;height:520px;background:var(--surface);border-radius:16px;border:1px solid var(--line);position:relative;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.6);}
+/* 主舞台 */
+.stage{
+  width:960px;height:560px;
+  background:var(--surface);
+  border-radius:20px;
+  border:1px solid var(--line);
+  position:relative;
+  overflow:hidden;
+  box-shadow:0 60px 120px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.03) inset;
+}
 
-/* Mock top bar */
-.mock-bar{height:40px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 16px;gap:8px;}
-.mock-bar .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.08);}
-.mock-bar .dot:nth-child(1){background:#FF5F57;}
-.mock-bar .dot:nth-child(2){background:#FEBC2E;}
-.mock-bar .dot:nth-child(3){background:#28C840;}
-.mock-bar .title{margin-left:12px;font-size:12px;color:var(--text-2);letter-spacing:1px;}
+/* 背景光效 */
+.stage::before{
+  content:'';position:absolute;
+  top:-200px;right:-100px;
+  width:500px;height:500px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(199,168,119,.06),transparent 65%);
+  pointer-events:none;z-index:0;
+  animation:breathe 6s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.1)}}
 
-/* Mock content area */
-.mock-content{padding:24px;height:calc(100% - 40px);position:relative;}
+/* 顶部进度条 */
+.progress-track{
+  position:absolute;top:0;left:0;right:0;height:3px;
+  background:rgba(255,255,255,.03);z-index:100;
+}
+.progress-fill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,var(--gold),#E8D5B0);
+  border-radius:0 2px 2px 0;
+  transition:width .8s cubic-bezier(.16,1,.3,1);
+  box-shadow:0 0 12px rgba(199,168,119,.4);
+}
 
-/* Phase indicator */
-.phase-bar{display:flex;gap:4px;margin-bottom:20px;}
-.phase-dot{height:3px;flex:1;border-radius:2px;background:rgba(255,255,255,.06);transition:background .5s;}
-.phase-dot.active{background:var(--gold);}
-.phase-dot.done{background:var(--green);}
-.phase-label{font-size:11px;color:var(--gold);letter-spacing:3px;margin-bottom:16px;opacity:0;transform:translateY(8px);transition:all .4s cubic-bezier(.16,1,.3,1);}
-.phase-label.show{opacity:1;transform:translateY(0);}
+/* 步骤指示器 */
+.steps{
+  position:absolute;top:20px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:0;z-index:50;
+}
+.step{
+  display:flex;align-items:center;gap:0;
+}
+.step-dot{
+  width:28px;height:28px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:600;color:var(--text-3);
+  background:var(--surface);
+  transition:all .5s cubic-bezier(.16,1,.3,1);
+  position:relative;
+}
+.step-dot.active{
+  border-color:var(--gold);color:var(--gold);
+  box-shadow:0 0 20px rgba(199,168,119,.3);
+  transform:scale(1.1);
+}
+.step-dot.done{
+  border-color:var(--green);color:var(--green);
+  background:rgba(126,155,134,.1);
+}
+.step-connector{
+  width:40px;height:2px;
+  background:rgba(255,255,255,.06);
+  transition:background .5s;
+}
+.step-connector.done{background:var(--green);}
+.step-label{
+  position:absolute;top:34px;left:50%;transform:translateX(-50%);
+  font-size:10px;letter-spacing:1px;color:var(--text-3);
+  white-space:nowrap;opacity:0;transition:opacity .3s;
+}
+.step-dot.active .step-label,.step-dot.done .step-label{opacity:1;}
+.step-dot.active .step-label{color:var(--gold);}
 
-/* Upload phase */
-.upload-zone{position:absolute;inset:64px 24px 24px;border:2px dashed rgba(255,255,255,.08);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;opacity:0;transition:opacity .5s;}
-.upload-zone.show{opacity:1;}
-.upload-zone .icon{font-size:36px;opacity:.5;}
-.upload-zone .txt{font-size:14px;color:var(--text-2);}
-.upload-progress{width:200px;height:4px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;margin-top:8px;}
-.upload-progress .bar{height:100%;background:var(--gold);width:0%;transition:width 3s linear;}
+/* 内容面板容器 */
+.panels{
+  position:absolute;inset:64px 0 0;
+  overflow:hidden;
+}
 
-/* Parse phase - shots appearing */
-.shots-grid{position:absolute;inset:84px 24px 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;opacity:0;transition:opacity .5s;}
-.shots-grid.show{opacity:1;}
-.shot-card{border-radius:8px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden;opacity:0;transform:translateY(20px) scale(0.95);transition:all .4s cubic-bezier(.16,1,.3,1);}
+/* 单个面板 */
+.panel{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;
+  transform:translateX(60px) scale(0.96);
+  transition:all .8s cubic-bezier(.16,1,.3,1);
+  pointer-events:none;
+}
+.panel.active{
+  opacity:1;transform:translateX(0) scale(1);
+  pointer-events:auto;
+}
+.panel.exit-left{
+  opacity:0;transform:translateX(-60px) scale(0.96);
+}
+
+/* ===== Phase 1: 上传 ===== */
+.upload-panel{flex-direction:column;gap:24px;}
+.upload-mockup{
+  width:680px;height:360px;
+  border-radius:14px;
+  overflow:hidden;
+  border:1px solid var(--line);
+  box-shadow:0 30px 60px rgba(0,0,0,.5);
+  position:relative;
+}
+.upload-mockup img{width:100%;height:100%;object-fit:cover;object-position:top;}
+/* 上传进度叠层 */
+.upload-overlay{
+  position:absolute;inset:0;
+  background:rgba(11,12,14,.85);
+  backdrop-filter:blur(8px);
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;
+  opacity:0;transition:opacity .5s;
+}
+.upload-overlay.show{opacity:1;}
+.upload-icon{
+  width:56px;height:56px;border-radius:50%;
+  border:2px solid rgba(199,168,119,.3);
+  display:flex;align-items:center;justify-content:center;
+  animation:pulse-ring 2s ease-in-out infinite;
+}
+@keyframes pulse-ring{0%,100%{box-shadow:0 0 0 0 rgba(199,168,119,.2)}50%{box-shadow:0 0 0 12px rgba(199,168,119,0)}}
+.upload-icon svg{width:24px;height:24px;stroke:var(--gold);fill:none;stroke-width:1.5;}
+.upload-text{font-size:14px;color:var(--text-2);}
+.upload-bar-track{
+  width:240px;height:4px;border-radius:2px;
+  background:rgba(255,255,255,.06);overflow:hidden;
+}
+.upload-bar-fill{
+  height:100%;width:0%;border-radius:2px;
+  background:linear-gradient(90deg,var(--gold),#E8D5B0);
+  transition:width 3.5s cubic-bezier(.4,.0,.2,1);
+}
+.upload-bar-fill.go{width:100%;}
+
+/* ===== Phase 2: AI 解析 ===== */
+.parse-panel{flex-direction:column;gap:16px;}
+.parse-mockup{
+  width:720px;height:380px;
+  border-radius:14px;overflow:hidden;
+  border:1px solid var(--line);
+  box-shadow:0 30px 60px rgba(0,0,0,.5);
+  position:relative;
+}
+.parse-mockup img{width:100%;height:100%;object-fit:cover;object-position:top;}
+/* 扫描线动画 */
+.scan-line{
+  position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  box-shadow:0 0 20px rgba(199,168,119,.5);
+  transform:translateY(-10px);
+  opacity:0;
+  animation:none;
+}
+.scan-line.active{
+  opacity:1;
+  animation:scanDown 2.5s ease-in-out infinite;
+}
+@keyframes scanDown{0%{transform:translateY(0)}100%{transform:translateY(380px)}}
+
+/* 分镜卡片弹出 */
+.shot-cards{
+  position:absolute;bottom:16px;left:16px;right:16px;
+  display:flex;gap:8px;
+}
+.shot-card{
+  flex:1;height:60px;
+  background:rgba(20,22,25,.9);
+  backdrop-filter:blur(10px);
+  border:1px solid rgba(199,168,119,.15);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:var(--gold);font-weight:500;
+  opacity:0;transform:translateY(20px) scale(0.9);
+  transition:all .4s cubic-bezier(.16,1.4,.3,1);
+}
 .shot-card.appear{opacity:1;transform:translateY(0) scale(1);}
-.shot-thumb{height:80px;background:linear-gradient(135deg,rgba(199,168,119,.05),rgba(199,168,119,.02));position:relative;}
-.shot-thumb .num{position:absolute;top:6px;left:8px;font-size:10px;background:rgba(0,0,0,.5);padding:2px 6px;border-radius:3px;color:var(--text-2);}
-.shot-info{padding:10px;font-size:11px;color:var(--text-2);line-height:1.5;}
 
-/* Generate phase */
-.gen-panel{position:absolute;inset:84px 24px 24px;display:flex;flex-direction:column;gap:12px;opacity:0;transition:opacity .5s;}
-.gen-panel.show{opacity:1;}
-.gen-group{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;align-items:center;justify-content:space-between;}
-.gen-group .left{display:flex;align-items:center;gap:12px;}
-.gen-group .badge{font-size:11px;padding:3px 8px;border-radius:5px;font-weight:500;}
-.gen-group .badge.pending{background:rgba(255,255,255,.05);color:var(--text-3);}
-.gen-group .badge.gen{background:rgba(194,150,90,.12);color:var(--amber);}
-.gen-group .badge.done{background:rgba(126,155,134,.12);color:var(--green);}
-.gen-group .meta{font-size:11px;color:var(--text-3);}
-.gen-progress{height:3px;border-radius:2px;background:rgba(255,255,255,.05);margin-top:10px;overflow:hidden;}
-.gen-progress .bar{height:100%;background:var(--amber);width:0%;transition:width 2.5s linear;}
+/* ===== Phase 3: 生成 ===== */
+.gen-panel{flex-direction:column;gap:16px;padding:20px 40px;}
+.gen-title{
+  font-size:13px;font-weight:500;color:var(--text);
+  display:flex;align-items:center;gap:8px;
+}
+.gen-title::before{
+  content:'';width:8px;height:8px;border-radius:50%;
+  background:var(--amber);
+  animation:gen-pulse 1.5s ease-in-out infinite;
+}
+@keyframes gen-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.gen-groups{
+  display:flex;flex-direction:column;gap:10px;
+  width:100%;max-width:680px;
+}
+.gen-group{
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:10px;padding:16px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  opacity:0;transform:translateX(-20px);
+  transition:all .5s cubic-bezier(.16,1,.3,1);
+}
+.gen-group.appear{opacity:1;transform:translateX(0);}
+.gen-group-left{display:flex;align-items:center;gap:14px;}
+.gen-group-name{font-size:13px;font-weight:500;}
+.gen-badge{
+  font-size:10px;padding:3px 10px;border-radius:12px;
+  font-weight:500;letter-spacing:.5px;
+  transition:all .3s;
+}
+.gen-badge.pending{background:rgba(255,255,255,.04);color:var(--text-3);}
+.gen-badge.running{background:rgba(194,150,90,.12);color:var(--amber);animation:gen-pulse 1.5s ease-in-out infinite;}
+.gen-badge.done{background:rgba(126,155,134,.12);color:var(--green);}
+.gen-group-meta{font-size:11px;color:var(--text-3);}
+.gen-bar-track{
+  width:100%;max-width:680px;height:3px;
+  border-radius:2px;background:rgba(255,255,255,.04);
+  overflow:hidden;margin-top:4px;
+}
+.gen-bar-fill{
+  height:100%;width:0%;border-radius:2px;
+  background:linear-gradient(90deg,var(--amber),var(--gold));
+  transition:width 4s linear;
+}
+.gen-bar-fill.go{width:100%;}
 
-/* Export phase */
-.export-panel{position:absolute;inset:84px 24px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;opacity:0;transition:opacity .5s;}
-.export-panel.show{opacity:1;}
-.export-check{width:64px;height:64px;border-radius:50%;border:2px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--green);opacity:0;transform:scale(0.5);transition:all .5s cubic-bezier(.16,1.4,.3,1);}
-.export-check.pop{opacity:1;transform:scale(1);}
-.export-text{font-size:16px;font-weight:500;opacity:0;transform:translateY(10px);transition:all .4s .2s;}
-.export-text.show{opacity:1;transform:translateY(0);}
-.export-sub{font-size:12px;color:var(--text-2);opacity:0;transition:opacity .4s .4s;}
+/* ===== Phase 4: 导出 ===== */
+.export-panel{flex-direction:column;gap:24px;}
+.export-check{
+  width:72px;height:72px;border-radius:50%;
+  border:2px solid var(--green);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:scale(0.3) rotate(-90deg);
+  transition:all .6s cubic-bezier(.16,1.4,.3,1);
+}
+.export-check.pop{opacity:1;transform:scale(1) rotate(0);}
+.export-check svg{width:32px;height:32px;stroke:var(--green);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.export-check svg path{
+  stroke-dasharray:40;stroke-dashoffset:40;
+  transition:stroke-dashoffset .5s .3s cubic-bezier(.16,1,.3,1);
+}
+.export-check.pop svg path{stroke-dashoffset:0;}
+.export-title{
+  font-size:20px;font-weight:600;
+  opacity:0;transform:translateY(10px);
+  transition:all .5s .2s cubic-bezier(.16,1,.3,1);
+}
+.export-title.show{opacity:1;transform:translateY(0);}
+.export-sub{
+  font-size:13px;color:var(--text-2);
+  opacity:0;transition:opacity .4s .5s;
+}
 .export-sub.show{opacity:1;}
+.export-preview{
+  width:300px;height:170px;
+  border-radius:10px;overflow:hidden;
+  border:1px solid rgba(126,155,134,.2);
+  box-shadow:0 20px 50px rgba(0,0,0,.4);
+  opacity:0;transform:translateY(20px);
+  transition:all .6s .4s cubic-bezier(.16,1,.3,1);
+}
+.export-preview.show{opacity:1;transform:translateY(0);}
+.export-preview img{width:100%;height:100%;object-fit:cover;}
+
+/* 粒子效果 */
+.particles{
+  position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden;
+}
+.particle{
+  position:absolute;width:3px;height:3px;
+  border-radius:50%;background:var(--gold);
+  opacity:0;
+}
+.particle.burst{
+  animation:particleBurst 1.5s ease-out forwards;
+}
+@keyframes particleBurst{
+  0%{opacity:.8;transform:translate(0,0) scale(1)}
+  100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0)}
+}
 </style>
 </head>
 <body>
 <div class="stage">
-  <div class="mock-bar">
-    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-    <span class="title">视频重塑 · 创作流程</span>
+  <!-- 顶部进度条 -->
+  <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+
+  <!-- 步骤指示器 -->
+  <div class="steps">
+    <div class="step">
+      <div class="step-dot" id="sd1">1<span class="step-label">上传</span></div>
+    </div>
+    <div class="step-connector" id="sc1"></div>
+    <div class="step">
+      <div class="step-dot" id="sd2">2<span class="step-label">解析</span></div>
+    </div>
+    <div class="step-connector" id="sc2"></div>
+    <div class="step">
+      <div class="step-dot" id="sd3">3<span class="step-label">生成</span></div>
+    </div>
+    <div class="step-connector" id="sc3"></div>
+    <div class="step">
+      <div class="step-dot" id="sd4">4<span class="step-label">导出</span></div>
+    </div>
   </div>
-  <div class="mock-content">
-    <div class="phase-bar">
-      <div class="phase-dot" id="pd1"></div>
-      <div class="phase-dot" id="pd2"></div>
-      <div class="phase-dot" id="pd3"></div>
-      <div class="phase-dot" id="pd4"></div>
-    </div>
-    <div class="phase-label" id="phase-label">上传视频</div>
 
-    <!-- Phase 1: Upload -->
-    <div class="upload-zone" id="upload">
-      <div class="icon">📤</div>
-      <div class="txt">拖拽视频文件到此处</div>
-      <div class="upload-progress"><div class="bar" id="upload-bar"></div></div>
-    </div>
-
-    <!-- Phase 2: Parse -->
-    <div class="shots-grid" id="shots">
-      <div class="shot-card" id="s1"><div class="shot-thumb"><span class="num">01</span></div><div class="shot-info">清晨天际线，暖金阳光</div></div>
-      <div class="shot-card" id="s2"><div class="shot-thumb"><span class="num">02</span></div><div class="shot-info">落地窗前，侧脸轮廓</div></div>
-      <div class="shot-card" id="s3"><div class="shot-thumb"><span class="num">03</span></div><div class="shot-info">地铁逆行，人群拥挤</div></div>
-      <div class="shot-card" id="s4"><div class="shot-thumb"><span class="num">04</span></div><div class="shot-info">出站口逆光，剪影</div></div>
-      <div class="shot-card" id="s5"><div class="shot-thumb"><span class="num">05</span></div><div class="shot-info">雨夜霓虹，低角度</div></div>
-      <div class="shot-card" id="s6"><div class="shot-thumb"><span class="num">06</span></div><div class="shot-info">便利店暖光，雨痕</div></div>
+  <!-- 内容面板 -->
+  <div class="panels">
+    <!-- Phase 1: 上传 -->
+    <div class="panel upload-panel" id="p1">
+      <div class="upload-mockup">
+        <img src="/workflow-screenshots/upload.png" alt="上传界面" />
+        <div class="upload-overlay" id="upload-overlay">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          </div>
+          <div class="upload-text">正在上传视频...</div>
+          <div class="upload-bar-track"><div class="upload-bar-fill" id="upload-bar"></div></div>
+        </div>
+      </div>
     </div>
 
-    <!-- Phase 3: Generate -->
-    <div class="gen-panel" id="gen">
-      <div class="gen-group"><div class="left"><span style="font-size:13px;font-weight:500;">第 1 组</span><span class="badge done" id="g1-badge">已完成</span></div><span class="meta">3 镜 · 6s</span></div>
-      <div class="gen-group"><div class="left"><span style="font-size:13px;font-weight:500;">第 2 组</span><span class="badge gen" id="g2-badge">生成中</span></div><span class="meta">2 镜 · 8s</span></div>
-      <div class="gen-progress"><div class="bar" id="gen-bar"></div></div>
-      <div class="gen-group"><div class="left"><span style="font-size:13px;font-weight:500;">第 3 组</span><span class="badge pending" id="g3-badge">待生成</span></div><span class="meta">4 镜 · 10s</span></div>
+    <!-- Phase 2: AI 解析 -->
+    <div class="panel parse-panel" id="p2">
+      <div class="parse-mockup">
+        <img src="/workflow-screenshots/editor.png" alt="编辑器界面" />
+        <div class="scan-line" id="scan-line"></div>
+        <div class="shot-cards">
+          <div class="shot-card" id="sc-1">镜头 1</div>
+          <div class="shot-card" id="sc-2">镜头 2</div>
+          <div class="shot-card" id="sc-3">镜头 3</div>
+          <div class="shot-card" id="sc-4">镜头 4</div>
+          <div class="shot-card" id="sc-5">镜头 5</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Phase 4: Export -->
-    <div class="export-panel" id="export">
-      <div class="export-check" id="exp-check">✓</div>
-      <div class="export-text" id="exp-text">合并导出完成</div>
-      <div class="export-sub" id="exp-sub">视频已准备就绪，可直接下载</div>
+    <!-- Phase 3: 生成 -->
+    <div class="panel gen-panel" id="p3">
+      <div class="gen-title">链式串行生成中</div>
+      <div class="gen-groups">
+        <div class="gen-group" id="gg1">
+          <div class="gen-group-left">
+            <span class="gen-group-name">第 1 组 · 镜头 1-2</span>
+            <span class="gen-badge pending" id="gb1">待生成</span>
+          </div>
+          <span class="gen-group-meta">2 镜 · 6s</span>
+        </div>
+        <div class="gen-group" id="gg2">
+          <div class="gen-group-left">
+            <span class="gen-group-name">第 2 组 · 镜头 3</span>
+            <span class="gen-badge pending" id="gb2">待生成</span>
+          </div>
+          <span class="gen-group-meta">1 镜 · 4s</span>
+        </div>
+        <div class="gen-group" id="gg3">
+          <div class="gen-group-left">
+            <span class="gen-group-name">第 3 组 · 镜头 4-5</span>
+            <span class="gen-badge pending" id="gb3">待生成</span>
+          </div>
+          <span class="gen-group-meta">2 镜 · 8s</span>
+        </div>
+      </div>
+      <div class="gen-bar-track"><div class="gen-bar-fill" id="gen-bar"></div></div>
+    </div>
+
+    <!-- Phase 4: 导出 -->
+    <div class="panel export-panel" id="p4">
+      <div class="export-check" id="exp-check">
+        <svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>
+      </div>
+      <div class="export-title" id="exp-title">合并导出完成 ✨</div>
+      <div class="export-sub" id="exp-sub">5 个镜头 · 3 个分镜组 · 总时长 18s</div>
+      <div class="export-preview" id="exp-preview">
+        <img src="/workflow-screenshots/dashboard.png" alt="导出预览" />
+      </div>
+      <div class="particles" id="particles"></div>
     </div>
   </div>
 </div>
 
 <script>
-const CYCLE = 20000; // 20s per loop
-const phases = ['upload','parse','generate','export'];
-let frame;
+const CYCLE = 24000;
 
 function reset() {
-  // Hide all panels
-  document.getElementById('upload').classList.remove('show');
-  document.getElementById('shots').classList.remove('show');
-  document.getElementById('gen').classList.remove('show');
-  document.getElementById('export').classList.remove('show');
-  document.getElementById('phase-label').classList.remove('show');
-  document.getElementById('upload-bar').style.width = '0%';
-  document.getElementById('gen-bar').style.width = '0%';
-  ['s1','s2','s3','s4','s5','s6'].forEach(id => document.getElementById(id).classList.remove('appear'));
-  document.getElementById('exp-check').classList.remove('pop');
-  document.getElementById('exp-text').classList.remove('show');
-  document.getElementById('exp-sub').classList.remove('show');
-  ['pd1','pd2','pd3','pd4'].forEach(id => {
+  // 进度条
+  document.getElementById('progress').style.width = '0%';
+  // 步骤
+  ['sd1','sd2','sd3','sd4'].forEach(id => {
     document.getElementById(id).classList.remove('active','done');
   });
-  document.getElementById('g1-badge').className = 'badge pending';
-  document.getElementById('g1-badge').textContent = '待生成';
-  document.getElementById('g2-badge').className = 'badge pending';
-  document.getElementById('g2-badge').textContent = '待生成';
-  document.getElementById('g3-badge').className = 'badge pending';
-  document.getElementById('g3-badge').textContent = '待生成';
+  ['sc1','sc2','sc3'].forEach(id => {
+    document.getElementById(id).classList.remove('done');
+  });
+  // 面板
+  ['p1','p2','p3','p4'].forEach(id => {
+    document.getElementById(id).classList.remove('active','exit-left');
+  });
+  // Upload
+  document.getElementById('upload-overlay').classList.remove('show');
+  document.getElementById('upload-bar').classList.remove('go');
+  // Parse
+  document.getElementById('scan-line').classList.remove('active');
+  ['sc-1','sc-2','sc-3','sc-4','sc-5'].forEach(id => {
+    document.getElementById(id).classList.remove('appear');
+  });
+  // Generate
+  ['gg1','gg2','gg3'].forEach(id => document.getElementById(id).classList.remove('appear'));
+  ['gb1','gb2','gb3'].forEach(id => {
+    const el = document.getElementById(id);
+    el.className = 'gen-badge pending';
+    el.textContent = '待生成';
+  });
+  document.getElementById('gen-bar').classList.remove('go');
+  // Export
+  document.getElementById('exp-check').classList.remove('pop');
+  document.getElementById('exp-title').classList.remove('show');
+  document.getElementById('exp-sub').classList.remove('show');
+  document.getElementById('exp-preview').classList.remove('show');
+  document.getElementById('particles').innerHTML = '';
+}
+
+function switchPanel(from, to) {
+  if (from) document.getElementById(from).classList.add('exit-left');
+  if (from) document.getElementById(from).classList.remove('active');
+  setTimeout(() => {
+    document.getElementById(to).classList.add('active');
+  }, 200);
+}
+
+function burstParticles() {
+  const container = document.getElementById('particles');
+  for (let i = 0; i < 20; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (Math.PI * 2 * i) / 20;
+    const distance = 80 + Math.random() * 60;
+    p.style.left = '50%';
+    p.style.top = '30%';
+    p.style.setProperty('--tx', `${Math.cos(angle) * distance}px`);
+    p.style.setProperty('--ty', `${Math.sin(angle) * distance}px`);
+    container.appendChild(p);
+    setTimeout(() => p.classList.add('burst'), i * 30);
+  }
 }
 
 function runCycle() {
   reset();
-  const label = document.getElementById('phase-label');
 
-  // Phase 1: Upload (0-4s)
+  // === Phase 1: 上传 (0-5s) ===
   setTimeout(() => {
-    document.getElementById('pd1').classList.add('active');
-    label.textContent = '上传视频';
-    label.classList.add('show');
-    document.getElementById('upload').classList.add('show');
-    setTimeout(() => { document.getElementById('upload-bar').style.width = '100%'; }, 200);
+    document.getElementById('sd1').classList.add('active');
+    document.getElementById('progress').style.width = '10%';
+    switchPanel(null, 'p1');
+    setTimeout(() => {
+      document.getElementById('upload-overlay').classList.add('show');
+      setTimeout(() => document.getElementById('upload-bar').classList.add('go'), 300);
+    }, 800);
+    setTimeout(() => document.getElementById('progress').style.width = '25%', 2000);
   }, 300);
 
-  // Phase 2: Parse (4-9s)
+  // === Phase 2: AI 解析 (5-11s) ===
   setTimeout(() => {
-    document.getElementById('upload').classList.remove('show');
-    document.getElementById('pd1').classList.remove('active');
-    document.getElementById('pd1').classList.add('done');
-    document.getElementById('pd2').classList.add('active');
-    label.textContent = 'AI 解析分镜';
-    document.getElementById('shots').classList.add('show');
-    // Stagger shot cards
-    ['s1','s2','s3','s4','s5','s6'].forEach((id, i) => {
-      setTimeout(() => document.getElementById(id).classList.add('appear'), i * 400);
+    document.getElementById('sd1').classList.remove('active');
+    document.getElementById('sd1').classList.add('done');
+    document.getElementById('sc1').classList.add('done');
+    document.getElementById('sd2').classList.add('active');
+    document.getElementById('progress').style.width = '40%';
+    switchPanel('p1', 'p2');
+    setTimeout(() => document.getElementById('scan-line').classList.add('active'), 400);
+    // 分镜卡片逐个弹出
+    ['sc-1','sc-2','sc-3','sc-4','sc-5'].forEach((id, i) => {
+      setTimeout(() => document.getElementById(id).classList.add('appear'), 1200 + i * 500);
     });
-  }, 4500);
+    setTimeout(() => document.getElementById('progress').style.width = '50%', 2500);
+  }, 5500);
 
-  // Phase 3: Generate (9-15s)
+  // === Phase 3: 生成 (11-18s) ===
   setTimeout(() => {
-    document.getElementById('shots').classList.remove('show');
-    document.getElementById('pd2').classList.remove('active');
-    document.getElementById('pd2').classList.add('done');
-    document.getElementById('pd3').classList.add('active');
-    label.textContent = '生成视频';
-    document.getElementById('gen').classList.add('show');
-    // Simulate generation progress
-    setTimeout(() => {
-      document.getElementById('g1-badge').className = 'badge done';
-      document.getElementById('g1-badge').textContent = '已完成';
-    }, 800);
-    setTimeout(() => {
-      document.getElementById('g2-badge').className = 'badge gen';
-      document.getElementById('g2-badge').textContent = '生成中';
-      document.getElementById('gen-bar').style.width = '100%';
-    }, 1200);
-    setTimeout(() => {
-      document.getElementById('g2-badge').className = 'badge done';
-      document.getElementById('g2-badge').textContent = '已完成';
-      document.getElementById('g3-badge').className = 'badge gen';
-      document.getElementById('g3-badge').textContent = '生成中';
-    }, 3500);
-    setTimeout(() => {
-      document.getElementById('g3-badge').className = 'badge done';
-      document.getElementById('g3-badge').textContent = '已完成';
-    }, 5200);
-  }, 9500);
+    document.getElementById('sd2').classList.remove('active');
+    document.getElementById('sd2').classList.add('done');
+    document.getElementById('sc2').classList.add('done');
+    document.getElementById('sd3').classList.add('active');
+    document.getElementById('progress').style.width = '60%';
+    switchPanel('p2', 'p3');
 
-  // Phase 4: Export (15-19s)
+    // 分镜组逐个出现
+    setTimeout(() => document.getElementById('gg1').classList.add('appear'), 400);
+    setTimeout(() => document.getElementById('gg2').classList.add('appear'), 700);
+    setTimeout(() => document.getElementById('gg3').classList.add('appear'), 1000);
+
+    // 链式生成动画
+    setTimeout(() => {
+      document.getElementById('gb1').className = 'gen-badge running';
+      document.getElementById('gb1').textContent = '生成中';
+      document.getElementById('gen-bar').classList.add('go');
+    }, 1300);
+    setTimeout(() => {
+      document.getElementById('gb1').className = 'gen-badge done';
+      document.getElementById('gb1').textContent = '✓ 完成';
+      document.getElementById('progress').style.width = '70%';
+    }, 2800);
+    setTimeout(() => {
+      document.getElementById('gb2').className = 'gen-badge running';
+      document.getElementById('gb2').textContent = '生成中';
+    }, 3200);
+    setTimeout(() => {
+      document.getElementById('gb2').className = 'gen-badge done';
+      document.getElementById('gb2').textContent = '✓ 完成';
+      document.getElementById('progress').style.width = '80%';
+    }, 4500);
+    setTimeout(() => {
+      document.getElementById('gb3').className = 'gen-badge running';
+      document.getElementById('gb3').textContent = '生成中';
+    }, 4800);
+    setTimeout(() => {
+      document.getElementById('gb3').className = 'gen-badge done';
+      document.getElementById('gb3').textContent = '✓ 完成';
+      document.getElementById('progress').style.width = '90%';
+    }, 6200);
+  }, 11500);
+
+  // === Phase 4: 导出 (18-23s) ===
   setTimeout(() => {
-    document.getElementById('gen').classList.remove('show');
-    document.getElementById('pd3').classList.remove('active');
-    document.getElementById('pd3').classList.add('done');
-    document.getElementById('pd4').classList.add('active');
-    label.textContent = '合并导出';
-    document.getElementById('export').classList.add('show');
-    setTimeout(() => document.getElementById('exp-check').classList.add('pop'), 400);
-    setTimeout(() => document.getElementById('exp-text').classList.add('show'), 600);
-    setTimeout(() => document.getElementById('exp-sub').classList.add('show'), 900);
-    setTimeout(() => {
-      document.getElementById('pd4').classList.remove('active');
-      document.getElementById('pd4').classList.add('done');
-    }, 1200);
-  }, 15500);
+    document.getElementById('sd3').classList.remove('active');
+    document.getElementById('sd3').classList.add('done');
+    document.getElementById('sc3').classList.add('done');
+    document.getElementById('sd4').classList.add('active');
+    document.getElementById('progress').style.width = '100%';
+    switchPanel('p3', 'p4');
 
-  // Restart
+    setTimeout(() => {
+      document.getElementById('exp-check').classList.add('pop');
+      burstParticles();
+    }, 500);
+    setTimeout(() => document.getElementById('exp-title').classList.add('show'), 800);
+    setTimeout(() => document.getElementById('exp-sub').classList.add('show'), 1100);
+    setTimeout(() => document.getElementById('exp-preview').classList.add('show'), 1400);
+    setTimeout(() => {
+      document.getElementById('sd4').classList.remove('active');
+      document.getElementById('sd4').classList.add('done');
+    }, 1800);
+  }, 18500);
+
+  // 循环
   setTimeout(runCycle, CYCLE);
 }
 
