@@ -24,7 +24,7 @@ import { applySameSceneContinuation } from '@/lib/frame-continuity'
 import { logger } from '@/lib/logger'
 import { publishStateChange, publishCompleted, publishFailed, publishChainProgress } from '@/lib/progress-publisher'
 import { createVersion } from '@/lib/version-history-service'
-import { writeFile, unlink } from 'fs/promises'
+import { writeFile, unlink, mkdir } from 'fs/promises'
 import path from 'path'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
@@ -92,6 +92,10 @@ async function downloadAndValidateVideo(videoUrl: string, outputPath: string): P
   const maxRetries = 3
   const retryInterval = 2000
   const timeout = 30000
+
+  // 确保输出目录存在（生产镜像未预置 public/uploads/temp，且 .dockerignore 已排除该目录，
+  // 不能依赖其他 worker 顺手创建——写入前自建，与 parse/merge/upscale/download 各 worker 行为一致）
+  await mkdir(path.dirname(outputPath), { recursive: true })
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -383,6 +387,8 @@ async function processProjectSegmentGenerate(job: Job<VideoGenerateJobData>) {
 
     // 下载视频并回存到 OSS
     const tempPath = path.join(process.cwd(), 'public', 'uploads', 'temp', `gen_${jobId}_${Date.now()}.mp4`)
+    // 确保临时目录存在（生产镜像未预置 temp 目录，写入前自建，避免 ENOENT）
+    await mkdir(path.dirname(tempPath), { recursive: true })
     const downloadResp = await fetch(resultVideoUrl)
     if (!downloadResp.ok) {
       throw new Error(`下载 Seedance 视频失败: HTTP ${downloadResp.status}`)

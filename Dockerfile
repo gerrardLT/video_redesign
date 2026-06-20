@@ -76,8 +76,9 @@ COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 # .env.production 复制为 .env，供 Prisma CLI (dotenv/config) 和运行时读取
 COPY --from=builder /app/.env.production ./.env
 
-# 创建上传目录
-RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
+# 创建上传目录（含 temp 子目录：generate/merge/upscale 等 worker 的本地中转目录，
+# .dockerignore 已排除该目录内容，运行时各 worker 也会自建，这里预置一份兜底）
+RUN mkdir -p /app/public/uploads/temp && chown -R nextjs:nodejs /app/public/uploads
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
 USER nextjs
