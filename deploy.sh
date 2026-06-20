@@ -138,7 +138,7 @@ sleep 8
 #       数据库已在第 1 步备份，可回滚。
 # ========================
 log "===== 同步数据库 schema（prisma db push）====="
-if $DC exec -T "$APP_SERVICE" npx prisma db push --accept-data-loss --skip-generate; then
+if $DC exec -T "$APP_SERVICE" npx prisma db push --accept-data-loss; then
   ok "数据库 schema 同步完成"
 else
   err "数据库 schema 同步失败！请检查日志。数据库已在第 1 步备份，可手动回滚"
