@@ -25,6 +25,10 @@ const OSS_BUCKET = process.env.OSS_BUCKET || ''
 const OSS_ACCESS_KEY_ID = process.env.OSS_ACCESS_KEY_ID || ''
 const OSS_ACCESS_KEY_SECRET = process.env.OSS_ACCESS_KEY_SECRET || ''
 const OSS_ENDPOINT = process.env.OSS_ENDPOINT || `https://${OSS_REGION}.aliyuncs.com`
+// OSS 传输加速 endpoint（如 oss-accelerate.aliyuncs.com）。
+// 仅用于「送外部境内服务（火山方舟）拉取」场景，解决跨境（境外 OSS ← 境内方舟）下载超时。
+// 留空则不启用加速，相关函数回退为普通直链。其它 OSS 操作（上传/下载/签名/前端代理）一律不走加速，避免额外加速流量计费。
+const OSS_ACCELERATE_ENDPOINT = process.env.OSS_ACCELERATE_ENDPOINT || ''
 
 /**
  * 检查 OSS 是否已配置
@@ -178,6 +182,22 @@ export function extractKeyFromUrl(url: string): string | null {
     return url.slice(prefix.length)
   }
   return null
+}
+
+/**
+ * 将普通 OSS 直链转换为「传输加速」直链，仅用于送外部境内服务（火山方舟）拉取。
+ *
+ * 背景：OSS bucket 在境外（如新加坡），方舟服务器在境内（北京），方舟直接拉境外直链会跨境超时。
+ * 转换后走 OSS 传输加速域名（{bucket}.{accelerate-endpoint}/{key}），经阿里云骨干网加速，避免超时。
+ *
+ * - 未配置 OSS_ACCELERATE_ENDPOINT、或 URL 不是本系统 OSS 直链时，原样返回（安全回退，不影响功能）
+ * - 仅此函数产生加速流量；其它存储/访问路径一律不调用本函数，避免额外计费
+ */
+export function toAcceleratedUrl(url: string): string {
+  if (!OSS_ACCELERATE_ENDPOINT) return url
+  const key = extractKeyFromUrl(url)
+  if (!key) return url
+  return `https://${OSS_BUCKET}.${OSS_ACCELERATE_ENDPOINT}/${key}`
 }
 
 // ========================

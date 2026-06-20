@@ -11,7 +11,7 @@ import { getVideoMetadata, normalizeVideo } from '@/lib/ffmpeg'
 import { parseVideoDirectly } from '@/lib/video-analyzer'
 import type { ParsedShot } from '@/lib/video-analyzer'
 import { groupShots } from '@/lib/grouping-service'
-import { uploadFile } from '@/lib/storage'
+import { uploadFile, toAcceleratedUrl } from '@/lib/storage'
 import { estimateParseCreditCost, freezeParseCredits, chargeParseCreditsFromReserve, refundParseCredits } from '@/lib/credit-service'
 import { withCreditLock } from '@/lib/distributed-lock'
 import { publishStateChange, publishCompleted, publishFailed } from '@/lib/progress-publisher'
@@ -415,7 +415,8 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
     let parseResult: Awaited<ReturnType<typeof parseVideoDirectly>> | null = null
     try {
       parseResult = await parseVideoDirectly({
-        videoUrl: normalizedOssUrl,
+        // 送方舟分析用传输加速直链：境外 OSS ← 境内方舟跨境拉取，普通直链会超时，加速域名经骨干网避免超时
+        videoUrl: toAcceleratedUrl(normalizedOssUrl),
         totalDuration: metadata.duration,
         sceneCuts,
       })
