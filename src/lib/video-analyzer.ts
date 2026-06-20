@@ -204,6 +204,17 @@ export async function parseVideoDirectly(params: {
   const jsonStr = extractJson(content)
   let parsed = JSON.parse(jsonStr) as ParseVideoResult
 
+  // 【临时诊断】打印模型返回的原始对白（在 repair/时间线修正/分组之前），
+  // 用于排查"对白错乱"到底是模型原始输出就这样，还是后处理造成。对比完可移除。
+  try {
+    const rawDialogueDump = (parsed.shots ?? []).map((s) => ({
+      orderIndex: s.orderIndex,
+      time: `${s.startTime}-${s.endTime}s`,
+      dialogue: s.dialogue,
+    }))
+    console.log('[video-analyzer][RAW对白] 模型原始返回（未经任何后处理）:\n' + JSON.stringify(rawDialogueDump, null, 2))
+  } catch { /* 日志失败不影响主流程 */ }
+
   // Zod 校验，失败则 repair retry（带原始输出 + 错误信息让模型修正）
   const zodResult = ParseResultSchema.safeParse(parsed)
   if (!zodResult.success) {
