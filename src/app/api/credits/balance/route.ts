@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ balance: user.creditBalance })
   } catch (error) {
     console.error('[GET /api/credits/balance]', error)
-    return NextResponse.json({ error: '查询余额失败' }, { status: 500 })
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: '查询余额失败' } },
+      { status: 500 }
+    )
   }
 }

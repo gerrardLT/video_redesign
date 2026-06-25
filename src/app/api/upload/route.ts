@@ -49,19 +49,21 @@ export async function POST(request: NextRequest) {
     // 本地相对路径（parse-video 使用）
     const localUrl = `/uploads/videos/${userId}/${projectId}/${fileName}`
 
-    // 同时上传到 OSS（公网可访问，失败不阻塞上传流程）
-    let ossUrl: string = localUrl
+    // 同时上传到 OSS（生产环境必须成功，不允许降级）
+    let ossUrl: string
     try {
       const ossKey = `videos/${userId}/${projectId}/${fileName}`
       ossUrl = await uploadBuffer(ossKey, buffer)
       console.log(`[upload] 视频已上传到 OSS: ${ossUrl}`)
     } catch (err) {
-      console.warn('[upload] 上传到 OSS 失败，降级使用本地路径:', err)
+      // P0 修复：OSS 上传失败直接报错拒绝，不降级本地路径（生产环境数据一致性保障）
+      console.error('[upload] 上传到 OSS 失败:', err)
+      return NextResponse.json({ error: '文件上传到存储服务失败，请重试' }, { status: 500 })
     }
 
     return NextResponse.json({
       url: ossUrl,         // OSS 公网 URL（存入 DB，供外部访问）
-      localUrl,            // 本地相对路径（供 parse-video 内部使用）
+      localUrl,            // 本地相对路径（供 parse-video 内部 FFmpeg 处理使用）
       fileName: file.name,
       fileSize: file.size,
     })

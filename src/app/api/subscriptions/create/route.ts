@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
 import { createSubscription } from '@/lib/subscription-service'
+import { ApiError } from '@/lib/api-error'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,15 +23,19 @@ export async function POST(request: NextRequest) {
     // 鉴权：从 header 获取用户 ID
     const userId = request.headers.get('x-user-id')
     if (!userId) {
-      return NextResponse.json({ error: '未登录' }, { status: 401 })
+      return NextResponse.json(
+        { error: { code: 'UNAUTHORIZED', message: '未登录' } },
+        { status: 401 }
+      )
     }
 
     // 参数校验
     const body = await request.json()
     const parsed = CreateSubscriptionSchema.safeParse(body)
     if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message || '参数校验失败'
       return NextResponse.json(
-        { error: '参数校验失败', details: parsed.error.issues },
+        { error: { code: 'VALIDATION_ERROR', message: firstError } },
         { status: 400 }
       )
     }
@@ -47,15 +52,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    const statusCode = (error as Error & { statusCode?: number }).statusCode
-    if (statusCode) {
+    if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: (error as Error).message },
-        { status: statusCode }
+        { error: { code: error.code, message: error.message } },
+        { status: error.statusCode }
       )
     }
 
     console.error('[POST /api/subscriptions/create]', error)
-    return NextResponse.json({ error: '创建订阅失败' }, { status: 500 })
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: '创建订阅失败' } },
+      { status: 500 }
+    )
   }
 }

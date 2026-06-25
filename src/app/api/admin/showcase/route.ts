@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
 import { showcaseService } from '@/lib/showcase-service'
-import { ApiError } from '@/lib/api-error'
+import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/api-error'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,12 +27,9 @@ const createSchema = z.object({
 
 // GET /api/admin/showcase - 管理后台案例列表（包含未发布）
 export async function GET(request: NextRequest) {
-  const role = request.headers.get('x-user-role')
-  if (role !== 'ADMIN') {
-    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
-  }
-
   try {
+    requireAdmin(request)
+
     const { searchParams } = request.nextUrl
 
     const parseResult = listQuerySchema.safeParse({
@@ -58,22 +56,19 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
+    if (error instanceof ApiError) {
+      return apiErrorToResponse(error)
+    }
     console.error('[GET /api/admin/showcase]', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: '获取案例列表失败' } },
-      { status: 500 }
-    )
+    return toErrorResponse('INTERNAL_ERROR', '获取案例列表失败')
   }
 }
 
 // POST /api/admin/showcase - 创建案例
 export async function POST(request: NextRequest) {
-  const role = request.headers.get('x-user-role')
-  if (role !== 'ADMIN') {
-    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
-  }
-
   try {
+    requireAdmin(request)
+
     const body = await request.json()
     const parseResult = createSchema.safeParse(body)
 
@@ -88,15 +83,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(item, { status: 201 })
   } catch (error) {
     if (error instanceof ApiError) {
-      return NextResponse.json(
-        { error: { code: error.code, message: error.message } },
-        { status: error.statusCode }
-      )
+      return apiErrorToResponse(error)
     }
     console.error('[POST /api/admin/showcase]', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: '创建案例失败' } },
-      { status: 500 }
-    )
+    return toErrorResponse('INTERNAL_ERROR', '创建案例失败')
   }
 }

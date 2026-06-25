@@ -38,7 +38,10 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get('token')?.value
 
     if (!token) {
-      return NextResponse.json({ error: '未登录' }, { status: 401 })
+      return NextResponse.json(
+        { error: { code: 'UNAUTHORIZED', message: '未登录' } },
+        { status: 401 }
+      )
     }
 
     try {
@@ -55,7 +58,11 @@ export async function middleware(request: NextRequest) {
         request: { headers: requestHeaders },
       })
     } catch {
-      return NextResponse.json({ error: '登录已过期' }, { status: 401 })
+      // P1 修复：token 验证失败返回统一错误格式
+      return NextResponse.json(
+        { error: { code: 'UNAUTHORIZED', message: '登录已过期，请重新登录' } },
+        { status: 401 }
+      )
     }
   }
 
@@ -73,9 +80,12 @@ export async function middleware(request: NextRequest) {
       await jwtVerify(token, getJwtSecret())
       return NextResponse.next()
     } catch {
+      // P1 修复：token 过期时清除无效 cookie 并跳转登录
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(loginUrl)
+      const response = NextResponse.redirect(loginUrl)
+      response.cookies.delete('token')
+      return response
     }
   }
 

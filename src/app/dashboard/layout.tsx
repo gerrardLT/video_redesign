@@ -23,6 +23,7 @@ interface UserInfo {
 }
 
 const NAV_LINKS = [
+  { href: '/dashboard/workspace', label: '工作台', exact: false, onboardingId: undefined },
   { href: '/dashboard', label: '我的项目', exact: true, onboardingId: undefined },
   { href: '/dashboard/assets', label: '资产库', exact: false, onboardingId: 'asset-library' },
   { href: '/dashboard/packages', label: '套餐', exact: false, onboardingId: 'packages' },

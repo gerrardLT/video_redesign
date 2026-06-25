@@ -71,7 +71,7 @@ export async function listBySection(publishedOnly = true): Promise<GroupedArticl
 
 /**
  * 全文搜索帮助文章（标题 + 正文）
- * 使用 Prisma contains 进行模糊匹配（SQLite 兼容）
+ * 使用 Prisma contains 进行模糊匹配
  * @param query - 搜索关键词
  * @param publishedOnly - 是否只搜索已发布文章（默认 true）
  */

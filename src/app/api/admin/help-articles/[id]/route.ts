@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
 import { update, deleteArticle } from '@/lib/help-center-service'
-import { ApiError } from '@/lib/api-error'
+import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/api-error'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,12 +21,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const role = request.headers.get('x-user-role')
-  if (role !== 'ADMIN') {
-    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
-  }
-
   try {
+    requireAdmin(request)
+
     const { id } = await params
     const body = await request.json()
     const parseResult = updateSchema.safeParse(body)
@@ -41,16 +39,10 @@ export async function PUT(
     return NextResponse.json(article)
   } catch (error) {
     if (error instanceof ApiError) {
-      return NextResponse.json(
-        { error: { code: error.code, message: error.message } },
-        { status: error.statusCode }
-      )
+      return apiErrorToResponse(error)
     }
     console.error('[PUT /api/admin/help-articles/[id]]', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: '更新帮助文章失败' } },
-      { status: 500 }
-    )
+    return toErrorResponse('INTERNAL_ERROR', '更新帮助文章失败')
   }
 }
 
@@ -59,26 +51,17 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const role = request.headers.get('x-user-role')
-  if (role !== 'ADMIN') {
-    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
-  }
-
   try {
+    requireAdmin(request)
+
     const { id } = await params
     await deleteArticle(id)
     return NextResponse.json({ success: true })
   } catch (error) {
     if (error instanceof ApiError) {
-      return NextResponse.json(
-        { error: { code: error.code, message: error.message } },
-        { status: error.statusCode }
-      )
+      return apiErrorToResponse(error)
     }
     console.error('[DELETE /api/admin/help-articles/[id]]', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: '删除帮助文章失败' } },
-      { status: 500 }
-    )
+    return toErrorResponse('INTERNAL_ERROR', '删除帮助文章失败')
   }
 }

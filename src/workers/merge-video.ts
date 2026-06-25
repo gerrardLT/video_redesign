@@ -39,6 +39,11 @@ interface VideoMergeJobData {
   reservedCredits?: number
   /** 视频总时长（秒） */
   videoDuration?: number
+  // HappyHorse 分段合并专用
+  /** 生成引擎标识，happyhorse 时走无转场直接拼接 */
+  engine?: 'seedance' | 'happyhorse'
+  /** HappyHorse 各段生成结果视频 URL（已按顺序排列） */
+  segmentVideoUrls?: string[]
 }
 
 const connection = redis as unknown as ConnectionOptions
@@ -687,6 +692,86 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
   })
   void publishStateChange(userId, 'merge', projectId, 'started', 0)
 
+  // === HappyHorse 分段合并分支：无转场，FFmpeg concat 直接拼接 ===
+  if (job.data.engine === 'happyhorse' && job.data.segmentVideoUrls) {
+    console.log(`[merge-video] HappyHorse 分段合并模式 - ${job.data.segmentVideoUrls.length} 段`)
+    const hhTempDir = path.join(process.cwd(), 'public', 'uploads', 'temp', `hh-merge-${projectId}-${Date.now()}`)
+    await mkdir(hhTempDir, { recursive: true })
+
+    try {
+      // 下载各段视频到临时目录
+      const segPaths: string[] = []
+      for (let i = 0; i < job.data.segmentVideoUrls.length; i++) {
+        const segUrl = job.data.segmentVideoUrls[i]
+        const segPath = path.join(hhTempDir, `seg_${i}.mp4`)
+        await downloadVideo(segUrl, segPath)
+        segPaths.push(segPath)
+        await job.updateProgress(Math.round((i / job.data.segmentVideoUrls.length) * 50))
+      }
+
+      // FFmpeg concat 无损拼接（不加转场）
+      const { mergeSegments } = await import('@/lib/segment-service')
+      const hhOutputPath = path.join(hhTempDir, `merged_${Date.now()}.mp4`)
+      await mergeSegments(segPaths, hhOutputPath)
+      await job.updateProgress(80)
+
+      // 上传到 OSS
+      const ossVideoUrl = await uploadMergedVideoToOSS(hhOutputPath, userId, projectId)
+      console.log(`[merge-video] HappyHorse 合并视频已上传到 OSS: ${ossVideoUrl}`)
+
+      // 创建 Asset + 更新项目状态
+      const { statSync } = await import('fs')
+      const fileSize = statSync(hhOutputPath).size
+
+      await prisma.$transaction(async (tx) => {
+        await tx.project.update({
+          where: { id: projectId },
+          data: {
+            status: 'EXPORTED',
+            exportStatus: 'COMPLETED',
+            exportVideoUrl: ossVideoUrl,
+            exportError: null,
+          },
+        })
+        const asset = await tx.asset.create({
+          data: {
+            userId,
+            projectId,
+            type: 'AI_GENERATED',
+            url: ossVideoUrl,
+            fileName: `happyhorse_merged_${projectId}.mp4`,
+            fileSize,
+            status: 'UPLOADED',
+          },
+        })
+        // 14 天过期
+        await setExpiry(asset.id)
+      })
+
+      // 更新最终结果到最后一个 GenerationJob
+      const lastJob = await prisma.generationJob.findFirst({
+        where: { projectId, engine: 'happyhorse', status: 'SUCCEEDED' },
+        orderBy: { segmentIndex: 'desc' },
+        select: { id: true },
+      })
+      if (lastJob) {
+        await prisma.generationJob.update({
+          where: { id: lastJob.id },
+          data: { resultVideoUrl: ossVideoUrl },
+        })
+      }
+
+      await job.updateProgress(100)
+      void publishCompleted(userId, 'merge', projectId)
+      console.log(`[merge-video] HappyHorse 合并完成: ${ossVideoUrl}`)
+      return
+    } finally {
+      await cleanupTempDir(hhTempDir)
+    }
+  }
+  // === 以下为 Seedance 原有合并逻辑 ===
+  void publishStateChange(userId, 'merge', projectId, 'started', 0)
+
   // 创建临时工作目录
   const tempDir = path.join(process.cwd(), 'public', 'uploads', 'temp', `merge-${projectId}-${Date.now()}`)
   await mkdir(tempDir, { recursive: true })
@@ -753,6 +838,45 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
     await job.updateProgress(85)
 
     console.log(`[merge-video] FFmpeg 合并完成: ${outputPath}`)
+
+    // 2.5 背景音乐替换：检查 Project.bgmKey，若存在则用 FFmpeg 替换原音轨
+    const projectForBgm = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { bgmKey: true, engine: true },
+    })
+    if (projectForBgm?.bgmKey && projectForBgm.engine === 'seedance') {
+      console.log(`[merge-video] 检测到自定义背景音乐，替换原音轨: ${projectForBgm.bgmKey}`)
+      const bgmLocalPath = path.join(tempDir, `bgm_${Date.now()}.mp3`)
+      // 下载 BGM 到临时目录
+      await resolveMediaUrlToLocal(
+        (await import('@/lib/storage')).getPublicUrl(projectForBgm.bgmKey),
+        bgmLocalPath
+      )
+      // 替换音轨：保留视频流，用 BGM 替换音频流
+      const bgmOutputPath = path.join(tempDir, `merged_bgm_${Date.now()}.mp4`)
+      await new Promise<void>((resolve, reject) => {
+        const proc = (require('child_process') as typeof import('child_process')).execFile(
+          'ffmpeg',
+          [
+            '-y',
+            '-i', outputPath,
+            '-i', bgmLocalPath,
+            '-map', '0:v',
+            '-map', '1:a',
+            '-c:v', 'copy',
+            '-shortest',
+            bgmOutputPath,
+          ],
+          { timeout: 120000 },
+          (err) => { if (err) reject(err); else resolve() }
+        )
+        proc.on('error', reject)
+      })
+      // 用替换后的视频覆盖原输出
+      const { copyFile } = await import('fs/promises')
+      await copyFile(bgmOutputPath, outputPath)
+      console.log(`[merge-video] 背景音乐替换完成`)
+    }
 
     // 3. 上传合并视频到 OSS（Req 3）
     void publishStateChange(userId, 'merge', projectId, 'uploading', 85)

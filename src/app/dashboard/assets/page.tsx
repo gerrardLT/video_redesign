@@ -14,12 +14,14 @@
  * Requirements: 1.1, 2.2, 3.1, 3.6, 4.3
  */
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { Upload } from 'lucide-react'
 import { AssetFilterBar } from '@/components/asset-library/asset-filter-bar'
 import { AssetGrid, type AssetLibraryItem } from '@/components/asset-library/asset-grid'
 import { PreviewModal } from '@/components/asset-library/preview-modal'
 import { CharacterApplyDialog } from '@/components/asset-library/character-apply-dialog'
 import { useAssetLibraryStore } from '@/stores/asset-library-store'
+import { toast } from 'sonner'
 
 /** 分类计数数据结构 */
 interface CategoryCounts {
@@ -154,10 +156,79 @@ export default function AssetLibraryPage() {
     setApplyTargetAsset(null)
   }, [])
 
+  // 上传素材（带分类选择）
+  const uploadInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false)
+  const [uploadCategory, setUploadCategory] = useState<string>('')
+
+  const handleStartUpload = (cat: string) => {
+    setUploadCategory(cat)
+    setShowCategoryPicker(false)
+    setTimeout(() => uploadInputRef.current?.click(), 0)
+  }
+
+  const handleUploadFiles = useCallback(async (files: FileList) => {
+    if (!uploadCategory) return
+    setUploading(true)
+    for (const file of Array.from(files)) {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('category', uploadCategory)
+        const res = await fetch('/api/asset-library/upload', { method: 'POST', body: formData })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || '上传失败')
+        }
+        toast.success(`${file.name} 已上传到资产库`)
+      } catch (error) {
+        toast.error(`${file.name}: ${error instanceof Error ? error.message : '上传失败'}`)
+      }
+    }
+    setUploading(false)
+    await Promise.all([fetchAssets(), fetchCounts()])
+  }, [uploadCategory, fetchAssets, fetchCounts])
+
   return (
     <div className="flex flex-col gap-6">
-      {/* 页面标题 */}
-      <h1 className="text-2xl font-bold text-white">资产库</h1>
+      {/* 页面标题 + 上传按钮 */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">资产库</h1>
+        <div className="relative">
+          <button
+            onClick={() => setShowCategoryPicker(!showCategoryPicker)}
+            disabled={uploading}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--cine-gold)] text-[var(--cine-bg)] text-sm font-medium hover:brightness-110 transition-all disabled:opacity-50"
+          >
+            <Upload className="w-4 h-4" />
+            {uploading ? '上传中...' : '上传素材'}
+          </button>
+          {/* 分类选择下拉 */}
+          {showCategoryPicker && (
+            <div className="absolute top-full right-0 mt-2 w-44 rounded-xl border border-[var(--cine-line-2)] bg-[var(--cine-surface)] shadow-lg overflow-hidden z-50 p-1">
+              <div className="text-[10px] text-[var(--cine-text-3)] px-3 py-1.5">选择分类</div>
+              <button onClick={() => handleStartUpload('CHARACTER')} className="w-full px-3 py-2 text-left text-xs text-[var(--cine-text)] hover:bg-[var(--cine-gold)]/5 rounded-lg transition-colors">
+                🎭 角色素材
+              </button>
+              <button onClick={() => handleStartUpload('MATERIAL')} className="w-full px-3 py-2 text-left text-xs text-[var(--cine-text)] hover:bg-[var(--cine-gold)]/5 rounded-lg transition-colors">
+                🖼 参考素材
+              </button>
+              <button onClick={() => handleStartUpload('AUDIO')} className="w-full px-3 py-2 text-left text-xs text-[var(--cine-text)] hover:bg-[var(--cine-gold)]/5 rounded-lg transition-colors">
+                🎵 音频素材
+              </button>
+            </div>
+          )}
+        </div>
+        <input
+          ref={uploadInputRef}
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,audio/aac"
+          onChange={(e) => { if (e.target.files?.length) { handleUploadFiles(e.target.files); e.target.value = '' } }}
+          className="hidden"
+        />
+      </div>
 
       {/* 筛选栏：分类 Tab + 搜索框 */}
       <AssetFilterBar counts={counts} />

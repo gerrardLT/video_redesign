@@ -32,9 +32,22 @@ export class AlipayGateway implements IPaymentGateway {
   private alipayPublicKey: string
 
   constructor() {
+    // P0 修复：环境变量缺失时直接抛错，不使用空字符串静默降级
     this.appId = process.env.ALIPAY_APP_ID || ''
     this.privateKey = process.env.ALIPAY_PRIVATE_KEY || ''
     this.alipayPublicKey = process.env.ALIPAY_PUBLIC_KEY || ''
+
+    const missing: string[] = []
+    if (!this.appId) missing.push('ALIPAY_APP_ID')
+    if (!this.privateKey) missing.push('ALIPAY_PRIVATE_KEY')
+    if (!this.alipayPublicKey) missing.push('ALIPAY_PUBLIC_KEY')
+
+    if (missing.length > 0) {
+      throw new Error(
+        `支付宝网关初始化失败：缺少环境变量 ${missing.join(', ')}。` +
+        `请在 .env.production 中配置所有支付宝密钥。`
+      )
+    }
   }
 
   /**

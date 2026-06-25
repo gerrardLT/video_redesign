@@ -4,11 +4,12 @@
  * GET /api/sse/progress
  *
  * 建立 Server-Sent Events 长连接，实时推送任务进度事件。
- * 鉴权方式：从 x-user-id header 获取用户 ID（与项目其他路由一致），
- * 或从 query param ?token=xxx 获取（兼容 EventSource 不支持自定义 header 的场景）。
+ * 鉴权方式：
+ * - 优先从 middleware 注入的 x-user-id header 获取（常规 API 路由走 Cookie JWT）
+ * - EventSource 不支持自定义 header，使用 ?token=JWT 传递完整 JWT token 验证
  *
  * 连接生命周期：
- * 1. 验证用户身份
+ * 1. 验证用户身份（JWT 签名验证）
  * 2. 检查全局连接容量
  * 3. 创建 ReadableStream 并注册到 ConnectionRegistry
  * 4. 订阅 Redis Pub/Sub 接收进度事件
@@ -18,6 +19,7 @@
  */
 
 import { NextRequest } from 'next/server'
+import { jwtVerify } from 'jose'
 import { connectionRegistry } from '@/lib/sse/connection-registry'
 import { redisSubscriber } from '@/lib/sse/redis-subscriber'
 import { serialize, serializeHeartbeat, serializeRetry } from '@/lib/sse/event-serializer'
@@ -33,21 +35,43 @@ const HEARTBEAT_INTERVAL_MS = 30_000
 const RETRY_MS = 3000
 
 /**
+ * 从 JWT token 中验证并提取 userId
+ * P0 修复：SSE 鉴权从明文 userId 改为 JWT 签名验证，防止越权订阅他人事件
+ */
+async function verifySSEToken(token: string): Promise<string | null> {
+  try {
+    const secret = process.env.JWT_SECRET
+    if (!secret) return null
+    const jwtSecret = new TextEncoder().encode(secret)
+    const { payload } = await jwtVerify(token, jwtSecret)
+    return (payload.userId as string) || null
+  } catch {
+    return null
+  }
+}
+
+/**
  * GET /api/sse/progress
  *
  * 建立 SSE 长连接，实时推送用户的任务进度事件。
- * 鉴权：x-user-id header 或 ?token= query param（简化鉴权，兼容 EventSource）。
+ * 鉴权：x-user-id header（middleware 注入）或 ?token=JWT（EventSource 场景，需 JWT 签名验证）。
  * 容量超限返回 503，未授权返回 401。
  */
 export async function GET(request: NextRequest): Promise<Response> {
-  // 1. Auth — 从 x-user-id header 或 ?token= query param 获取 userId
-  const userId =
-    request.headers.get('x-user-id') ||
-    request.nextUrl.searchParams.get('token')
+  // 1. Auth — 优先从 middleware 注入的 x-user-id（已经过 JWT 验证）
+  let userId = request.headers.get('x-user-id')
+
+  // EventSource 不支持自定义 header，从 ?token= 获取 JWT 并验证签名
+  if (!userId) {
+    const token = request.nextUrl.searchParams.get('token')
+    if (token) {
+      userId = await verifySSEToken(token)
+    }
+  }
 
   if (!userId) {
     return new Response(
-      JSON.stringify({ error: '未授权' }),
+      JSON.stringify({ error: { code: 'UNAUTHORIZED', message: '未授权或 token 无效' } }),
       { status: 401, headers: { 'Content-Type': 'application/json' } }
     )
   }

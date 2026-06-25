@@ -31,9 +31,9 @@ export const AssetTypeSchema = z.enum([
 ])
 export type AssetType = z.infer<typeof AssetTypeSchema>
 
-// 积分动作类型
+// 积分动作类型（覆盖所有合法的 CreditLedger.action 值）
 export const CreditActionSchema = z.enum([
-  'RESERVE', 'CHARGE', 'REFUND', 'ADMIN_ADJUST'
+  'RESERVE', 'CHARGE', 'REFUND', 'TOPUP', 'ADMIN_ADJUST', 'SUBSCRIPTION_GRANT'
 ])
 export type CreditAction = z.infer<typeof CreditActionSchema>
 

@@ -31,9 +31,15 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof ApiError) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+      return NextResponse.json(
+        { error: { code: error.code, message: error.message } },
+        { status: error.statusCode }
+      )
     }
     console.error('[GET /api/notifications]', error)
-    return NextResponse.json({ error: '获取通知列表失败' }, { status: 500 })
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: '获取通知列表失败' } },
+      { status: 500 }
+    )
   }
 }

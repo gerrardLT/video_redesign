@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
 import { list, create } from '@/lib/help-center-service'
-import { ApiError } from '@/lib/api-error'
+import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/api-error'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,31 +18,25 @@ const createSchema = z.object({
 
 // GET /api/admin/help-articles - 管理后台文章列表（包含未发布）
 export async function GET(request: NextRequest) {
-  const role = request.headers.get('x-user-role')
-  if (role !== 'ADMIN') {
-    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
-  }
-
   try {
+    requireAdmin(request)
+
     const articles = await list(false)
     return NextResponse.json({ articles })
   } catch (error) {
+    if (error instanceof ApiError) {
+      return apiErrorToResponse(error)
+    }
     console.error('[GET /api/admin/help-articles]', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: '获取帮助文章列表失败' } },
-      { status: 500 }
-    )
+    return toErrorResponse('INTERNAL_ERROR', '获取帮助文章列表失败')
   }
 }
 
 // POST /api/admin/help-articles - 创建帮助文章
 export async function POST(request: NextRequest) {
-  const role = request.headers.get('x-user-role')
-  if (role !== 'ADMIN') {
-    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
-  }
-
   try {
+    requireAdmin(request)
+
     const body = await request.json()
     const parseResult = createSchema.safeParse(body)
 
@@ -56,15 +51,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(article, { status: 201 })
   } catch (error) {
     if (error instanceof ApiError) {
-      return NextResponse.json(
-        { error: { code: error.code, message: error.message } },
-        { status: error.statusCode }
-      )
+      return apiErrorToResponse(error)
     }
     console.error('[POST /api/admin/help-articles]', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: '创建帮助文章失败' } },
-      { status: 500 }
-    )
+    return toErrorResponse('INTERNAL_ERROR', '创建帮助文章失败')
   }
 }

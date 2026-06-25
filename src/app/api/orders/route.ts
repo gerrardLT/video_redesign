@@ -19,7 +19,10 @@ export async function POST(request: NextRequest) {
     const parsed = CreateOrderSchema.safeParse(body)
     if (!parsed.success) {
       const firstError = parsed.error.issues[0]?.message || '参数校验失败'
-      return NextResponse.json({ error: firstError }, { status: 400 })
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: firstError } },
+        { status: 400 }
+      )
     }
 
     const { packageId, payMethod } = parsed.data
@@ -30,12 +33,15 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message },
+        { error: { code: error.code, message: error.message } },
         { status: error.statusCode }
       )
     }
     console.error('[POST /api/orders]', error)
-    return NextResponse.json({ error: '创建订单失败' }, { status: 500 })
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: '创建订单失败' } },
+      { status: 500 }
+    )
   }
 }
 
@@ -54,11 +60,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message },
+        { error: { code: error.code, message: error.message } },
         { status: error.statusCode }
       )
     }
     console.error('[GET /api/orders]', error)
-    return NextResponse.json({ error: '获取订单列表失败' }, { status: 500 })
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: '获取订单列表失败' } },
+      { status: 500 }
+    )
   }
 }

@@ -13,7 +13,7 @@ AI 视频重绘 SaaS 平台：用户上传短视频 → AI 多模态解析为分
 - **包管理**: pnpm 10 (monorepo-free, single package)
 - **UI**: React 19, Tailwind CSS v4, shadcn/ui, lucide-react, tw-animate-css
 - **状态管理**: Zustand 5 (客户端), SWR (服务端数据)
-- **数据库**: SQLite (libSQL via @prisma/adapter-libsql), Prisma 7.8 ORM
+- **数据库**: PostgreSQL 16 (@prisma/adapter-pg), Prisma 7.8 ORM
 - **队列**: BullMQ + Redis 7 (ioredis)
 - **对象存储**: 阿里云 OSS (ali-oss)
 - **视频处理**: FFmpeg (场景检测/Normalize/音频切片/缩略图), yt-dlp (链接下载)
@@ -218,9 +218,9 @@ docker-compose -f docker-compose.prod.yml up -d --build
 
 ## 架构决策记录
 
-### 为什么用 SQLite 而不是 PostgreSQL
+### 为什么用 PostgreSQL
 
-MVP 阶段单机部署，SQLite (libSQL) 足够且运维简单。通过 Prisma adapter 层隔离，未来可切换。
+多用户并发场景下 PostgreSQL 的行级锁和 MVCC 并发控制远优于 SQLite 单写锁模型。通过 Prisma adapter 层隔离，从 SQLite 迁移到 PostgreSQL 仅需更换 adapter 和连接配置。
 
 ### 为什么 Worker 独立进程
 
@@ -242,7 +242,7 @@ Seedance 2.0 单次调用支持 4-15s 视频，分镜组将相邻镜头合并为
 - **API 入口层**：Redis 原子计数器（parse/merge）或 DB 状态查询（generate）门控
 - **Worker 层**：BullMQ concurrency 限制同时执行的任务数
 - **任务层**：Redis 分布式锁（按分镜组）防止同一组被重复处理
-- **积分层**：全局积分写锁（withCreditLock）跨进程串行化，消除 SQLite 并发写竞争
+- **积分层**：全局积分写锁（withCreditLock）跨进程串行化，防止 read-modify-write 丢失更新
 - **漂移修复**：concurrency-reconcile 看门狗每5分钟用 DB 真相覆盖 Redis 计数器
 
 ## Git 规范
@@ -257,7 +257,7 @@ Seedance 2.0 单次调用支持 4-15s 视频，分镜组将相邻镜头合并为
 2. **Redis 连接**: Workers 必须在 Redis 启动后运行，否则 BullMQ 会崩溃
 3. **FFmpeg 路径**: Windows 开发需确保 ffmpeg/ffprobe 在 PATH 中（或使用 WSL）
 4. **环境变量**: 所有关键 API Key 缺失会直接抛错，不会静默跳过
-5. **SQLite 并发写**: 积分等高并发写场景通过 Redis 全局锁（withCreditLock）跨进程串行化，锁内复用 db-retry 对残余 SQLITE_BUSY 兜底
+5. **SQLite 并发写**: 积分等高并发写场景通过 Redis 全局锁（withCreditLock）跨进程串行化，防止 read-modify-write 丢失更新
 6. **Turbopack 端口**: 开发端口固定 3011（`pnpm dev` 已配置），前端 NEXT_PUBLIC_APP_URL 要匹配
 7. **生成目录**: `src/generated/prisma/` 在 `.gitignore` 中，首次 clone 需执行 `npx prisma generate`
 8. **全局积分写锁不可重入**: `withCreditLock` 内部不得再调用 `withCreditLock`（会自锁死至超时抛错）

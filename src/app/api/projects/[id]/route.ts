@@ -186,6 +186,7 @@ export async function GET(
         createdAt: project.createdAt.toISOString(),
         updatedAt: project.updatedAt.toISOString(),
         shotCount: project._count.shots,
+        engine: project.engine, // 生成引擎: seedance | happyhorse
         // Stepper 所需的步骤状态计算数据
         shots: project.shots.map((s) => ({ genStatus: s.genStatus })),
         characters: project.characters.map((c) => ({ enabled: c.enabled, avatarStatus: c.avatarStatus, avatarAssetUrl: c.avatarAssetUrl })),
@@ -221,7 +222,22 @@ export async function DELETE(
     })
 
     if (!project) {
-      return NextResponse.json({ error: '项目不存在' }, { status: 404 })
+      return NextResponse.json({ error: { code: 'NOT_FOUND', message: '项目不存在' } }, { status: 404 })
+    }
+
+    // P1 修复：进行中的项目不允许删除（防止产生孤儿 Worker 任务）
+    const activeStatuses = ['DOWNLOADING', 'PARSING', 'GENERATING']
+    if (activeStatuses.includes(project.status)) {
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: `项目正在${project.status === 'GENERATING' ? '生成' : '解析'}中，无法删除。请等待完成或联系管理员` } },
+        { status: 400 }
+      )
+    }
+    if (project.exportStatus === 'MERGING' || project.exportStatus === 'UPSCALING') {
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: '项目正在导出中，无法删除。请等待导出完成' } },
+        { status: 400 }
+      )
     }
 
     // 删除项目（级联删除 shots, characters, assets）
@@ -232,6 +248,6 @@ export async function DELETE(
     return NextResponse.json({ message: '项目已删除' })
   } catch (error) {
     console.error('[DELETE /api/projects/[id]]', error)
-    return NextResponse.json({ error: '删除项目失败' }, { status: 500 })
+    return NextResponse.json({ error: { code: 'INTERNAL_ERROR', message: '删除项目失败' } }, { status: 500 })
   }
 }

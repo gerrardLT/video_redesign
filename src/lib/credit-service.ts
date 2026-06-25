@@ -9,7 +9,7 @@ import { ApiError } from './api-error'
 import { withCreditLock } from './distributed-lock'
 
 // 纯计算函数从 credit-calc.ts 重导出（服务端既有 import 不受影响）
-export { estimateUpscaleCreditCost, estimateCreditCost, estimateParseCreditCost } from './credit-calc'
+export { estimateUpscaleCreditCost, estimateCreditCost, estimateParseCreditCost, estimateHappyHorseCreditCost, calculateHappyHorseActualCost } from './credit-calc'
 export type { UpscaleResolution } from './credit-calc'
 
 // ========================
@@ -171,7 +171,7 @@ export async function refundParseCredits(
  * 导出阶段积分冻结（RESERVE，按 projectId 关联，无 jobId 外键）
  *
  * 与 freezeParseCredits 同模型：入队前真实冻结积分，成功时由 merge Worker 记账，失败时退还。
- * 幂等：按 projectId + action='RESERVE' + remark 含「导出」关键字 去重，重试不重复冻结。
+ * 幂等：按 projectId + action='RESERVE' + remark 前缀 `[EXPORT]` 去重，重试不重复冻结。
  *
  * 注意：不能使用 reserveCredits（该函数写 jobId 字段，有 GenerationJob 外键约束），
  * 导出阶段无 GenerationJob，必须走 projectId 关联。
@@ -187,9 +187,9 @@ export async function freezeExportCredits(
 ): Promise<void> {
   await withCreditLock(() =>
     prisma.$transaction(async (tx) => {
-      // 幂等：已存在该 projectId 的导出 RESERVE 则跳过（重试场景）
+      // P0 修复：幂等键使用固定前缀 `[EXPORT]` 而非 `contains: '导出'`（中文文案），避免因文案变动导致幂等失效
       const existing = await tx.creditLedger.findFirst({
-        where: { projectId, action: 'RESERVE', remark: { contains: '导出' } },
+        where: { projectId, action: 'RESERVE', remark: { startsWith: '[EXPORT]' } },
       })
       if (existing) return
 
@@ -213,7 +213,7 @@ export async function freezeExportCredits(
           action: 'RESERVE',
           amount: -amount,
           balanceAfter: newBalance,
-          remark: `导出超分冻结 ${amount} 积分`,
+          remark: `[EXPORT] 导出超分冻结 ${amount} 积分`,
         },
       })
     })
@@ -298,9 +298,7 @@ export async function reserveCredits(
   jobId: string,
   amount: number
 ): Promise<void> {
-  // 关键积分写（缺陷 11）：经 Redis 全局锁【跨进程】串行化执行，消除 libSQL/SQLite 单写锁下
-  // 「Worker 进程 × Next.js 应用进程」并发写 creditLedger/余额的锁竞争与读-改-写丢失更新；
-  // 锁内复用 db-retry 对跨进程残余 SQLITE_BUSY 兜底，串行化与重试互补。
+  // 关键积分写：经 Redis 全局锁【跨进程】串行化执行，防止 read-modify-write 丢失更新
   await withCreditLock(() =>
     prisma.$transaction(async (tx) => {
       const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
@@ -437,8 +435,7 @@ export async function chargeCreditsTx(
 /**
  * 正式扣除积分（CHARGE，按 jobId 关联）
  * 薄封装：在 Prisma 事务中调用统一的 chargeCreditsTx（幂等 + RESERVE 差额退款）。
- * 关键积分写（缺陷 11）：经 Redis 全局锁【跨进程】串行化执行，消除 libSQL/SQLite 单写锁
- * 下「Worker 进程 × 应用进程」并发写锁竞争与读-改-写丢失更新（锁内复用 db-retry 兜底）。
+ * 关键积分写：经 Redis 全局锁【跨进程】串行化执行，防止 read-modify-write 丢失更新。
  */
 export async function chargeCredits(
   userId: string,
@@ -455,8 +452,7 @@ export async function chargeCredits(
 /**
  * 返还积分（REFUND）
  * 幂等性：如果已存在该 jobId 的 REFUND 记录则跳过
- * 关键积分写（缺陷 11）：经 Redis 全局锁【跨进程】串行化执行，消除 libSQL/SQLite 单写锁
- * 下「Worker 进程 × 应用进程」并发写锁竞争与读-改-写丢失更新（锁内复用 db-retry 兜底）。
+ * 关键积分写：经 Redis 全局锁【跨进程】串行化执行，防止 read-modify-write 丢失更新。
  */
 export async function refundCredits(
   userId: string,
@@ -498,8 +494,8 @@ export async function refundCredits(
  * 幂等性：如果已存在该 orderId 的 TOPUP 记录则跳过
  * 在 Prisma 事务中：增加用户余额 → 创建 TOPUP 流水记录（含 orderId）
  * 返回充值后的新余额（幂等跳过时返回当前余额）
- * 关键积分写（缺陷 11）：充值回调来自 Next.js 应用进程，经 Redis 全局锁【跨进程】串行化，
- * 与 Worker 进程的扣费/退款互斥，消除 libSQL/SQLite 并发写锁竞争与读-改-写丢失更新。
+ * 关键积分写：充值回调来自 Next.js 应用进程，经 Redis 全局锁【跨进程】串行化，
+ * 防止 read-modify-write 丢失更新。
  */
 export async function topupCredits(
   userId: string,

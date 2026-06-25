@@ -16,18 +16,22 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=file:/app/data/prod.db
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/video_redesign
     volumes:
       - uploads_data:/app/public/uploads
-      - db_data:/app/data
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/auth/me"]
       interval: 30s
       timeout: 10s
       retries: 3
+    # 启动前执行数据库迁移
+    command: ["sh", "-c", "npx prisma migrate deploy && node server.js"]
 
   # Workers（后台任务：视频解析/生成/合并/人物图等）
   workers:
@@ -38,13 +42,33 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=file:/app/data/prod.db
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/video_redesign
     volumes:
       - uploads_data:/app/public/uploads
-      - db_data:/app/data
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: video_redesign
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # Redis（BullMQ 任务队列）
   redis:
@@ -63,5 +87,5 @@ services:
 
 volumes:
   uploads_data:
-  db_data:
+  postgres_data:
   redis_data:

@@ -252,3 +252,233 @@ export async function orchestrateGeneration(params: OrchestrationParams): Promis
 
   return result
 }
+
+
+// ========================
+// HappyHorse V-Edit 编排
+// ========================
+
+import { estimateHappyHorseCreditCost } from '@/lib/credit-calc'
+import { segmentVideo, cutVideoSegments, type VideoSegment } from '@/lib/segment-service'
+import { downloadToTemp } from '@/lib/storage'
+import path from 'path'
+import { promises as fs } from 'fs'
+import os from 'os'
+
+/** HappyHorse 编排参数 */
+export interface HappyHorseOrchestrationParams {
+  /** 用户 ID */
+  userId: string
+  /** 项目 ID */
+  projectId: string
+  /** 原视频 OSS URL（公网可访问） */
+  videoUrl: string
+  /** 原视频时长（秒） */
+  videoDuration: number
+  /** 用户 prompt 指令 */
+  prompt: string
+  /** 参考图 URL 列表（0-5 张） */
+  referenceImages?: string[]
+  /** 用户等级 */
+  tier: UserTier
+}
+
+/** HappyHorse 编排结果 */
+export interface HappyHorseOrchestrationResult {
+  /** 生成模式：direct=短视频直接生成，segmented=长视频分段生成 */
+  mode: 'direct' | 'segmented'
+  /** 总分段数 */
+  totalSegments: number
+  /** 积分总消耗 */
+  totalCost: number
+  /** 各分段的任务信息 */
+  jobs: Array<{ id: string; segmentIndex: number; status: string }>
+}
+
+/**
+ * 判断视频是否走 HappyHorse 短视频直接模式
+ * @param duration 视频时长（秒）
+ * @returns true=直接模式（3-15s），false=分段模式（>15s）
+ */
+export function isHappyHorseDirectMode(duration: number): boolean {
+  return duration >= 3 && duration <= 15
+}
+
+/**
+ * 验证引擎字段取值
+ * @param engine 引擎字符串
+ * @returns true 当且仅当为 "seedance" 或 "happyhorse"
+ */
+export function isValidEngine(engine: string): engine is 'seedance' | 'happyhorse' {
+  return engine === 'seedance' || engine === 'happyhorse'
+}
+
+/**
+ * HappyHorse 编排入口
+ *
+ * 短视频（3-15s）: 直接创建单个 GenerationJob 并入队
+ * 长视频（>15s）: 分段后为每段创建 GenerationJob，链式串行入队第一段
+ *
+ * @param params HappyHorse 编排参数
+ * @returns 编排结果
+ * @throws ApiError('INSUFFICIENT_CREDITS') 余额不足时抛出
+ */
+export async function orchestrateHappyHorseGeneration(
+  params: HappyHorseOrchestrationParams
+): Promise<HappyHorseOrchestrationResult> {
+  const { userId, projectId, videoUrl, videoDuration, prompt, referenceImages, tier } = params
+
+  const isDirect = isHappyHorseDirectMode(videoDuration)
+
+  // 计算分段信息（短视频只有 1 段）
+  let segments: VideoSegment[] = []
+  let segmentVideoUrls: string[] = []
+
+  if (isDirect) {
+    // 短视频直接模式：单段
+    segments = [{ index: 0, startTime: 0, endTime: videoDuration, duration: videoDuration }]
+    segmentVideoUrls = [videoUrl]
+  } else {
+    // 长视频分段模式：下载视频 → 场景检测 → 分段 → 裁切 → 上传各段到 OSS
+    const tmpDir = path.join(os.tmpdir(), `happyhorse-seg-${projectId}-${Date.now()}`)
+    await fs.mkdir(tmpDir, { recursive: true })
+
+    try {
+      // 下载原视频到临时目录
+      const videoTmpPath = path.join(tmpDir, 'source.mp4')
+      await downloadToTemp(videoUrl, videoTmpPath)
+
+      // 智能分段
+      segments = await segmentVideo(videoTmpPath, videoDuration)
+
+      // 裁切各段
+      const cutSegments = await cutVideoSegments(videoTmpPath, segments, tmpDir)
+
+      // 上传各段到 OSS 并收集 URL
+      const { uploadFile, getPublicUrl } = await import('@/lib/storage')
+      for (const seg of cutSegments) {
+        if (!seg.filePath) throw new Error(`分段 ${seg.index} 裁切失败：无文件路径`)
+        const ossKey = `projects/${projectId}/segments/segment_${seg.index}.mp4`
+        await uploadFile(ossKey, seg.filePath)
+        segmentVideoUrls.push(getPublicUrl(ossKey))
+      }
+    } finally {
+      // 清理临时目录
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+    }
+  }
+
+  const totalSegments = segments.length
+
+  // 计算总积分消耗（所有分段的输入时长累加）
+  const totalCost = segments.reduce(
+    (sum, seg) => sum + estimateHappyHorseCreditCost(seg.duration),
+    0
+  )
+
+  // 校验用户余额
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
+  if (user.creditBalance < totalCost) {
+    throw new ApiError(
+      'INSUFFICIENT_CREDITS',
+      `积分不足：生成需 ${totalCost} 积分，当前余额 ${user.creditBalance}`,
+      402
+    )
+  }
+
+  // 使用 withCreditLock 原子冻结全部积分 + 创建 GenerationJob
+  const jobRecords = await withCreditLock(async () => {
+    return prisma.$transaction(async (tx) => {
+      // 事务内二次校验余额
+      const freshUser = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+      if (freshUser.creditBalance < totalCost) {
+        throw new ApiError(
+          'INSUFFICIENT_CREDITS',
+          `积分不足：生成需 ${totalCost} 积分，当前余额 ${freshUser.creditBalance}`,
+          402
+        )
+      }
+
+      // 一次性扣减用户余额
+      const newBalance = freshUser.creditBalance - totalCost
+      await tx.user.update({
+        where: { id: userId },
+        data: { creditBalance: newBalance },
+      })
+
+      // 为每段创建 RESERVE 流水 + GenerationJob
+      let runningBalance = freshUser.creditBalance
+      const jobs: Array<{ id: string; segmentIndex: number; status: string; estimatedCost: number }> = []
+
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i]
+        const segCost = estimateHappyHorseCreditCost(seg.duration)
+        runningBalance -= segCost
+
+        const job = await tx.generationJob.create({
+          data: {
+            userId,
+            projectId,
+            status: 'QUEUED',
+            engine: 'happyhorse',
+            segmentIndex: i,
+            totalSegments,
+            costEstimate: segCost,
+            promptSnapshot: prompt,
+          },
+        })
+
+        await tx.creditLedger.create({
+          data: {
+            userId,
+            jobId: job.id,
+            action: 'RESERVE',
+            amount: -segCost,
+            balanceAfter: runningBalance,
+            remark: `冻结 HappyHorse 分段 #${i + 1}/${totalSegments} 积分（${segCost}）`,
+          },
+        })
+
+        jobs.push({
+          id: job.id,
+          segmentIndex: i,
+          status: 'QUEUED',
+          estimatedCost: segCost,
+        })
+      }
+
+      return jobs
+    })
+  }, 'orchestrateHappyHorseGeneration')
+
+  // 入队第一段（链式串行）
+  await scheduleWithPriority(
+    videoGenerateQueue,
+    'generate-video',
+    {
+      jobId: jobRecords[0].id,
+      userId,
+      projectId,
+      engine: 'happyhorse',
+      sourceVideoUrl: segmentVideoUrls[0],
+      happyHorseReferenceImages: referenceImages?.slice(0, 5),
+      prompt,
+      segmentIndex: 0,
+      totalSegments,
+      chainMode: totalSegments > 1,
+      segmentVideoUrls: totalSegments > 1 ? segmentVideoUrls : undefined,
+    },
+    tier
+  )
+
+  return {
+    mode: isDirect ? 'direct' : 'segmented',
+    totalSegments,
+    totalCost,
+    jobs: jobRecords.map(j => ({
+      id: j.id,
+      segmentIndex: j.segmentIndex,
+      status: j.status,
+    })),
+  }
+}

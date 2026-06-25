@@ -4,6 +4,8 @@ import { canRetry, assertTransition } from '@/lib/state-machine'
 import { estimateCreditCost, reserveCredits } from '@/lib/credit-service'
 import { videoGenerateQueue } from '@/lib/queue'
 import { buildReferenceData } from '@/lib/reference-builder'
+import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/api-error'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,10 +15,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const role = request.headers.get('x-user-role')
-    if (role !== 'ADMIN') {
-      return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
-    }
+    requireAdmin(request)
 
     const { id } = await params
 
@@ -135,7 +134,10 @@ export async function POST(
       { status: 202 }
     )
   } catch (error) {
+    if (error instanceof ApiError) {
+      return apiErrorToResponse(error)
+    }
     console.error('[POST /api/admin/jobs/[id]/retry]', error)
-    return NextResponse.json({ error: '管理员重试任务失败' }, { status: 500 })
+    return toErrorResponse('INTERNAL_ERROR', '管理员重试任务失败')
   }
 }

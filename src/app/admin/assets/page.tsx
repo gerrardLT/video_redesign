@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 
 interface AssetItem {
   id: string
-  projectId: string
+  projectId: string | null
   userId: string
   type: string
   url: string
@@ -14,7 +14,7 @@ interface AssetItem {
   expiresAt: string | null
   createdAt: string
   project: {
-    name: string
+    name: string | null
   }
   user: {
     email: string

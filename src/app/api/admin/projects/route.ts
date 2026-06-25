@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/api-error'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/admin/projects - 获取所有项目列表（管理员）
 export async function GET(request: NextRequest) {
-  const role = request.headers.get('x-user-role')
-  if (role !== 'ADMIN') {
-    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
-  }
-
   try {
+    requireAdmin(request)
+
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -41,7 +40,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ projects: result })
   } catch (error) {
+    if (error instanceof ApiError) {
+      return apiErrorToResponse(error)
+    }
     console.error('[GET /api/admin/projects]', error)
-    return NextResponse.json({ error: '获取项目列表失败' }, { status: 500 })
+    return toErrorResponse('INTERNAL_ERROR', '获取项目列表失败')
   }
 }

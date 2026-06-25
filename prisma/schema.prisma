@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // ========================
@@ -24,12 +24,13 @@ model User {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   lastLoginAt   DateTime? @map("last_login_at")
 
-  projects           Project[]
-  jobs               GenerationJob[]
-  ledger             CreditLedger[]
-  orders             PackageOrder[]
-  notifications      Notification[]
-  onboardingProgress OnboardingProgress?
+  projects            Project[]
+  jobs                GenerationJob[]
+  ledger              CreditLedger[]
+  orders              PackageOrder[]
+  assets              Asset[]
+  notifications       Notification[]
+  onboardingProgress  OnboardingProgress?
   subscriptionRecords SubscriptionRecord[]
   subscriptionOrders  SubscriptionOrder[]
 
@@ -59,6 +60,9 @@ model Project {
   exportError      String?   @map("export_error") // 导出失败原因
   exportCreatedAt  DateTime? @map("export_created_at") // 导出任务创建时间
 
+  engine String  @default("seedance") @map("engine") // 生成引擎: seedance | happyhorse
+  bgmKey String? @map("bgm_key") // 自定义背景音乐 OSS 键
+
   isSample Boolean @default(false) @map("is_sample") // 标记是否为新手引导示例项目
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -76,25 +80,25 @@ model Project {
 // 分镜表
 // ========================
 model Shot {
-  id          String   @id @default(cuid())
-  projectId   String   @map("project_id")
-  orderIndex  Int      @map("order_index")
-  startTime   Float    @map("start_time")
-  endTime     Float    @map("end_time")
-  coverUrl    String?  @map("cover_url")
-  scene       String?
-  shotType    String?  @map("shot_type")
-  cameraMove  String?  @map("camera_move")
-  dialogue    String? // JSON 字符串，SQLite 无 JSON 类型
-  audioDesc   String?  @map("audio_desc")
-  prompt      String?
-  genStatus   String   @default("PENDING") @map("gen_status") // PENDING|QUEUED|GENERATING|SUCCEEDED|FAILED|CANCELED
-  genVideoUrl String?  @map("gen_video_url")
-  hasFace     Boolean  @default(true) @map("has_face")
+  id                   String   @id @default(cuid())
+  projectId            String   @map("project_id")
+  orderIndex           Int      @map("order_index")
+  startTime            Float    @map("start_time")
+  endTime              Float    @map("end_time")
+  coverUrl             String?  @map("cover_url")
+  scene                String?
+  shotType             String?  @map("shot_type")
+  cameraMove           String?  @map("camera_move")
+  dialogue             String? // JSON 字符串，SQLite 无 JSON 类型
+  audioDesc            String?  @map("audio_desc")
+  prompt               String?
+  genStatus            String   @default("PENDING") @map("gen_status") // PENDING|QUEUED|GENERATING|SUCCEEDED|FAILED|CANCELED
+  genVideoUrl          String?  @map("gen_video_url")
+  hasFace              Boolean  @default(true) @map("has_face")
   shotGroupId          String?  @map("shot_group_id") // 新增可空：归属的分镜组
   characterAppearances String?  @map("character_appearances") // 角色外观描述 JSON，格式: [{name: string, appearance: {hair, clothing, accessories, makeup}}]
   createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   project    Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   shotGroup  ShotGroup?      @relation(fields: [shotGroupId], references: [id], onDelete: SetNull)
@@ -111,23 +115,24 @@ model Shot {
 // 一个分镜组对应一次 Seedance 生成调用与一段合并视频
 // ========================
 model ShotGroup {
-  id             String   @id @default(cuid())
-  projectId      String   @map("project_id")
-  groupIndex     Int      @map("group_index") // Project 内唯一，从 0 起连续递增
-  genDuration    Float    @map("gen_duration") // 0.01 ~ 15.00 秒
-  startTime      Float    @map("start_time") // 组内首个 Shot 的 startTime
-  endTime        Float    @map("end_time") // 组内末个 Shot 的 endTime
-  genStatus      String   @default("PENDING") @map("gen_status") // PENDING|QUEUED|GENERATING|SUCCEEDED|FAILED|CANCELED
-  genVideoUrl    String?  @map("gen_video_url") // 未生成时为空
-  genCoverUrl    String?  @map("gen_cover_url") // 生成视频封面 URL（从 genVideoUrl 抽帧持久化，用于前端 poster 展示）
-  lastFrameUrl   String?  @map("last_frame_url") // 本组生成成功时 Seedance 返回的受信尾帧 URL（returnLastFrame=true 时有值），供后续同场景承接复用
-  audioKey       String?  @map("audio_key") // group_{groupIndex}.mp3 的 OSS 键
-  clipVideoUrl   String?  @map("clip_video_url") // 按组裁切的视频片段 OSS URL（修复风险14）
-  timelineScript String?  @map("timeline_script") // 最近一次合并的 Timeline_Script 快照
-  scriptEdited   Boolean  @default(false) @map("script_edited") // 用户是否手动编辑过脚本：true 固定复用 timelineScript；false 每次按最新规则重合并（含对白/台词）
-  scriptHash     String?  @map("script_hash") // 最近一次生成请求的幂等哈希
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(cuid())
+  projectId          String   @map("project_id")
+  groupIndex         Int      @map("group_index") // Project 内唯一，从 0 起连续递增
+  genDuration        Float    @map("gen_duration") // 0.01 ~ 15.00 秒
+  startTime          Float    @map("start_time") // 组内首个 Shot 的 startTime
+  endTime            Float    @map("end_time") // 组内末个 Shot 的 endTime
+  genStatus          String   @default("PENDING") @map("gen_status") // PENDING|QUEUED|GENERATING|SUCCEEDED|FAILED|CANCELED
+  genVideoUrl        String?  @map("gen_video_url") // 未生成时为空
+  genCoverUrl        String?  @map("gen_cover_url") // 生成视频封面 URL（从 genVideoUrl 抽帧持久化，用于前端 poster 展示）
+  lastFrameUrl       String?  @map("last_frame_url") // 本组生成成功时 Seedance 返回的受信尾帧 URL（returnLastFrame=true 时有值），供后续同场景承接复用
+  audioKey           String?  @map("audio_key") // group_{groupIndex}.mp3 的 OSS 键
+  clipVideoUrl       String?  @map("clip_video_url") // 按组裁切的视频片段 OSS URL（修复风险14）
+  timelineScript     String?  @map("timeline_script") // 最近一次合并的 Timeline_Script 快照
+  scriptEdited       Boolean  @default(false) @map("script_edited") // 用户是否手动编辑过脚本：true 固定复用 timelineScript；false 每次按最新规则重合并（含对白/台词）
+  scriptHash         String?  @map("script_hash") // 最近一次生成请求的幂等哈希
+  backgroundImageUrl String?  @map("background_image_url") // Seedance 模式背景图 OSS URL
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   shots           Shot[]
@@ -146,13 +151,13 @@ model ShotGroup {
 // 生成时仅注入本组选中人物的锚定图作 reference_image
 // ========================
 model ShotGroupCharacter {
-  id               String   @id @default(cuid())
-  shotGroupId      String   @map("shot_group_id")
-  characterId      String   @map("character_id")
-  createdAt        DateTime @default(now()) @map("created_at")
+  id          String   @id @default(cuid())
+  shotGroupId String   @map("shot_group_id")
+  characterId String   @map("character_id")
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  shotGroup      ShotGroup       @relation(fields: [shotGroupId], references: [id], onDelete: Cascade)
-  character      Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  shotGroup ShotGroup @relation(fields: [shotGroupId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
 
   @@unique([shotGroupId, characterId])
   @@index([shotGroupId])
@@ -206,6 +211,7 @@ model Asset {
   createdAt    DateTime  @default(now()) @map("created_at")
 
   project    Project?    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   shotAssets ShotAsset[]
 
   @@index([projectId])
@@ -251,6 +257,9 @@ model GenerationJob {
   resultVideoUrl String?  @map("result_video_url")
   errorCode      String?  @map("error_code")
   errorMessage   String?  @map("error_message")
+  engine         String   @default("seedance") @map("engine") // 生成引擎: seedance | happyhorse
+  segmentIndex   Int?     @map("segment_index") // HappyHorse 分段索引（0-based）
+  totalSegments  Int?     @map("total_segments") // HappyHorse 总分段数
   costEstimate   Int?     @map("cost_estimate")
   retryCount     Int      @default(0) @map("retry_count")
   createdAt      DateTime @default(now()) @map("created_at")
@@ -525,7 +534,6 @@ model OnboardingProgress {
   @@map("onboarding_progress")
 }
 
-
 // ========================
 // 订阅套餐定义表（种子数据）
 // ========================
@@ -566,8 +574,8 @@ model SubscriptionRecord {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  user   User               @relation(fields: [userId], references: [id])
-  plan   SubscriptionPlan   @relation(fields: [planId], references: [id])
+  user   User                @relation(fields: [userId], references: [id])
+  plan   SubscriptionPlan    @relation(fields: [planId], references: [id])
   orders SubscriptionOrder[]
 
   @@index([userId])
@@ -609,4 +617,516 @@ model SubscriptionOrder {
   @@map("subscription_orders")
 }
 
+// ================================================================
+// ============ 本地生活营销平台 - 新增枚举与模型 ============
+// ============ (增量添加，不修改/删除现有表结构) ============
+// ================================================================
 
+// ============ 枚举 ============
+
+enum MerchantIndustry {
+  RESTAURANT
+  DRINK
+  BAKERY
+  CAFE
+  HOTPOT
+  BBQ
+  FAST_FOOD
+  OTHER_LOCAL
+}
+
+enum ContentGoal {
+  TRAFFIC
+  PROMOTION
+  NEW_PRODUCT
+  TRUST_BUILDING
+  BRAND_STORY
+  CUSTOMER_TESTIMONIAL
+  WEEKEND_BOOST
+  REPEAT_PURCHASE
+}
+
+enum ContentBriefStatus {
+  DRAFT
+  READY_TO_SHOOT
+  MATERIALS_UPLOADED
+  RENDERING
+  GENERATED
+  COMPLIANCE_REVIEW
+  READY_TO_EXPORT
+  EXPORTED
+  PUBLISHED
+  FAILED
+  ARCHIVED
+}
+
+enum ShotTaskType {
+  STOREFRONT
+  PRODUCT_CLOSEUP
+  COOKING_PROCESS
+  STAFF_ACTION
+  CUSTOMER_REACTION
+  OWNER_TALKING
+  ENVIRONMENT
+  OFFER_DISPLAY
+  CTA_SCREEN
+  AI_GENERATED_FILLER
+}
+
+enum VideoVariantType {
+  PROMOTION
+  ATMOSPHERE
+  OWNER_TALKING
+  TRUST
+  PRODUCT
+}
+
+enum ComplianceRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  BLOCKED
+}
+
+enum PublishPlatform {
+  DOUYIN
+  KUAISHOU
+  XIAOHONGSHU
+  WECHAT_CHANNELS
+  MANUAL_EXPORT
+}
+
+enum PublishJobStatus {
+  DRAFT
+  READY
+  EXPORTING
+  EXPORTED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+// ============ 商家与门店 ============
+
+/// 商家实体，关联用户账号
+model Merchant {
+  id          String           @id @default(cuid())
+  userId      String           @unique // 关联现有 User 表，一个用户只能有一个商家身份
+  name        String
+  contactName String?
+  phone       String?
+  industry    MerchantIndustry
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  stores Store[]
+
+  @@index([userId])
+  @@index([industry])
+  @@map("merchants")
+}
+
+/// 门店实体，包含地址、行业、主打产品等经营信息
+model Store {
+  id                String           @id @default(cuid())
+  merchantId        String
+  name              String
+  industry          MerchantIndustry
+  city              String?
+  district          String?
+  businessArea      String?
+  address           String?
+  avgTicket         Int? // 客单价，分为单位
+  openingHours      String?
+  phone             String?
+  mainProducts      Json // string[] - 主打产品列表
+  mainSellingPoints Json // string[] - 主要卖点列表
+  targetCustomers   Json? // string[] - 目标客群
+  brandTone         String?
+  canShootKitchen   Boolean          @default(false)
+  canShootStaff     Boolean          @default(true)
+  canShootCustomers Boolean          @default(false)
+  hasGroupBuying    Boolean          @default(false)
+  hasReservation    Boolean          @default(false)
+  status            String           @default("ACTIVE") // ACTIVE | PROFILE_PENDING
+  notes             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  merchant       Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  profile        StoreProfile?
+  offers         ProductOffer[]
+  contentPlans   ContentPlan[]
+  contentBriefs  ContentBrief[]
+  rawAssets      RawAsset[]
+  consentRecords ConsentRecord[]
+  socialAccounts SocialAccount[]
+
+  @@index([merchantId])
+  @@index([industry])
+  @@index([city, district])
+  @@map("stores")
+}
+
+// ============ 门店画像 ============
+
+/// AI 生成的门店内容定位、人设、风格等策略信息
+model StoreProfile {
+  id                 String   @id @default(cuid())
+  storeId            String   @unique
+  contentPositioning String? // 内容定位描述
+  recommendedPersona String? // 推荐人设
+  contentDos         Json? // string[] - 内容推荐做的事
+  contentDonts       Json? // string[] - 内容禁止做的事
+  visualStyle        String? // 视觉风格
+  hookKeywords       Json? // string[] - 钩子关键词（5-15个）
+  forbiddenClaims    Json? // string[] - 违禁词列表（≥5个）
+  preferredCta       Json? // string[] - 推荐 CTA（3-5个）
+  weeklyCadence      Json? // { day: number, theme: string, count: number }[] - 每周发布节奏
+  aiSummary          String? // LLM 生成的自然语言总结
+  status             String   @default("COMPLETE") // COMPLETE | INCOMPLETE
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("store_profiles")
+}
+
+// ============ 商品/优惠 ============
+
+/// 商品或优惠活动信息（套餐、折扣、团购等）
+model ProductOffer {
+  id            String    @id @default(cuid())
+  storeId       String
+  name          String
+  description   String?
+  originalPrice Int? // 原价，分为单位
+  salePrice     Int? // 售价，分为单位
+  validFrom     DateTime?
+  validTo       DateTime?
+  sellingPoints Json? // string[] - 卖点列表
+  usageRules    String? // 使用规则说明
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([isActive])
+  @@map("product_offers")
+}
+
+// ============ 行业剧本库 ============
+
+/// 行业剧本模板，定义视频结构、镜头顺序和文案模板
+model Playbook {
+  id                  String           @id @default(cuid())
+  industry            MerchantIndustry
+  name                String
+  goal                ContentGoal
+  description         String?
+  structure           Json // PlaybookSegment[] - 视频结构定义
+  requiredShots       Json // ShotTaskType[] - 必拍镜头类型列表
+  optionalShots       Json? // ShotTaskType[] - 可选镜头类型列表
+  hookTemplates       Json // string[] - 钩子模板（带 {变量} 占位符）
+  captionTemplates    Json // string[] - 文案模板
+  coverTitleTemplates Json // string[] - 封面标题模板
+  ctaTemplates        Json // string[] - CTA 模板
+  complianceRules     Json? // 剧本级额外合规规则
+  scoreWeight         Json? // { views: number, conversion: number } - 评分权重
+  tierRequired        String           @default("FREE") // FREE | GROWTH - 所需订阅等级
+  isActive            Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  contentBriefs ContentBrief[]
+
+  @@index([industry])
+  @@index([goal])
+  @@index([isActive])
+  @@map("playbooks")
+}
+
+// ============ 内容计划 ============
+
+/// 内容计划，覆盖一段时间的每日内容安排
+model ContentPlan {
+  id        String   @id @default(cuid())
+  storeId   String
+  title     String
+  startDate DateTime
+  endDate   DateTime
+  strategy  Json? // 生成策略元数据
+  status    String   @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store  Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  briefs ContentBrief[]
+
+  @@index([storeId])
+  @@index([startDate, endDate])
+  @@map("content_plans")
+}
+
+// ============ 内容任务 ============
+
+/// 单条内容任务，对应一天的拍摄和生成目标
+model ContentBrief {
+  id                  String             @id @default(cuid())
+  storeId             String
+  contentPlanId       String?
+  playbookId          String?
+  title               String
+  goal                ContentGoal
+  scheduledDate       DateTime
+  status              ContentBriefStatus @default(DRAFT)
+  hook                String? // 钩子文案
+  mainMessage         String? // 主要信息
+  offerId             String? // 关联的优惠 ID
+  suggestedCaption    String? // 建议文案
+  suggestedTitle      String? // 建议标题
+  suggestedCoverTitle String? // 建议封面标题
+  suggestedCta        String? // 建议 CTA
+  platformCopies      Json? // Record<PublishPlatform, PlatformCopy> - 各平台文案
+  tags                Json? // string[] - 标签列表
+  aiReasoning         String? // AI 决策推理记录
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  contentPlan      ContentPlan?      @relation(fields: [contentPlanId], references: [id], onDelete: SetNull)
+  playbook         Playbook?         @relation(fields: [playbookId], references: [id], onDelete: SetNull)
+  shotTasks        ShotTask[]
+  videoVariants    VideoVariant[]
+  publishJobs      PublishJob[]
+  complianceChecks ComplianceCheck[]
+  metrics          PublishMetric[]
+
+  @@index([storeId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@index([contentPlanId])
+  @@map("content_briefs")
+}
+
+// ============ 拍摄任务 ============
+
+/// 拍摄任务，单个镜头的拍摄指引
+model ShotTask {
+  id             String       @id @default(cuid())
+  contentBriefId String
+  order          Int // 镜头顺序，从 1 开始
+  type           ShotTaskType
+  title          String // max 20 chars，日常用语描述
+  instruction    String // max 200 chars，日常用语拍摄指引
+  examplePrompt  String? // Seedance prompt（仅 AI 补充时使用）
+  durationSec    Int // 推荐拍摄时长，3-15 秒
+  required       Boolean      @default(true)
+  framingGuide   Json? // { angle: string, movement: string, tips: string } - 取景指导
+  qualityRules   Json? // { needsAudio: boolean, minBrightness: number } - 质量要求
+  status         String       @default("PENDING") // PENDING | CAPTURED | SKIPPED
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  contentBrief ContentBrief @relation(fields: [contentBriefId], references: [id], onDelete: Cascade)
+  rawAssets    RawAsset[]
+
+  @@index([contentBriefId])
+  @@index([order])
+  @@map("shot_tasks")
+}
+
+// ============ 原始素材 ============
+
+/// 商家上传的原始素材（视频或图片），14 天过期策略
+model RawAsset {
+  id             String    @id @default(cuid())
+  storeId        String
+  shotTaskId     String?
+  uploaderUserId String? // 上传者 userId
+  type           String // VIDEO | IMAGE
+  ossKey         String // OSS 存储路径
+  url            String? // 签名 URL（临时，按需生成）
+  filename       String?
+  mimeType       String?
+  sizeBytes      Int?
+  durationSec    Float?
+  width          Int?
+  height         Int?
+  thumbnailKey   String? // 缩略图 OSS 路径
+  qualityScore   Float? // 0-100 质量评分
+  qualityReport  Json? // QualityInspectionResult.report - 质量检测详细报告
+  expiresAt      DateTime? // 14 天后过期，用于 asset-lifecycle-service 清理
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  shotTask ShotTask? @relation(fields: [shotTaskId], references: [id], onDelete: SetNull)
+
+  @@index([storeId])
+  @@index([shotTaskId])
+  @@index([expiresAt])
+  @@map("raw_assets")
+}
+
+// ============ 视频版本 ============
+
+/// AI 渲染生成的最终视频版本（促销版/氛围版/口播版等）
+model VideoVariant {
+  id             String           @id @default(cuid())
+  contentBriefId String
+  type           VideoVariantType
+  title          String
+  description    String?
+  ossKey         String? // 视频 OSS 路径
+  coverOssKey    String? // 封面图 OSS 路径
+  durationSec    Float?
+  width          Int?
+  height         Int?
+  subtitles      Json? // { text: string, startSec: number, endSec: number }[] - 字幕序列
+  renderParams   Json? // FFmpeg 渲染参数记录
+  generationLog  Json? // Seedance 生成调用记录
+  score          Float? // AI 质量评分
+  isSelected     Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  contentBrief     ContentBrief      @relation(fields: [contentBriefId], references: [id], onDelete: Cascade)
+  publishJobs      PublishJob[]
+  complianceChecks ComplianceCheck[]
+
+  @@index([contentBriefId])
+  @@index([type])
+  @@map("video_variants")
+}
+
+// ============ 发布任务 ============
+
+/// 视频导出或发布的记录
+model PublishJob {
+  id             String           @id @default(cuid())
+  contentBriefId String
+  videoVariantId String?
+  platform       PublishPlatform
+  status         PublishJobStatus @default(DRAFT)
+  title          String?
+  caption        String?
+  tags           Json? // string[] - 发布标签
+  locationText   String? // 位置文本
+  exportedOssKey String? // 导出文件 OSS 路径
+  errorMessage   String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  publishedAt    DateTime?
+
+  contentBrief ContentBrief  @relation(fields: [contentBriefId], references: [id], onDelete: Cascade)
+  videoVariant VideoVariant? @relation(fields: [videoVariantId], references: [id], onDelete: SetNull)
+
+  @@index([contentBriefId])
+  @@index([platform])
+  @@index([status])
+  @@map("publish_jobs")
+}
+
+// ============ 发布数据指标 ============
+
+/// 视频在各平台的表现数据（手动录入或 API 同步）
+model PublishMetric {
+  id             String          @id @default(cuid())
+  contentBriefId String
+  platform       PublishPlatform
+  publishJobId   String?
+  views          Int             @default(0)
+  likes          Int             @default(0)
+  comments       Int             @default(0)
+  shares         Int             @default(0)
+  saves          Int             @default(0)
+  profileVisits  Int             @default(0)
+  linkClicks     Int             @default(0)
+  messages       Int             @default(0)
+  orders         Int             @default(0)
+  redemptions    Int             @default(0)
+  revenueCents   Int             @default(0) // 收入，分为单位
+  source         String          @default("MANUAL") // MANUAL | API_SYNC
+  capturedAt     DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+
+  contentBrief ContentBrief @relation(fields: [contentBriefId], references: [id], onDelete: Cascade)
+
+  @@index([contentBriefId])
+  @@index([platform])
+  @@index([capturedAt])
+  @@map("publish_metrics")
+}
+
+// ============ 合规检查 ============
+
+/// 合规检查记录，包含风险等级和问题列表
+model ComplianceCheck {
+  id             String              @id @default(cuid())
+  contentBriefId String
+  videoVariantId String?
+  riskLevel      ComplianceRiskLevel
+  issues         Json // ComplianceIssue[] - 合规问题列表
+  suggestions    Json? // string[] - 修复建议
+  blockedReasons Json? // string[] - 阻断原因（riskLevel=BLOCKED 时）
+  passed         Boolean             @default(false)
+  acknowledgedAt DateTime? // 用户确认时间（HIGH 风险时用户确认后方可导出）
+  createdAt      DateTime            @default(now())
+
+  contentBrief ContentBrief  @relation(fields: [contentBriefId], references: [id], onDelete: Cascade)
+  videoVariant VideoVariant? @relation(fields: [videoVariantId], references: [id], onDelete: SetNull)
+
+  @@index([contentBriefId])
+  @@index([videoVariantId])
+  @@index([riskLevel])
+  @@map("compliance_checks")
+}
+
+// ============ 出镜授权 ============
+
+/// 出镜授权记录，顾客或员工的肖像使用授权
+model ConsentRecord {
+  id          String    @id @default(cuid())
+  storeId     String
+  personName  String?
+  personRole  String? // CUSTOMER | STAFF | OWNER
+  consentType String // APPEARANCE | VOICE
+  consentText String // 授权文本
+  assetOssKey String? // 签署授权书扫描件 OSS 路径
+  validFrom   DateTime  @default(now())
+  validTo     DateTime? // 授权有效期截止，null 表示永久有效
+  createdAt   DateTime  @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([validTo])
+  @@map("consent_records")
+}
+
+// ============ 发布账号（第一阶段预留，暂不实现自动发布） ============
+
+/// 门店绑定的社交平台发布账号（预留）
+model SocialAccount {
+  id             String          @id @default(cuid())
+  storeId        String
+  platform       PublishPlatform
+  accountName    String?
+  externalUserId String?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([platform])
+  @@map("social_accounts")
+}

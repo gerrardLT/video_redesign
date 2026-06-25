@@ -1,19 +1,26 @@
 /**
- * SQLite 写操作重试辅助函数
- * 仅对 SQLITE_BUSY / "database is locked" 错误重试
- * 最多 3 次重试（共 4 次尝试），间隔 500ms / 1000ms / 1500ms
+ * 数据库操作重试辅助函数（PostgreSQL 版）
+ *
+ * PostgreSQL 使用 MVCC + 行级锁，不存在 SQLite 整库写锁问题。
+ * 此模块保留 withRetry 接口以保持向后兼容，但仅对 Prisma 事务死锁/序列化失败重试。
+ * 实际触发概率极低。
  */
 
 export const RETRY_CONFIG = {
   maxRetries: 3,
-  delays: [500, 1000, 1500],
+  delays: [200, 500, 1000],
 } as const
 
-export function isSQLiteLockError(error: unknown): boolean {
+/**
+ * 判断是否为 PostgreSQL 可重试的事务冲突错误
+ * - P2034: Transaction failed due to a write conflict or a deadlock
+ */
+export function isRetriableError(error: unknown): boolean {
   if (error instanceof Error) {
     return (
-      error.message.includes('SQLITE_BUSY') ||
-      error.message.includes('database is locked')
+      error.message.includes('P2034') ||
+      error.message.includes('deadlock detected') ||
+      error.message.includes('could not serialize access')
     )
   }
   return false
@@ -29,12 +36,12 @@ export const _internals = {
 }
 
 /**
- * 对 SQLite 写操作进行锁竞争重试。
+ * 对数据库写操作进行事务冲突重试。
  *
  * @param operation - 需要执行的异步操作
  * @param label - 可选标签，用于日志上下文
  * @returns 操作的返回值
- * @throws 非锁竞争错误立即抛出；超过重试次数抛出原始错误
+ * @throws 非可重试错误立即抛出；超过重试次数抛出原始错误
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
@@ -47,7 +54,7 @@ export async function withRetry<T>(
     try {
       return await operation()
     } catch (error) {
-      if (!isSQLiteLockError(error)) {
+      if (!isRetriableError(error)) {
         throw error
       }
 
@@ -57,7 +64,7 @@ export async function withRetry<T>(
         const waitMs = delays[attempt]
         if (label) {
           console.warn(
-            `[withRetry] ${label} — SQLite lock detected, retry ${attempt + 1}/${maxRetries} after ${waitMs}ms`
+            `[withRetry] ${label} — PostgreSQL transaction conflict, retry ${attempt + 1}/${maxRetries} after ${waitMs}ms`
           )
         }
         await _internals.sleep(waitMs)

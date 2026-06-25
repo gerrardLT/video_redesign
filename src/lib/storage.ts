@@ -281,3 +281,28 @@ export async function getObjectStream(
     contentLength: contentLengthRaw ? Number(contentLengthRaw) : undefined,
   }
 }
+
+
+/**
+ * 从 URL 下载文件到本地临时路径
+ * 支持 OSS 直链和任意公网 URL
+ *
+ * @param url 远程文件 URL
+ * @param destPath 本地目标路径
+ * @throws 下载失败或 HTTP 非 2xx 时抛错
+ */
+export async function downloadToTemp(url: string, destPath: string): Promise<void> {
+  const { promises: fsPromises } = await import('fs')
+  const { dirname } = await import('path')
+
+  // 确保目标目录存在
+  await fsPromises.mkdir(dirname(destPath), { recursive: true })
+
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`下载失败 (${response.status}): ${url}`)
+  }
+
+  const arrayBuffer = await response.arrayBuffer()
+  await fsPromises.writeFile(destPath, Buffer.from(arrayBuffer))
+}

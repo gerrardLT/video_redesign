@@ -13,6 +13,7 @@ import { Worker, type Job, UnrecoverableError } from 'bullmq'
 import { redis } from '@/lib/redis'
 import { prisma } from '@/lib/db'
 import { createSeedanceTask, getSeedanceTaskStatus } from '@/lib/seedance'
+import { createHappyHorseWorkspaceTask, getHappyHorseTaskStatus as getHHWorkspaceStatus } from '@/lib/happyhorse-workspace'
 import { refundCredits, chargeCreditsTx } from '@/lib/credit-service'
 import { setExpiry } from '@/lib/asset-lifecycle-service'
 import { uploadFile } from '@/lib/storage'
@@ -40,6 +41,12 @@ interface VideoGenerateJobData {
   duration: number
   aspectRatio: string
   resolution: string
+  // 工作台模式标记
+  mode?: 'workspace'
+  workspaceData?: {
+    assetUrls: string[]
+    assetTypes: Record<string, 'image' | 'video' | 'audio'>
+  }
   // 二选一（保持向后兼容）：
   // - shotId 存在 → 单分镜生成（原有流程不变）
   // - shotGroupId 存在 → 分镜组合并生成（按组分支）
@@ -300,6 +307,11 @@ async function atomicSuccessUpdate(params: {
 }
 
 async function processVideoGenerate(job: Job<VideoGenerateJobData>) {
+  // 工作台模式分支
+  if (job.data.mode === 'workspace') {
+    return processWorkspaceGenerate(job)
+  }
+
   // 项目级生成（无 shotGroupId）：直接走通用生成逻辑
   if (!job.data.shotGroupId) {
     return processProjectSegmentGenerate(job)
@@ -403,8 +415,7 @@ async function processProjectSegmentGenerate(job: Job<VideoGenerateJobData>) {
     await unlink(tempPath).catch(() => {})
 
     // 原子化扣费 + 更新 GenerationJob
-    // 关键积分写（缺陷 11）：整笔事务经 Redis 全局锁【跨进程】串行化，与应用进程/其它 Worker
-    // 分支的积分写互斥，消除 libSQL/SQLite 并发写锁竞争与读-改-写丢失更新（锁内复用 db-retry 兜底）。
+    // 关键积分写：整笔事务经 Redis 全局锁【跨进程】串行化，防止 read-modify-write 丢失更新。
     await withCreditLock(() => prisma.$transaction(async (tx) => {
       await tx.generationJob.update({
         where: { id: jobId },
@@ -1074,6 +1085,140 @@ async function markChainCompleted(projectId: string, userId: string): Promise<vo
       where: { id: projectId },
       data: { status: 'FAILED', errorMsg: `标记完成失败: ${msg}` },
     }).catch(() => {})
+  }
+}
+
+/**
+ * 工作台模式视频生成（不涉及 Shot/ShotGroup）
+ */
+async function processWorkspaceGenerate(job: Job<VideoGenerateJobData>) {
+  const { jobId, projectId, userId, workspaceData } = job.data
+
+  logger.info('[workspace] 生成开始', { jobId, projectId })
+
+  const genJob = await prisma.generationJob.findUnique({ where: { id: jobId } })
+  if (!genJob) throw new UnrecoverableError(`Job 不存在: ${jobId}`)
+  if (genJob.status === 'SUCCEEDED' || genJob.status === 'FAILED') return
+
+  await prisma.generationJob.update({ where: { id: jobId }, data: { status: 'GENERATING' } })
+  await publishStateChange(userId, 'generation', jobId, 'GENERATING', 10).catch(() => {})
+
+  const engine = genJob.engine || 'seedance'
+  const prompt = genJob.promptSnapshot || ''
+  const duration = genJob.duration || 5
+  const aspectRatio = job.data.aspectRatio || '16:9'
+  const assetUrls = workspaceData?.assetUrls || []
+  const assetTypes = workspaceData?.assetTypes || {}
+
+  let externalTaskId: string
+
+  try {
+    if (engine === 'happyhorse') {
+      const refImages = assetUrls.filter((u) => assetTypes[u] === 'image')
+      const r = await createHappyHorseWorkspaceTask({
+        prompt, duration, aspectRatio, resolution: '720P',
+        referenceImages: refImages.length > 0 ? refImages : undefined,
+      })
+      externalTaskId = r.taskId
+    } else {
+      const r = await createSeedanceTask({
+        prompt, duration, aspectRatio,
+        resolution: job.data.resolution || '720p',
+        referenceImages: assetUrls.filter((u) => assetTypes[u] === 'image'),
+        referenceAudioUrl: assetUrls.find((u) => assetTypes[u] === 'audio'),
+      })
+      externalTaskId = r.taskId
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    await prisma.generationJob.update({ where: { id: jobId }, data: { status: 'FAILED', errorMessage: msg } })
+    await prisma.project.update({ where: { id: projectId }, data: { status: 'FAILED', errorMsg: msg } }).catch(() => {})
+    await refundCredits(userId, jobId, genJob.costEstimate || 0)
+    await publishFailed(userId, 'generation', jobId, msg).catch(() => {})
+    return
+  }
+
+  await publishStateChange(userId, 'generation', jobId, 'GENERATING', 30).catch(() => {})
+
+  const startTime = Date.now()
+  let finalVideoUrl: string | undefined
+
+  while (Date.now() - startTime < MAX_POLL_TIME) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL))
+
+    const st = engine === 'happyhorse'
+      ? await getHHWorkspaceStatus(externalTaskId)
+      : await getSeedanceTaskStatus(externalTaskId)
+
+    if (st.status === 'SUCCEEDED' || st.status === 'succeeded') {
+      finalVideoUrl = st.videoUrl
+      break
+    }
+    if (st.status === 'FAILED' || st.status === 'failed') {
+      const msg = st.error?.message || '生成失败'
+      await prisma.generationJob.update({ where: { id: jobId }, data: { status: 'FAILED', errorMessage: msg } })
+      await prisma.project.update({ where: { id: projectId }, data: { status: 'FAILED', errorMsg: msg } }).catch(() => {})
+      await refundCredits(userId, jobId, genJob.costEstimate || 0)
+      await publishFailed(userId, 'generation', jobId, msg).catch(() => {})
+      return
+    }
+
+    const elapsed = Date.now() - startTime
+    const pct = Math.min(90, 30 + Math.floor((elapsed / MAX_POLL_TIME) * 60))
+    await publishStateChange(userId, 'generation', jobId, 'GENERATING', pct).catch(() => {})
+  }
+
+  if (!finalVideoUrl) {
+    const msg = '生成超时'
+    await prisma.generationJob.update({ where: { id: jobId }, data: { status: 'FAILED', errorMessage: msg } })
+    await prisma.project.update({ where: { id: projectId }, data: { status: 'FAILED', errorMsg: msg } }).catch(() => {})
+    await refundCredits(userId, jobId, genJob.costEstimate || 0)
+    await publishFailed(userId, 'generation', jobId, msg).catch(() => {})
+    return
+  }
+
+  // 成功：下载 → 转存 OSS
+  const tmpDir = path.join('/tmp', 'workspace-gen', jobId)
+  const tmpFile = path.join(tmpDir, 'output.mp4')
+  try {
+    await mkdir(tmpDir, { recursive: true })
+    await downloadAndValidateVideo(finalVideoUrl, tmpFile)
+    const ossKey = `workspace/${userId}/generated/${Date.now()}_${jobId}.mp4`
+    await uploadFile(ossKey, tmpFile)
+    const { getPublicUrl } = await import('@/lib/storage')
+    const ossVideoUrl = getPublicUrl(ossKey)
+
+    let coverUrl: string | undefined
+    try {
+      const coverTmp = path.join(tmpDir, 'cover.jpg')
+      await execFileAsync('ffmpeg', ['-i', tmpFile, '-ss', '0.1', '-frames:v', '1', '-y', coverTmp])
+      const coverKey = `workspace/${userId}/covers/${Date.now()}_${jobId}.jpg`
+      await uploadFile(coverKey, coverTmp)
+      coverUrl = getPublicUrl(coverKey)
+    } catch { /* 封面失败不阻塞 */ }
+
+    await prisma.generationJob.update({ where: { id: jobId }, data: { status: 'SUCCEEDED', resultVideoUrl: ossVideoUrl } })
+    await prisma.project.update({ where: { id: projectId }, data: { status: 'EDITABLE', videoUrl: ossVideoUrl, coverUrl: coverUrl || null } })
+
+    const amt = genJob.costEstimate || 0
+    await withCreditLock(() => prisma.$transaction(async (tx) => {
+      const ex = await tx.creditLedger.findFirst({ where: { jobId, action: 'CHARGE' } })
+      if (ex) return
+      await tx.creditLedger.create({ data: { userId, jobId, action: 'CHARGE', amount: -amt, balanceAfter: 0, remark: '工作台生成扣费' } })
+    }), 'workspace-charge')
+
+    await setExpiry(ossVideoUrl, 14).catch(() => {})
+    await publishCompleted(userId, 'generation', jobId).catch(() => {})
+    logger.info('[workspace] 生成成功', { jobId, ossVideoUrl })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    await prisma.generationJob.update({ where: { id: jobId }, data: { status: 'FAILED', errorMessage: msg } })
+    await prisma.project.update({ where: { id: projectId }, data: { status: 'FAILED', errorMsg: msg } }).catch(() => {})
+    await refundCredits(userId, jobId, genJob.costEstimate || 0)
+    await publishFailed(userId, 'generation', jobId, msg).catch(() => {})
+  } finally {
+    await unlink(tmpFile).catch(() => {})
+    await unlink(path.join(tmpDir, 'cover.jpg')).catch(() => {})
   }
 }
 

@@ -5,7 +5,7 @@
  * 1. 校验项目状态与分镜完整性
  * 2. 获取用户特权（含并发配置）
  * 3. 项目级并发检查（基于 DB 查询 GENERATING 项目数量，纯门控不侵入 Worker）
- * 4. 先完成所有 DB 状态写入（项目/分镜组/分镜 → GENERATING/QUEUED），避免与 Worker 争 SQLite 锁
+ * 4. 先完成所有 DB 状态写入（项目/分镜组/分镜 → GENERATING/QUEUED），再入队 BullMQ
  * 5. 调用 GenerationOrchestrator 执行链式串行编排：
  *    - 所有等级统一走链式串行（仅入队第一组，chainMode=true，后续由 Worker 逐组触发）
  * 6. 返回 OrchestrationResult（202 Accepted）
@@ -33,6 +33,10 @@ export const dynamic = 'force-dynamic'
 
 const GenerateSchema = z.object({
   resolution: z.enum(['480p', '720p']).optional(),
+  engine: z.enum(['seedance', 'happyhorse']).optional(),
+  // HappyHorse 模式专用参数
+  prompt: z.string().optional(),
+  referenceImages: z.array(z.string()).optional(),
 })
 
 export async function POST(
@@ -71,6 +75,55 @@ export async function POST(
 
     if (!project) {
       return NextResponse.json({ error: '项目不存在' }, { status: 404 })
+    }
+
+    // 引擎转发：当显式传入 engine=happyhorse 或项目默认引擎为 happyhorse 时，转发到 HappyHorse 编排
+    const requestedEngine = parseResult.data.engine || project.engine || 'seedance'
+    if (requestedEngine === 'happyhorse') {
+      const { orchestrateHappyHorseGeneration } = await import('@/lib/generation-orchestrator')
+      const { getUserPrivileges: getPriv } = await import('@/lib/privilege-engine')
+      const privileges = await getPriv(userId)
+
+      if (!project.videoUrl || !project.duration) {
+        return NextResponse.json(
+          { error: '项目无原始视频或时长信息，无法使用 HappyHorse 模式' },
+          { status: 400 }
+        )
+      }
+
+      if (!parseResult.data.prompt) {
+        return NextResponse.json(
+          { error: 'HappyHorse 模式需要提供 prompt 参数' },
+          { status: 400 }
+        )
+      }
+
+      try {
+        const result = await orchestrateHappyHorseGeneration({
+          userId,
+          projectId,
+          videoUrl: project.videoUrl,
+          videoDuration: project.duration,
+          prompt: parseResult.data.prompt,
+          referenceImages: parseResult.data.referenceImages,
+          tier: privileges.tier,
+        })
+
+        await prisma.project.update({
+          where: { id: projectId },
+          data: { status: 'GENERATING', engine: 'happyhorse' },
+        })
+
+        return NextResponse.json(result, { status: 202 })
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'INSUFFICIENT_CREDITS') {
+          return NextResponse.json(
+            { error: 'INSUFFICIENT_CREDITS', message: error.message },
+            { status: 402 }
+          )
+        }
+        throw error
+      }
     }
 
     if (project.status !== 'EDITABLE' && project.status !== 'FAILED' && project.status !== 'MERGE_FAILED') {
@@ -140,7 +193,7 @@ export async function POST(
       shotGroupIndex: g.groupIndex,
     }))
 
-    // 先更新项目和分镜组/分镜状态（在 BullMQ 入队前完成所有 DB 写，避免与 Worker 争 SQLite 锁）
+    // 先更新项目和分镜组/分镜状态（在 BullMQ 入队前完成所有 DB 写）
     await prisma.project.update({
       where: { id: projectId },
       data: { status: 'GENERATING' },

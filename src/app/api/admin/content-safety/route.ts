@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
 import { faceDetectionService } from '@/lib/face-detection-service'
+import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/api-error'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,12 +14,9 @@ const listQuerySchema = z.object({
 
 // GET /api/admin/content-safety - 获取被拦截素材列表
 export async function GET(request: NextRequest) {
-  const role = request.headers.get('x-user-role')
-  if (role !== 'ADMIN') {
-    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
-  }
-
   try {
+    requireAdmin(request)
+
     const { searchParams } = request.nextUrl
 
     const parseResult = listQuerySchema.safeParse({
@@ -38,10 +37,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
+    if (error instanceof ApiError) {
+      return apiErrorToResponse(error)
+    }
     console.error('[GET /api/admin/content-safety]', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: '获取被拦截素材列表失败' } },
-      { status: 500 }
-    )
+    return toErrorResponse('INTERNAL_ERROR', '获取被拦截素材列表失败')
   }
 }

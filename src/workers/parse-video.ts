@@ -676,7 +676,7 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
 
     // 9.1 自动为每个有外貌描述的人物生成人物形象（锚定图）
     //     移到步骤 10（解析积分扣费）之后触发，确保所有 DB 写操作完成后再入队，
-    //     避免 generate-character Worker 与 parse-video 争 SQLite 写锁导致超时。
+    //     避免 generate-character Worker 与 parse-video 争抢数据库连接。
     //     此处仅标记需要生成的角色列表，入队动作在后面执行。
     let pendingCharGens: Array<{ id: string; appearance: string }> = []
     try {
@@ -693,8 +693,7 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
     // 10. 解析成功：在同一事务内写 CHARGE 记账 + 置项目为可编辑（即使部分音频组失败也允许进入 EDITABLE）
     //     积分已在步骤 2.2 通过 freezeParseCredits 真实冻结（余额已扣），此处仅写 CHARGE 流水记账。
     //     幂等：chargeParseCreditsFromReserve 内部检查已有 CHARGE 流水则跳过。
-    //     关键积分写（缺陷 11）：整笔「记账 + 置 EDITABLE」经 Redis 全局锁【跨进程】串行化，
-    //     与 Worker / 应用进程其它积分写互斥，消除 libSQL/SQLite 并发写锁竞争与读-改-写丢失更新。
+    //     关键积分写：整笔「记账 + 置 EDITABLE」经 Redis 全局锁【跨进程】串行化，防止 read-modify-write 丢失更新。
     await withCreditLock(() => prisma.$transaction(async (tx) => {
       // 查询项目所属用户（job data 不含 userId）
       const project = await tx.project.findUniqueOrThrow({
@@ -723,7 +722,6 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
     void publishCompleted(userId, 'parse', projectId)
 
     // 9.1（延迟执行）：所有 DB 写操作已完成，此时安全入队 generate-character jobs
-    // 确保 Worker 拾取 job 时不会与 parse-video 的 DB 写争 SQLite 写锁
     if (pendingCharGens.length > 0) {
       try {
         const { imageGenerateQueue } = await import('@/lib/queue')

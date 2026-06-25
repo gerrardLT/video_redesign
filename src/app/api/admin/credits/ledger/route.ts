@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/api-error'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/admin/credits/ledger - 获取所有用户积分流水（分页，可按 userId 过滤）
 export async function GET(request: NextRequest) {
-  const role = request.headers.get('x-user-role')
-  if (role !== 'ADMIN') {
-    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
-  }
-
   try {
+    requireAdmin(request)
+
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
@@ -58,7 +57,10 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+    if (error instanceof ApiError) {
+      return apiErrorToResponse(error)
+    }
     console.error('[GET /api/admin/credits/ledger]', error)
-    return NextResponse.json({ error: '获取流水失败' }, { status: 500 })
+    return toErrorResponse('INTERNAL_ERROR', '获取流水失败')
   }
 }

@@ -46,7 +46,7 @@ export interface UseSSEProgressReturn {
 /**
  * SSE 实时进度推送 Hook
  *
- * @param token - 鉴权 token（userId），为 null 时不连接
+ * @param token - 鉴权 token（完整 JWT token，从 cookie 获取），为 null 时不连接
  * @param enabled - 是否启用 SSE（用于 feature flag 控制），默认 true
  * @returns SSE 连接状态、进度数据、重连方法和推荐轮询间隔
  */

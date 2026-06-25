@@ -26,14 +26,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/prisma ./prisma
 COPY . .
 
-# 构建时使用临时 SQLite（仅供 SSG 预渲染读空表用，运行时由 .env.production 覆盖）
-ENV DATABASE_URL="file:./build.db"
+# 构建时使用临时环境变量（Prisma generate 不需要连接数据库）
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
 # Prisma 客户端生成（输出到 src/generated/prisma，须在 COPY 源码后执行）
 RUN npx prisma generate
-
-# 创建空数据库供 SSG 预渲染使用（构建时需要表结构，运行时会用真实 DB）
-RUN npx prisma db push --accept-data-loss 2>/dev/null || true
 
 # 构建时需要的环境变量（Next.js 内联 NEXT_PUBLIC_* 到客户端包）
 ARG NEXT_PUBLIC_APP_URL
@@ -57,13 +54,22 @@ RUN apk add --no-cache ffmpeg yt-dlp
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# 拷贝构建产物
-COPY --from=builder /app/public ./public
+# P2 修复：镜像瘦身 — 仅拷贝 standalone 产物 + Workers 运行时必需依赖
+# standalone 模式已内含 Next.js 运行所需的 node_modules 子集（~50MB vs 完整 ~800MB）
+
+# Next.js standalone 产物（含精简 node_modules）
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+# Prisma 客户端和 schema（运行时 + migrate deploy 需要）
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src/generated/prisma ./src/generated/prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+
+# Workers 源码（tsx 运行时编译执行）
 COPY --from=builder /app/src/workers ./src/workers
 COPY --from=builder /app/src/lib ./src/lib
 COPY --from=builder /app/src/services ./src/services
@@ -71,15 +77,26 @@ COPY --from=builder /app/src/constants ./src/constants
 COPY --from=builder /app/src/types ./src/types
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+
+# Workers 运行时依赖（仅拷贝 Worker 进程需要但 standalone 未包含的包）
+# standalone 已包含 Next.js 应用依赖；Worker 额外需要：bullmq, ioredis, tsx, ali-oss 等
+COPY --from=builder /app/node_modules/bullmq ./node_modules/bullmq
+COPY --from=builder /app/node_modules/ioredis ./node_modules/ioredis
+COPY --from=builder /app/node_modules/tsx ./node_modules/tsx
+COPY --from=builder /app/node_modules/ali-oss ./node_modules/ali-oss
+COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
+COPY --from=builder /app/node_modules/jose ./node_modules/jose
+COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
+COPY --from=builder /app/node_modules/zod ./node_modules/zod
+COPY --from=builder /app/node_modules/fast-check ./node_modules/fast-check
+COPY --from=builder /app/node_modules/pg ./node_modules/pg
+COPY --from=builder /app/node_modules/@prisma/adapter-pg ./node_modules/@prisma/adapter-pg
+
 # .env.production 复制为 .env，供 Prisma CLI (dotenv/config) 和运行时读取
 COPY --from=builder /app/.env.production ./.env
 
-# 创建上传目录（含 temp 子目录：generate/merge/upscale 等 worker 的本地中转目录，
-# .dockerignore 已排除该目录内容，运行时各 worker 也会自建，这里预置一份兜底）
+# 创建上传目录（含 temp 子目录：generate/merge/upscale 等 worker 的本地中转目录）
 RUN mkdir -p /app/public/uploads/temp && chown -R nextjs:nodejs /app/public/uploads
-RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
 USER nextjs
 

@@ -22,6 +22,9 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json({ packages })
   } catch (error) {
     console.error('[GET /api/packages]', error)
-    return NextResponse.json({ error: '获取套餐列表失败' }, { status: 500 })
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: '获取套餐列表失败' } },
+      { status: 500 }
+    )
   }
 }

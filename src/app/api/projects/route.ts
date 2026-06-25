@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
 import { prisma } from '@/lib/db'
-import { generateUploadUrl } from '@/lib/storage'
+import { generateUploadUrl, toMediaProxyUrl } from '@/lib/storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +24,10 @@ export async function POST(request: NextRequest) {
     const parsed = CreateProjectSchema.safeParse(body)
     if (!parsed.success) {
       const firstError = parsed.error.issues[0]?.message || '参数校验失败'
-      return NextResponse.json({ error: firstError }, { status: 400 })
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: firstError } },
+        { status: 400 }
+      )
     }
 
     const { name, videoFileName, videoDuration } = parsed.data
@@ -56,7 +59,10 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('[POST /api/projects]', error)
-    return NextResponse.json({ error: '创建项目失败' }, { status: 500 })
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: '创建项目失败' } },
+      { status: 500 }
+    )
   }
 }
 
@@ -82,7 +88,7 @@ export async function GET(request: NextRequest) {
     const result = projects.map((p) => ({
       id: p.id,
       name: p.name,
-      coverUrl: p.coverUrl,
+      coverUrl: toMediaProxyUrl(p.coverUrl) ?? null,
       status: p.status,
       isSample: p.isSample,
       createdAt: p.createdAt.toISOString(),
@@ -93,6 +99,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ projects: result })
   } catch (error) {
     console.error('[GET /api/projects]', error)
-    return NextResponse.json({ error: '获取项目列表失败' }, { status: 500 })
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: '获取项目列表失败' } },
+      { status: 500 }
+    )
   }
 }

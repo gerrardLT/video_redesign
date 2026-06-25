@@ -256,9 +256,8 @@ export async function POST(
     // + 组内全部 Shot 置 QUEUED + 持久化 timelineScript（Req 8.3）
     // 注意：此处采用内联冻结而非调用 reserveCredits，避免事务嵌套冲突，
     // 与单分镜 generate 路由保持一致的组织顺序。
-    // 关键积分写（缺陷 11）：本路由运行于 Next.js 应用进程，整笔「冻结 + 入队」事务经
-    // Redis 全局锁【跨进程】串行化，与 Worker 进程的扣费/退款互斥，消除 libSQL/SQLite
-    // 并发写锁竞争与读-改-写丢失更新（锁内复用 db-retry 兜底）。
+    // 关键积分写：本路由运行于 Next.js 应用进程，整笔「冻结 + 入队」事务经
+    // Redis 全局锁【跨进程】串行化，防止 read-modify-write 丢失更新。
     const job = await withCreditLock(() => prisma.$transaction(async (tx) => {
       // 事务内重读余额并二次校验（消除 TOCTOU 并发风险，修复 F）
       const freshUser = await tx.user.findUniqueOrThrow({ where: { id: userId } })

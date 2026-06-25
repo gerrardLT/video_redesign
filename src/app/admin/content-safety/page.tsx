@@ -17,7 +17,7 @@ interface RejectedAsset {
       nickname: string | null
       email: string
     }
-  }
+  } | null
 }
 
 interface RejectedAssetsResponse {
@@ -168,10 +168,10 @@ export default function AdminContentSafetyPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm text-[var(--cine-text)]">
-                        {asset.project.user.nickname || '未命名用户'}
+                        {asset.project?.user.nickname || '未命名用户'}
                       </div>
                       <div className="text-xs text-[var(--cine-text-3)]">
-                        {asset.project.user.email}
+                        {asset.project?.user.email || '-'}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-[var(--cine-text-2)]">

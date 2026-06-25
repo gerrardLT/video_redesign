@@ -31,7 +31,12 @@ export async function POST(request: NextRequest) {
       headers[key] = value
     })
 
-    logger.info('收到支付宝回调', { body })
+    logger.info('收到支付宝回调', { 
+      // P2 修复：日志脱敏，不记录完整 body（含签名密钥信息）
+      out_trade_no: (body as Record<string, unknown>).out_trade_no,
+      trade_status: (body as Record<string, unknown>).trade_status,
+      total_amount: (body as Record<string, unknown>).total_amount,
+    })
 
     // 验证签名并解析回调数据
     const gateway = getPaymentGateway('alipay')

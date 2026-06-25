@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
 import { prisma } from '@/lib/db'
 import { signToken, comparePassword } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rate-limiter'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,19 @@ const LoginSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // P0 修复：登录接口速率限制（5 次/分钟/IP，防暴力破解）
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown'
+    const rateLimitKey = `auth:login:${clientIp}`
+    const rateResult = checkRateLimit(rateLimitKey, 5, 60 * 1000)
+    if (!rateResult.allowed) {
+      return NextResponse.json(
+        { error: { code: 'RATE_LIMITED', message: '登录尝试过于频繁，请稍后重试' } },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const parsed = LoginSchema.safeParse(body)
 

@@ -354,22 +354,43 @@ export function PreviewModal({ asset, onClose, onDownload }: PreviewModalProps) 
               </div>
             )}
 
-            {/* 图片（CSS transform 实现缩放和平移） */}
+            {/* 内容预览（根据类型分支：图片/视频/音频） */}
             {!imgError && asset && (
               <div className="flex h-full w-full items-center justify-center">
-                <img
-                  key={`${asset.id}-${retryCount}`}
-                  src={imgSrcWithRetry}
-                  alt={asset.displayName}
-                  className="max-h-full max-w-full select-none transition-transform duration-75"
-                  style={{
-                    transform: `translate(${transform.panX}px, ${transform.panY}px) scale(${transform.scale})`,
-                    transformOrigin: 'center center',
-                  }}
-                  onLoad={handleImgLoad}
-                  onError={handleImgError}
-                  draggable={false}
-                />
+                {asset.category === 'AUDIO' ? (
+                  /* 音频预览 */
+                  <div className="flex flex-col items-center gap-6">
+                    <div className="w-24 h-24 rounded-full bg-purple-500/10 flex items-center justify-center">
+                      <svg className="w-10 h-10 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg>
+                    </div>
+                    <audio src={imageUrl} controls autoPlay={false} className="w-80" />
+                    <p className="text-sm text-white/60">{asset.displayName}</p>
+                  </div>
+                ) : asset.url && (asset.url.includes('/video/') || asset.url.match(/\.(mp4|mov|webm)(\?|$)/i)) ? (
+                  /* 视频预览 */
+                  <video
+                    key={`${asset.id}-video`}
+                    src={imageUrl}
+                    controls
+                    autoPlay
+                    className="max-h-full max-w-full rounded-lg"
+                  />
+                ) : (
+                  /* 图片预览（原有逻辑） */
+                  <img
+                    key={`${asset.id}-${retryCount}`}
+                    src={imgSrcWithRetry}
+                    alt={asset.displayName}
+                    className="max-h-full max-w-full select-none transition-transform duration-75"
+                    style={{
+                      transform: `translate(${transform.panX}px, ${transform.panY}px) scale(${transform.scale})`,
+                      transformOrigin: 'center center',
+                    }}
+                    onLoad={handleImgLoad}
+                    onError={handleImgError}
+                    draggable={false}
+                  />
+                )}
               </div>
             )}
           </div>

@@ -2,18 +2,34 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
 import { prisma } from '@/lib/db'
 import { signToken, hashPassword } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rate-limiter'
 
 export const dynamic = 'force-dynamic'
 
 // 注册请求 schema
 const RegisterSchema = z.object({
   email: z.email('邮箱格式不正确'),
-  password: z.string().min(8, '密码至少 8 位'),
+  password: z.string()
+    .min(8, '密码至少 8 位')
+    .regex(/[A-Z]|[0-9]|[^a-zA-Z0-9]/, '密码需包含大写字母、数字或特殊字符中的至少一种'),
   nickname: z.string().optional(),
 })
 
 export async function POST(request: NextRequest) {
   try {
+    // P0 修复：注册接口速率限制（3 次/分钟/IP，防批量注册）
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown'
+    const rateLimitKey = `auth:register:${clientIp}`
+    const rateResult = checkRateLimit(rateLimitKey, 3, 60 * 1000)
+    if (!rateResult.allowed) {
+      return NextResponse.json(
+        { error: { code: 'RATE_LIMITED', message: '注册尝试过于频繁，请稍后重试' } },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const parsed = RegisterSchema.safeParse(body)
 

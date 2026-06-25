@@ -221,8 +221,15 @@ export async function buildGroupGenReference(shotGroupId: string): Promise<Group
     }
   }
 
+  // 背景图注入：若分镜组设置了 backgroundImageUrl，将其追加到 referenceImages
+  // （Seedance 模式下作为 reference_image 影响画面风格）
+  const finalReferenceImages = [...ref.referenceImages]
+  if (group.backgroundImageUrl) {
+    finalReferenceImages.push(group.backgroundImageUrl)
+  }
+
   return {
-    referenceImages: ref.referenceImages,
+    referenceImages: finalReferenceImages,
     referenceAudioUrl: ref.referenceAudioUrl,
     characterPrefix,
   }

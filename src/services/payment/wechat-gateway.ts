@@ -33,11 +33,27 @@ export class WechatPayGateway implements IPaymentGateway {
   private privateKey: string
 
   constructor() {
+    // P0 修复：环境变量缺失时直接抛错，不使用空字符串静默降级
+    // 避免生产忘配时用空密钥签名导致支付请求失败但报错不明确
     this.mchId = process.env.WECHAT_PAY_MCH_ID || ''
     this.appId = process.env.WECHAT_PAY_APP_ID || ''
     this.apiV3Key = process.env.WECHAT_PAY_API_V3_KEY || ''
     this.serialNo = process.env.WECHAT_PAY_SERIAL_NO || ''
     this.privateKey = process.env.WECHAT_PAY_PRIVATE_KEY || ''
+
+    const missing: string[] = []
+    if (!this.mchId) missing.push('WECHAT_PAY_MCH_ID')
+    if (!this.appId) missing.push('WECHAT_PAY_APP_ID')
+    if (!this.apiV3Key) missing.push('WECHAT_PAY_API_V3_KEY')
+    if (!this.serialNo) missing.push('WECHAT_PAY_SERIAL_NO')
+    if (!this.privateKey) missing.push('WECHAT_PAY_PRIVATE_KEY')
+
+    if (missing.length > 0) {
+      throw new Error(
+        `微信支付网关初始化失败：缺少环境变量 ${missing.join(', ')}。` +
+        `请在 .env.production 中配置所有微信支付密钥。`
+      )
+    }
   }
 
   /**

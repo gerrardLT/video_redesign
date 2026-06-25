@@ -23,8 +23,8 @@ NO_CACHE="${NO_CACHE:-1}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 APP_SERVICE="app"
 WORKERS_SERVICE="workers"
-# 容器内数据库路径（与 docker-compose.prod.yml 的 DATABASE_URL 对应）
-DB_PATH_IN_CONTAINER="/app/data/prod.db"
+# P1 修复：备份改为 PostgreSQL pg_dump（原 SQLite 路径已废弃）
+PG_SERVICE="postgres"
 
 # ========================
 # 工具函数
@@ -70,23 +70,23 @@ done
 ok "环境检查通过，使用命令：$DC"
 
 # ========================
-# 第 1 步：备份生产数据库
+# 第 1 步：备份生产数据库（PostgreSQL pg_dump）
 # ========================
 if [ "$SKIP_BACKUP" = "1" ]; then
   warn "已跳过数据库备份（SKIP_BACKUP=1）"
 else
-  log "===== 备份生产数据库 ====="
+  log "===== 备份生产数据库（PostgreSQL）====="
   mkdir -p "$BACKUP_DIR"
-  BACKUP_FILE="$BACKUP_DIR/prod.db.backup.$(date +%Y%m%d_%H%M%S)"
-  # 仅当 app 容器在运行时才能备份；首次部署可能没有容器，允许失败
-  if $DC ps "$APP_SERVICE" 2>/dev/null | grep -q "Up"; then
-    if $DC cp "$APP_SERVICE:$DB_PATH_IN_CONTAINER" "$BACKUP_FILE" 2>/dev/null; then
-      ok "数据库已备份到 $BACKUP_FILE"
+  BACKUP_FILE="$BACKUP_DIR/pg_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+  # 仅当 postgres 容器在运行时才能备份
+  if $DC ps "$PG_SERVICE" 2>/dev/null | grep -q "Up"; then
+    if $DC exec -T "$PG_SERVICE" pg_dump -U postgres video_redesign | gzip > "$BACKUP_FILE" 2>/dev/null; then
+      ok "数据库已备份到 $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
     else
-      warn "数据库备份失败（可能数据库文件尚未创建），继续部署"
+      warn "数据库备份失败，继续部署（可能是首次部署）"
     fi
   else
-    warn "app 容器未运行，跳过备份（可能是首次部署）"
+    warn "postgres 容器未运行，跳过备份（可能是首次部署）"
   fi
 fi
 
@@ -131,18 +131,17 @@ log "等待 app 容器就绪..."
 sleep 8
 
 # ========================
-# 第 5 步：同步数据库 schema（db push，项目原生工作流）
-# 说明：本项目使用 prisma db push（非 migrate），直接对比当前库与 schema.prisma 应用差异，
-#       不依赖 migration 历史，避免 P3005（数据库非空且无 baseline）错误。
-#       --accept-data-loss 用于应用含废弃字段删除的变更；核心数据表仅新增，不丢数据。
-#       数据库已在第 1 步备份，可回滚。
+# 第 5 步：数据库迁移（prisma migrate deploy — 生产标准方式）
+# 说明：docker-compose.prod.yml 的 app command 已包含 `prisma migrate deploy`，
+#       此处显式再跑一次确保 schema 最新（幂等操作，已应用的迁移不会重复执行）。
+#       不使用 db push --accept-data-loss（有丢数据风险）。
 # ========================
-log "===== 同步数据库 schema（prisma db push）====="
-if $DC exec -T "$APP_SERVICE" npx prisma db push --accept-data-loss; then
-  ok "数据库 schema 同步完成"
+log "===== 同步数据库 schema（prisma migrate deploy）====="
+if $DC exec -T "$APP_SERVICE" npx prisma migrate deploy; then
+  ok "数据库迁移完成"
 else
-  err "数据库 schema 同步失败！请检查日志。数据库已在第 1 步备份，可手动回滚"
-  err "回滚命令示例：$DC cp $BACKUP_FILE $APP_SERVICE:$DB_PATH_IN_CONTAINER"
+  err "数据库迁移失败！请检查日志。数据库已在第 1 步备份，可手动回滚"
+  err "回滚命令示例：gunzip -c $BACKUP_FILE | $DC exec -T $PG_SERVICE psql -U postgres video_redesign"
   exit 1
 fi
 

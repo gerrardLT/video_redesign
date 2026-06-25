@@ -6,7 +6,7 @@
  */
 
 /** 任务类型枚举 */
-export type TaskType = 'generation' | 'parse' | 'character' | 'merge' | 'chain'
+export type TaskType = 'generation' | 'parse' | 'character' | 'merge' | 'chain' | 'render'
 
 /** 进度事件负载 */
 export interface ProgressEventPayload {

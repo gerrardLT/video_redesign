@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 export default function LoginPage() {
-  const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -26,11 +26,15 @@ export default function LoginPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || '登录失败')
+        // P1 修复：统一读取新错误格式 { error: { code, message } } 或旧格式 { error: string }
+        const errorMsg = typeof data.error === 'object' ? data.error.message : data.error
+        setError(errorMsg || '登录失败')
         return
       }
 
-      window.location.href = '/dashboard'
+      // P1 修复：读取 redirect 参数，支持中间件跳转回目标页
+      const redirect = searchParams.get('redirect') || '/dashboard'
+      window.location.href = redirect
     } catch {
       setError('网络错误，请稍后重试')
     } finally {

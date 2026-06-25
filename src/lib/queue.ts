@@ -180,6 +180,58 @@ export const subscriptionExpireQueue = lazyQueue('subscription-expire', {
 })
 
 // ========================
+// 本地生活营销平台队列
+// ========================
+
+/** 生成门店画像：基于问诊信息生成内容定位和策略 */
+export const generateStoreProfileQueue = lazyQueue('generate-store-profile', {
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 5000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
+/** 生成 7 天内容计划：根据门店画像和剧本库生成每日内容任务 */
+export const generateContentPlanQueue = lazyQueue('generate-content-plan', {
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 5000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
+/** 渲染本地视频：将商家素材组合成 3 版本视频（促销/氛围/口播） */
+export const renderLocalVideoQueue = lazyQueue('render-local-video', {
+  attempts: 2,
+  backoff: { type: 'exponential', delay: 10000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
+/** 合规检查：扫描视频文案是否存在违禁词、虚假宣传等 */
+export const complianceReviewQueue = lazyQueue('compliance-review', {
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 5000 },
+  removeOnComplete: 100,
+  removeOnFail: 200,
+})
+
+/** 数据同步（第一阶段占位，后续实现平台 API 自动拉取） */
+export const syncMetricsQueue = lazyQueue('sync-metrics', {
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 10000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
+/** 商家周报（第一阶段占位，后续实现自动周报） */
+export const weeklyMerchantReportQueue = lazyQueue('weekly-merchant-report', {
+  attempts: 2,
+  backoff: { type: 'exponential', delay: 30000 },
+  removeOnComplete: 20,
+  removeOnFail: 50,
+})
+
+// ========================
 // 定时任务调度注册
 // ========================
 

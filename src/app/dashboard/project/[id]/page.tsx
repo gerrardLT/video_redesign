@@ -13,6 +13,8 @@ import ShotGroupList, { type ShotGroupData } from '@/components/shot/ShotGroupLi
 import CharacterPanel, { type Character } from '@/components/shot/CharacterPanel'
 import { StyleConfigEditor } from '@/components/project/style-config-editor'
 import { EditorGuide } from '@/components/onboarding/editor-guide'
+import { EngineSelector } from '@/components/editor/engine-selector'
+import { HappyHorseGeneratePanel } from '@/components/editor/happyhorse-generate-panel'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +39,7 @@ interface ProjectDetail {
   createdAt: string
   updatedAt: string
   shotCount: number
+  engine?: string // 生成引擎: seedance | happyhorse
   // Stepper 步骤状态计算所需字段
   shots?: { genStatus: string }[]
   characters?: { enabled: boolean }[]
@@ -365,6 +368,9 @@ function EditableState({ project, onReparse, reparsing }: { project: ProjectDeta
   const router = useRouter()
   const [creditsDialogOpen, setCreditsDialogOpen] = useState(false)
   const [creditsInfo, setCreditsInfo] = useState({ currentBalance: 0, requiredCredits: 0 })
+  const [currentEngine, setCurrentEngine] = useState<'seedance' | 'happyhorse'>(
+    project.engine === 'happyhorse' ? 'happyhorse' : 'seedance'
+  )
 
   // 基于 shotGroups 判断导出按钮可用性
   // initialAllSucceeded 来自父级（页面加载时的快照，可能滞后于实际生成进度)
@@ -449,7 +455,30 @@ function EditableState({ project, onReparse, reparsing }: { project: ProjectDeta
         </div>
       </div>
 
-      {/* 操作按钮栏 */}
+      {/* 引擎选择（Seedance / HappyHorse 切换） */}
+      <div className="rounded-xl border border-[var(--cine-line-2)] bg-[var(--cine-surface)] p-4">
+        <p className="text-xs text-[var(--cine-text-3)] mb-2">生成引擎</p>
+        <EngineSelector
+          projectId={project.id}
+          currentEngine={currentEngine}
+          onEngineChange={setCurrentEngine}
+          disabled={project.status === 'GENERATING'}
+        />
+      </div>
+
+      {/* HappyHorse 模式生成面板（仅引擎为 happyhorse 时显示） */}
+      {currentEngine === 'happyhorse' && (
+        <div className="rounded-xl border border-green-900/30 bg-green-950/20 p-4">
+          <HappyHorseGeneratePanel
+            projectId={project.id}
+            videoDuration={project.duration ?? 0}
+            originalVideoUrl={project.videoUrl ?? ''}
+            disabled={project.status === 'GENERATING'}
+          />
+        </div>
+      )}
+
+      {/* 操作按钮栏（Seedance 模式） */}
       <div id="generate-section" className="flex items-center gap-3" data-onboarding="generate-btn">
         <Button
           variant="outline"

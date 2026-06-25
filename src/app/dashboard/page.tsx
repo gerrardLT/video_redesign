@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { HelpEntryLink } from '@/components/help/help-entry-link'
 import { WelcomeWizard } from '@/components/onboarding/welcome-wizard'
 import { DashboardGuide } from '@/components/onboarding/dashboard-guide'
@@ -99,12 +100,14 @@ export default function DashboardPage() {
       const res = await fetch(`/api/projects/${pendingDelete.id}`, { method: 'DELETE' })
       if (res.ok) {
         setProjects((prev) => prev.filter((p) => p.id !== pendingDelete.id))
+        toast.success('项目已删除')
       } else {
         const data = await res.json()
-        alert(data.error || '删除失败')
+        const errorMsg = typeof data.error === 'object' ? data.error.message : data.error
+        toast.error(errorMsg || '删除失败')
       }
     } catch {
-      alert('网络错误')
+      toast.error('网络错误，请稍后重试')
     } finally {
       setDeletingId(null)
       setPendingDelete(null)
