@@ -32,26 +32,26 @@ describe('Feature: video-export-upscale, Property 1: 超分积分计算公式正
     )
   })
 
-  it('720p 返回 ceil(duration × 1)', () => {
+  it('720p 返回 0（720p 免费）', () => {
     fc.assert(
       fc.property(
         fc.double({ min: 0.01, max: 600, noNaN: true, noDefaultInfinity: true }),
         (duration) => {
           const cost = estimateUpscaleCreditCost(duration, '720p')
-          expect(cost).toBe(Math.ceil(duration * 1))
+          expect(cost).toBe(0)
         }
       ),
       { numRuns: 200 }
     )
   })
 
-  it('1080p 返回 ceil(duration × 2)', () => {
+  it('1080p 返回 ceil(duration × 1.33)', () => {
     fc.assert(
       fc.property(
         fc.double({ min: 0.01, max: 600, noNaN: true, noDefaultInfinity: true }),
         (duration) => {
           const cost = estimateUpscaleCreditCost(duration, '1080p')
-          expect(cost).toBe(Math.ceil(duration * 2))
+          expect(cost).toBe(Math.ceil(duration * 1.33))
         }
       ),
       { numRuns: 200 }
@@ -72,7 +72,7 @@ describe('Feature: video-export-upscale, Property 1: 超分积分计算公式正
     )
   })
 
-  it('非标准分辨率字符串返回 0（仅 720p/1080p 收费）', () => {
+  it('非标准分辨率字符串返回 0（仅 1080p 收费）', () => {
     const nonStandardArb = fc.string({ minLength: 1, maxLength: 20 })
       .filter((s) => s !== '720p' && s !== '1080p' && s !== '480p')
 

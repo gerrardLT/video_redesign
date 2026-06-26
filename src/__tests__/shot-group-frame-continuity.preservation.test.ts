@@ -438,7 +438,7 @@ describe('Property 2: Preservation — 非 bug 输入行为保持不变（未修
 // ============================================================
 describe('Preservation — scriptHash 幂等、force 抽卡、积分冻结行为不变（Req 3.6）', () => {
   it('SUCCEEDED 且 scriptHash 命中且非 force：幂等短路，不入队、不冻结积分', async () => {
-    const hash = computeScriptHash(BASE_PROMPT, 12, '720p')
+    const hash = computeScriptHash(BASE_PROMPT, 12, '480p')
     const group = makeCurrentGroupG({
       genStatus: 'SUCCEEDED',
       scriptHash: hash,
@@ -456,7 +456,7 @@ describe('Preservation — scriptHash 幂等、force 抽卡、积分冻结行为
   })
 
   it('force=true：绕过 SUCCEEDED 幂等短路，走真生成（入队 + 冻结事务）', async () => {
-    const hash = computeScriptHash(BASE_PROMPT, 12, '720p')
+    const hash = computeScriptHash(BASE_PROMPT, 12, '480p')
     const group = makeCurrentGroupG({
       genStatus: 'SUCCEEDED',
       scriptHash: hash,
@@ -476,7 +476,7 @@ describe('Preservation — scriptHash 幂等、force 抽卡、积分冻结行为
   })
 
   it('QUEUED 进行中且 scriptHash 命中：幂等短路返回进行中，不重复入队/扣费', async () => {
-    const hash = computeScriptHash(BASE_PROMPT, 12, '720p')
+    const hash = computeScriptHash(BASE_PROMPT, 12, '480p')
     const group = makeCurrentGroupG({ genStatus: 'QUEUED', scriptHash: hash })
     installGroupQueries({ group, prev: makePrevGroupP(), successor: null })
     mockPrisma.generationJob.findFirst.mockResolvedValue({ id: 'job-q', status: 'QUEUED' })

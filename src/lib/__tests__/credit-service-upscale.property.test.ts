@@ -14,9 +14,9 @@ describe('estimateUpscaleCreditCost 属性测试', () => {
    * **Validates: Requirements 1.2**
    *
    * For any 正数视频时长 duration：
-   * - 480p 返回 0
-   * - 720p 返回 Math.ceil(duration * 1)
-   * - 1080p 返回 Math.ceil(duration * 2)
+   * - 480p 返回 0（免费）
+   * - 720p 返回 0（免费）
+   * - 1080p 返回 Math.ceil(duration * 1.33)
    */
   it('480p 始终返回 0', () => {
     fc.assert(
@@ -30,26 +30,26 @@ describe('estimateUpscaleCreditCost 属性测试', () => {
     )
   })
 
-  it('720p 返回 Math.ceil(duration * 1)', () => {
+  it('720p 返回 0（720p 免费）', () => {
     fc.assert(
       fc.property(
         fc.double({ min: 0.01, max: 100000, noNaN: true, noDefaultInfinity: true }),
         (duration) => {
           const result = estimateUpscaleCreditCost(duration, '720p')
-          expect(result).toBe(Math.ceil(duration * 1))
+          expect(result).toBe(0)
         }
       ),
       { numRuns: 200 }
     )
   })
 
-  it('1080p 返回 Math.ceil(duration * 2)', () => {
+  it('1080p 返回 Math.ceil(duration * 1.33)', () => {
     fc.assert(
       fc.property(
         fc.double({ min: 0.01, max: 100000, noNaN: true, noDefaultInfinity: true }),
         (duration) => {
           const result = estimateUpscaleCreditCost(duration, '1080p')
-          expect(result).toBe(Math.ceil(duration * 2))
+          expect(result).toBe(Math.ceil(duration * 1.33))
         }
       ),
       { numRuns: 200 }

@@ -28,19 +28,19 @@ describe('estimateUpscaleCreditCost', () => {
     expect(estimateUpscaleCreditCost(600, '480p')).toBe(0)
   })
 
-  it('720p 返回 ceil(duration × 1)', () => {
-    expect(estimateUpscaleCreditCost(10, '720p')).toBe(10)
-    expect(estimateUpscaleCreditCost(10.1, '720p')).toBe(11)
-    expect(estimateUpscaleCreditCost(0.5, '720p')).toBe(1)
-    expect(estimateUpscaleCreditCost(1, '720p')).toBe(1)
+  it('720p 返回 0（720p 免费）', () => {
+    expect(estimateUpscaleCreditCost(10, '720p')).toBe(0)
+    expect(estimateUpscaleCreditCost(10.1, '720p')).toBe(0)
+    expect(estimateUpscaleCreditCost(0.5, '720p')).toBe(0)
+    expect(estimateUpscaleCreditCost(1, '720p')).toBe(0)
   })
 
-  it('1080p 返回 ceil(duration × 2)', () => {
-    expect(estimateUpscaleCreditCost(10, '1080p')).toBe(20)
-    expect(estimateUpscaleCreditCost(10.1, '1080p')).toBe(21)
-    expect(estimateUpscaleCreditCost(0.5, '1080p')).toBe(1)
-    expect(estimateUpscaleCreditCost(1, '1080p')).toBe(2)
-    expect(estimateUpscaleCreditCost(0.3, '1080p')).toBe(1)
+  it('1080p 返回 ceil(duration × 1.33)', () => {
+    expect(estimateUpscaleCreditCost(10, '1080p')).toBe(Math.ceil(10 * 1.33))
+    expect(estimateUpscaleCreditCost(10.1, '1080p')).toBe(Math.ceil(10.1 * 1.33))
+    expect(estimateUpscaleCreditCost(0.5, '1080p')).toBe(Math.ceil(0.5 * 1.33))
+    expect(estimateUpscaleCreditCost(1, '1080p')).toBe(Math.ceil(1 * 1.33))
+    expect(estimateUpscaleCreditCost(0.3, '1080p')).toBe(Math.ceil(0.3 * 1.33))
   })
 
   it('非标准分辨率返回 0', () => {
