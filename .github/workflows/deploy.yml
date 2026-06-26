@@ -1,0 +1,75 @@
+# CI/CD 自动部署工作流
+# 触发：推送到 main 分支
+# 流程：代码检查 → SSH 到生产服务器 → 执行 deploy.sh
+#
+# 需要在 GitHub repo Settings → Secrets and variables → Actions 中配置：
+# - SERVER_SSH_KEY: 服务器 SSH 私钥（ed25519 或 rsa）
+# - SERVER_HOST: 服务器 IP（165.154.147.155）
+# - SERVER_USER: SSH 用户名（通常为 root）
+
+name: 部署到生产环境
+
+on:
+  push:
+    branches: [main]
+  # 支持手动触发（GitHub UI 上点按钮部署）
+  workflow_dispatch:
+
+# 同一时间只允许一个部署运行，后续推送排队等待
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: 部署到宝塔服务器
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📦 检出代码
+        uses: actions/checkout@v4
+
+      - name: 🔑 配置 SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: 🚀 SSH 部署
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER || 'root' }}
+        run: |
+          # 添加服务器到 known_hosts（避免首次连接交互确认）
+          ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts 2>/dev/null
+
+          # SSH 到服务器执行部署
+          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'DEPLOY_SCRIPT'
+            set -e
+            
+            echo "===== 开始自动部署 ====="
+            echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"
+            echo "服务器: $(hostname)"
+            
+            # 进入项目目录
+            cd /www/wwwroot/video-redesign
+            
+            # 执行部署脚本（已包含：拉代码→构建→迁移→重启）
+            bash deploy.sh
+            
+            echo "===== 部署完成 ====="
+          DEPLOY_SCRIPT
+
+      - name: ✅ 部署成功通知
+        if: success()
+        run: |
+          echo "🎉 部署成功！"
+          echo "服务器: ${{ secrets.SERVER_HOST }}"
+          echo "分支: ${{ github.ref_name }}"
+          echo "提交: ${{ github.sha }}"
+
+      - name: ❌ 部署失败通知
+        if: failure()
+        run: |
+          echo "💥 部署失败！"
+          echo "请检查服务器日志: ssh root@${{ secrets.SERVER_HOST }} 'cd /www/wwwroot/video-redesign && docker compose -f docker-compose.prod.yml logs --tail=50'"
