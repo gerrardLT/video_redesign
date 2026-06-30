@@ -46,6 +46,7 @@ next-env.d.ts
 
 # uploaded files (MVP local storage)
 /public/uploads/videos/
+/public/uploads/temp/
 
 
 # Local database
@@ -59,3 +60,6 @@ dev.db-wal
 
 # Design demos (non-production)
 design-demos/
+
+# Kiro 本地 skill（非项目源码，不入库）
+.kiro/skills/
