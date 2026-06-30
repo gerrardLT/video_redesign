@@ -221,6 +221,71 @@ export async function freezeExportCredits(
 }
 
 /**
+ * 商家操作积分冻结（RESERVE，按 (bizRefType, bizRefId) 关联，恒不写 jobId）
+ *
+ * 泛化 freezeExportCredits 的关联键：把单一 projectId 抽象为 (bizRefType, bizRefId) 元组，
+ * 既能避免 jobId 外键约束（credit_ledger_job_id_fkey 要求 jobId 指向已存在的 generation_jobs.id，
+ * 而商家操作无对应 GenerationJob），又能区分 CONTENT_BRIEF / CONTENT_PLAN / STORE 等不同商家实体。
+ *
+ * 与既有 freezeExportCredits / projectId 版本并存，不改动既有函数签名。
+ *
+ * - 经 withCreditLock 全局锁【跨进程】串行化 + Prisma 事务，防止 read-modify-write 丢失更新。
+ * - 幂等键：(bizRefType, bizRefId, action='RESERVE') 已存在则跳过（重试不重复冻结）。
+ * - 余额 < amount → 抛 ApiError('INSUFFICIENT_CREDITS', 402)，余额不变、绝不为负、绝不欠费。
+ * - 写 CreditLedger 时 jobId 恒为 null，关联字段写 bizRefType / bizRefId。
+ *
+ * @param params.userId 用户 ID
+ * @param params.bizRefType 商家实体关联类型（CONTENT_BRIEF | CONTENT_PLAN | STORE）
+ * @param params.bizRefId 商家实体主键（无外键约束）
+ * @param params.amount 冻结额度（估算值，必须 > 0）
+ * @param params.remark 流水备注（用于区分操作，如 '[MERCHANT_RENDER] 渲染冻结'）
+ */
+export async function reserveCreditsByBizRef(params: {
+  userId: string
+  bizRefType: string
+  bizRefId: string
+  amount: number
+  remark: string
+}): Promise<void> {
+  const { userId, bizRefType, bizRefId, amount, remark } = params
+  await withCreditLock(() =>
+    prisma.$transaction(async (tx) => {
+      // 幂等：已存在该 (bizRefType, bizRefId) 的 RESERVE 则跳过（重试场景）
+      const existing = await tx.creditLedger.findFirst({
+        where: { bizRefType, bizRefId, action: 'RESERVE' },
+      })
+      if (existing) return
+
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+      if (user.creditBalance < amount) {
+        throw new ApiError(
+          'INSUFFICIENT_CREDITS',
+          `积分不足：本次操作需 ${amount} 积分，当前余额 ${user.creditBalance}`,
+          402
+        )
+      }
+      const newBalance = user.creditBalance - amount
+      await tx.user.update({
+        where: { id: userId },
+        data: { creditBalance: newBalance },
+      })
+      await tx.creditLedger.create({
+        data: {
+          userId,
+          // jobId 恒为 null：商家操作无对应 GenerationJob，关联恒走 bizRefType / bizRefId
+          bizRefType,
+          bizRefId,
+          action: 'RESERVE',
+          amount: -amount,
+          balanceAfter: newBalance,
+          remark,
+        },
+      })
+    })
+  , 'reserveCreditsByBizRef')
+}
+
+/**
  * 解析前余额预检（仅校验，不冻结）——供 API 入口快速拒绝余额为 0 的请求
  *
  * 真实冻结由 Worker 内的 freezeParseCredits 执行（拿到精确视频时长后）。
@@ -430,6 +495,176 @@ export async function chargeCreditsTx(
       remark: `正式扣除 ${actualAmount} 积分`,
     },
   })
+}
+
+/**
+ * 商家操作正式扣费（CHARGE，按 (bizRefType, bizRefId) 关联，恒不写 jobId，事务内）
+ *
+ * 泛化 chargeCreditsTx 的关联键：把 jobId / projectId 抽象为 (bizRefType, bizRefId) 元组，
+ * 既能避免 jobId 外键约束（商家操作无对应 GenerationJob），又能区分 CONTENT_BRIEF /
+ * CONTENT_PLAN / STORE 等不同商家实体。语义与 chargeCreditsTx 完全一致：
+ *
+ * - 幂等：已存在该 (bizRefType, bizRefId) 的 CHARGE 记录则跳过（队列重试不重复扣费）。
+ * - 若存在对应 RESERVE（余额已在冻结时扣减）：将多冻结部分（reserved - actualAmount）
+ *   以 REFUND 退回并更新余额，再写一条 CHARGE 记账（余额不再二次变动），
+ *   使最终净扣减恰好等于 actualAmount。
+ * - 若不存在 RESERVE（未走冻结模型的直扣场景）：校验余额充足后直接扣减并写 CHARGE，
+ *   余额不足抛 ApiError('INSUFFICIENT_CREDITS')，绝不欠费、绝不兜底扣至 0。
+ *
+ * tx 版本：可在外部事务中调用，与商家实体状态更新（如置 ContentBrief GENERATED）同事务。
+ * 与既有 chargeCreditsTx（jobId / projectId 版本）并存，不改动既有函数签名。
+ *
+ * @param tx Prisma 事务客户端（与商家实体状态更新同事务）
+ * @param params.userId 用户 ID
+ * @param params.bizRefType 商家实体关联类型（CONTENT_BRIEF | CONTENT_PLAN | STORE）
+ * @param params.bizRefId 商家实体主键（无外键约束）
+ * @param params.actualAmount 实际应扣额度（≤ 已冻结额，多余部分退回）
+ */
+export async function chargeCreditsByBizRef(
+  tx: Prisma.TransactionClient,
+  params: { userId: string; bizRefType: string; bizRefId: string; actualAmount: number }
+): Promise<void> {
+  const { userId, bizRefType, bizRefId, actualAmount } = params
+
+  // 幂等键：按 (bizRefType, bizRefId) 关联 CHARGE / RESERVE 流水
+  const ledgerKey = { bizRefType, bizRefId }
+
+  // 幂等检查：已扣费则跳过（保证扣费恰好一次）
+  const existingCharge = await tx.creditLedger.findFirst({
+    where: { ...ledgerKey, action: 'CHARGE' },
+  })
+  if (existingCharge) return
+
+  // 查找 RESERVE：存在则走「冻结→扣费」差额退款；不存在则直扣
+  const reserveEntry = await tx.creditLedger.findFirst({
+    where: { ...ledgerKey, action: 'RESERVE' },
+  })
+
+  if (reserveEntry) {
+    // RESERVE→CHARGE：余额已在冻结时扣减，此处仅退还多冻结差额并记账
+    const reservedAmount = Math.abs(reserveEntry.amount)
+    const diff = reservedAmount - actualAmount
+    if (diff > 0) {
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+      const newBalance = user.creditBalance + diff
+      await tx.user.update({
+        where: { id: userId },
+        data: { creditBalance: newBalance },
+      })
+      await tx.creditLedger.create({
+        data: {
+          userId,
+          ...ledgerKey,
+          action: 'REFUND',
+          amount: diff,
+          balanceAfter: newBalance,
+          remark: `退还多冻结 ${diff} 积分`,
+        },
+      })
+    }
+    const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+    await tx.creditLedger.create({
+      data: {
+        userId,
+        ...ledgerKey,
+        action: 'CHARGE',
+        amount: -actualAmount,
+        balanceAfter: user.creditBalance,
+        remark: `正式扣除 ${actualAmount} 积分`,
+      },
+    })
+    return
+  }
+
+  // 无 RESERVE：直扣并校验余额，绝不欠费、绝不兜底扣至 0
+  const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+  if (user.creditBalance < actualAmount) {
+    throw new ApiError(
+      'INSUFFICIENT_CREDITS',
+      `积分不足：应扣 ${actualAmount}，当前余额 ${user.creditBalance}`,
+      402
+    )
+  }
+  const newBalance = user.creditBalance - actualAmount
+  await tx.user.update({
+    where: { id: userId },
+    data: { creditBalance: newBalance },
+  })
+  await tx.creditLedger.create({
+    data: {
+      userId,
+      ...ledgerKey,
+      action: 'CHARGE',
+      amount: -actualAmount,
+      balanceAfter: newBalance,
+      remark: `正式扣除 ${actualAmount} 积分`,
+    },
+  })
+}
+
+/**
+ * 商家操作失败补偿退款（REFUND，按 (bizRefType, bizRefId) 关联，恒不写 jobId）
+ *
+ * 用于商家渲染 / 导出等操作在 CHARGE 之前失败的全额补偿退款：
+ * 退还额 = 该关联键已 RESERVE 的冻结额度（full compensation），从对应 RESERVE 流水读取，
+ * 无需调用方传入金额，避免与冻结额不一致。
+ *
+ * 泛化 refundParseCredits 的关联键：把单一 projectId 抽象为 (bizRefType, bizRefId) 元组，
+ * 既能避免 jobId 外键约束（商家操作无对应 GenerationJob），又能区分 CONTENT_BRIEF /
+ * CONTENT_PLAN / STORE 等不同商家实体。与既有 refundParseCredits / refundCredits 并存，
+ * 不改动既有函数签名。
+ *
+ * - 经 withCreditLock 全局锁【跨进程】串行化 + Prisma 事务，防止 read-modify-write 丢失更新。
+ * - 幂等键：(bizRefType, bizRefId, action='REFUND') 已存在则跳过（不重复退款）。
+ * - 若不存在对应 RESERVE（未冻结或冻结已被结算）：无可退冻结额，跳过（不凭空增加余额）。
+ * - 退款后余额恢复到该操作冻结发生前的数值（冻结—退款往返一致）。
+ *
+ * @param params.userId 用户 ID
+ * @param params.bizRefType 商家实体关联类型（CONTENT_BRIEF | CONTENT_PLAN | STORE）
+ * @param params.bizRefId 商家实体主键（无外键约束）
+ */
+export async function refundCreditsByBizRef(params: {
+  userId: string
+  bizRefType: string
+  bizRefId: string
+}): Promise<void> {
+  const { userId, bizRefType, bizRefId } = params
+  await withCreditLock(() =>
+    prisma.$transaction(async (tx) => {
+      // 幂等：已存在该 (bizRefType, bizRefId) 的 REFUND 则跳过（不重复退款）
+      const existingRefund = await tx.creditLedger.findFirst({
+        where: { bizRefType, bizRefId, action: 'REFUND' },
+      })
+      if (existingRefund) return
+
+      // 退还额从 RESERVE 流水读取：等于该关联键已冻结的额度（全额补偿）
+      const reserveEntry = await tx.creditLedger.findFirst({
+        where: { bizRefType, bizRefId, action: 'RESERVE' },
+      })
+      // 无对应 RESERVE：无可退冻结额，跳过（绝不凭空增加余额）
+      if (!reserveEntry) return
+      const amount = Math.abs(reserveEntry.amount)
+
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+      const newBalance = user.creditBalance + amount
+      await tx.user.update({
+        where: { id: userId },
+        data: { creditBalance: newBalance },
+      })
+      await tx.creditLedger.create({
+        data: {
+          userId,
+          // jobId 恒为 null：商家操作无对应 GenerationJob，关联恒走 bizRefType / bizRefId
+          bizRefType,
+          bizRefId,
+          action: 'REFUND',
+          amount,
+          balanceAfter: newBalance,
+          remark: `操作失败退还 ${amount} 积分`,
+        },
+      })
+    })
+  , 'refundCreditsByBizRef')
 }
 
 /**

@@ -24,6 +24,7 @@
 
 import { useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import useSWR from 'swr'
 import {
   Download,
@@ -37,10 +38,15 @@ import {
   Clock,
   ExternalLink,
   AlertTriangle,
+  BarChart3,
+  ChevronRight,
+  Megaphone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { CopyCompliancePanel } from '@/components/merchant/CopyCompliancePanel'
+import { GenerationControlPanel } from '@/components/merchant/GenerationControlPanel'
 
 // ─── 类型定义 ───
 
@@ -73,6 +79,10 @@ interface VideoVariant {
   subtitles: Array<{ text: string; startSec: number; endSec: number }> | null
   complianceChecks: ComplianceCheck[]
   createdAt: string
+  // 渲染参数（renderParams.advancedParams 标注本次实际生效的高级参数，需求 4.7）
+  renderParams?: Record<string, unknown> | null
+  // 上次局部重渲染的受影响范围（需求 4.5 追溯）
+  regenScope?: Record<string, unknown> | null
 }
 
 interface ExportResult {
@@ -127,7 +137,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 
 export default function VariantsExportPage() {
   const params = useParams<{ storeId: string; briefId: string }>()
-  const { briefId } = params
+  const { storeId, briefId } = params
 
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [exportingId, setExportingId] = useState<string | null>(null)
@@ -147,7 +157,7 @@ export default function VariantsExportPage() {
   )
 
   // 获取 ContentBrief 的文案信息
-  const { data: briefData } = useSWR<{ brief: { platformCopies: Record<string, PlatformCopy> | null } }>(
+  const { data: briefData, mutate: mutateBrief } = useSWR<{ brief: { platformCopies: Record<string, PlatformCopy> | null } }>(
     `/api/content-briefs/${briefId}`,
     fetcher
   )
@@ -275,9 +285,64 @@ export default function VariantsExportPage() {
         ))}
       </div>
 
-      {/* 选中版本时：平台文案预览 */}
-      {selectedVariant && platformCopies && (
-        <PlatformCopiesPreview copies={platformCopies} />
+      {/* 选中版本时：文案就地编辑 + 合规可操作面板（任务 3.7） */}
+      {selectedVariant && (
+        <CopyCompliancePanel
+          briefId={briefId}
+          variantId={selectedVariant.id}
+          compliance={selectedVariant.complianceChecks[0] ?? null}
+          platformCopies={platformCopies}
+          onCopiesChanged={() => { void mutateBrief() }}
+          onComplianceChanged={() => { void mutateVariants() }}
+        />
+      )}
+
+      {/* 选中版本时：生成可控性面板（任务 5.9）——
+          重新生成此版本 / 重拍某镜头 / 高级抽屉（默认隐藏）/ 参数标注 / 承接链提示 */}
+      {selectedVariant && (
+        <GenerationControlPanel
+          briefId={briefId}
+          variant={selectedVariant}
+          onVariantsChanged={() => { void mutateVariants() }}
+        />
+      )}
+
+      {/* 已导出后：引导前往待发布清单完成发布（清单 + 提醒 + 手动标记，需求 8.2/8.5） */}
+      {Object.keys(exportResults).length > 0 && (
+        <Link
+          href={`/merchant/stores/${storeId}/publish-queue`}
+          className="block mt-6"
+        >
+          <Card className="p-4 rounded-2xl border-2 border-amber-100 bg-amber-50/40 flex items-center gap-3 hover:border-amber-300 transition-all cursor-pointer">
+            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+              <Megaphone className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-gray-800">去发布这条视频</h3>
+              <p className="text-xs text-gray-500 mt-0.5">复制文案、下载视频、跳转平台发布，发完回来标记一下</p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-gray-300 flex-shrink-0" />
+          </Card>
+        </Link>
+      )}
+
+      {/* 已导出后：引导发布后回填数据做复盘（接通数据复盘页） */}
+      {Object.keys(exportResults).length > 0 && (
+        <Link
+          href={`/merchant/stores/${storeId}/briefs/${briefId}/metrics`}
+          className="block mt-4"
+        >
+          <Card className="p-4 rounded-2xl border-2 border-green-100 bg-green-50/40 flex items-center gap-3 hover:border-green-300 transition-all cursor-pointer">
+            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 text-green-600 flex items-center justify-center">
+              <BarChart3 className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-gray-800">发布后来回填数据</h3>
+              <p className="text-xs text-gray-500 mt-0.5">录入播放/转化数据，获取下一轮优化建议</p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-gray-300 flex-shrink-0" />
+          </Card>
+        </Link>
       )}
 
       {/* 高风险确认对话框 */}

@@ -197,7 +197,7 @@ export default function ShowcasePage() {
             <button
               onClick={handleLoadMore}
               disabled={loadingMore}
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-6 py-3 text-sm font-medium text-[var(--cine-ink)] transition-colors hover:bg-[var(--cine-gold-2)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loadingMore ? (
                 <>

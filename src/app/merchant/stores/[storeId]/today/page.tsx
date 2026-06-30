@@ -10,7 +10,10 @@
  *
  * 数据获取：useSWR('/api/stores/{storeId}/today')
  *
- * Requirements: 15.1, 5.2
+ * 溯源展示：内嵌 BriefProvenanceCard（需求 5.1/5.3/5.5/5.6），
+ * 展示今日 brief 引用的门店画像依据，并提供仅对后续生效的画像调整入口。
+ *
+ * Requirements: 15.1, 5.1, 5.2, 5.3, 5.5, 5.6
  */
 
 import { useParams, useRouter } from 'next/navigation'
@@ -21,6 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ArrowLeft, Camera, CheckCircle, Circle } from 'lucide-react'
+import { BriefProvenanceCard } from '@/components/merchant'
 
 // ========================
 // 数据获取
@@ -279,6 +283,9 @@ export default function TodayTaskPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 内容溯源展示 + 画像调整入口（需求 5.1/5.3/5.5/5.6） */}
+      <BriefProvenanceCard storeId={storeId} briefId={brief.id} />
 
       {/* 拍摄任务列表 */}
       <div className="space-y-3">

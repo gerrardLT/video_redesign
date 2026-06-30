@@ -1,54 +1,45 @@
 /**
- * GET /api/merchant/subscription — 获取当前用户的订阅与额度信息
+ * GET /api/merchant/subscription — 获取当前用户的会员权益与积分余额
  *
- * 返回：tier, 各操作当前使用量/上限, resetDate
+ * 收敛后：会员权益由 privilege-engine 的 getMerchantPrivileges 经 UserTier
+ * （FREE / MONTHLY / YEARLY）映射决定，积分余额由 credit-service 的 getBalance 返回。
+ * 不再汇总额度（Quota）信息。
  *
  * 响应：
- * - 200: { tier, quotas: { ... }, resetDate }
+ * - 200: { tier, exportResolution, complianceCheckEnabled, insightsEnabled,
+ *          maxStores, batchConcurrency, creditBalance }
  * - 401: 未认证
  * - 500: 服务器内部错误
  *
- * Requirements: 14.6, 14.7
+ * Requirements: 2.3, 5.1, 5.2
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { checkMerchantQuota, getMerchantTier } from '@/lib/merchant-quota-service'
+import { getMerchantPrivileges } from '@/lib/privilege-engine'
+import { getBalance } from '@/lib/credit-service'
 import { ApiError } from '@/lib/api-error'
-import { SUBSCRIPTION_TIERS } from '@/constants/merchant'
 
 export async function GET(request: NextRequest) {
   try {
     // 1. 鉴权
     const userId = getUserIdFromRequest(request)
 
-    // 2. 获取订阅等级
-    const tier = await getMerchantTier(userId)
-    const tierConfig = SUBSCRIPTION_TIERS[tier]
+    // 2. 并行获取会员权益与积分余额
+    const [privileges, creditBalance] = await Promise.all([
+      getMerchantPrivileges(userId),
+      getBalance(userId),
+    ])
 
-    // 3. 获取各操作的额度使用情况
-    const [storeQuota, contentPlanQuota, renderQuota, exportQuota, insightsQuota] =
-      await Promise.all([
-        checkMerchantQuota(userId, 'CREATE_STORE'),
-        checkMerchantQuota(userId, 'CREATE_CONTENT_PLAN'),
-        checkMerchantQuota(userId, 'RENDER_VIDEO'),
-        checkMerchantQuota(userId, 'EXPORT_VIDEO'),
-        checkMerchantQuota(userId, 'ACCESS_INSIGHTS'),
-      ])
-
-    // 4. 返回聚合信息
+    // 3. 返回聚合信息（权益 + 积分余额）
     return NextResponse.json({
-      tier,
-      label: tierConfig.label,
-      exportResolution: tierConfig.exportResolution,
-      quotas: {
-        stores: storeQuota,
-        contentPlans: contentPlanQuota,
-        videoGenerations: renderQuota,
-        export: exportQuota,
-        insights: insightsQuota,
-      },
-      resetDate: renderQuota.resetDate ?? null,
+      tier: privileges.tier,
+      exportResolution: privileges.exportResolution,
+      complianceCheckEnabled: privileges.complianceCheckEnabled,
+      insightsEnabled: privileges.insightsEnabled,
+      maxStores: privileges.maxStores,
+      batchConcurrency: privileges.batchConcurrency,
+      creditBalance,
     })
   } catch (error) {
     if (error instanceof ApiError) {

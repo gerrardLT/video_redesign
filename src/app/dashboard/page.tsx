@@ -42,13 +42,13 @@ interface ProjectItem {
 }
 
 const STATUS_LABELS: Record<string, { text: string; color: string }> = {
-  PARSING: { text: '解析中', color: 'bg-yellow-500/20 text-yellow-400' },
-  EDITABLE: { text: '可编辑', color: 'bg-green-500/20 text-[var(--cine-green)]' },
-  GENERATING: { text: '生成中', color: 'bg-blue-500/20 text-blue-400' },
-  PARTIAL: { text: '部分完成', color: 'bg-orange-500/20 text-orange-400' },
-  COMPLETED: { text: '已完成', color: 'bg-emerald-500/20 text-emerald-400' },
-  EXPORTED: { text: '已导出', color: 'bg-purple-500/20 text-purple-400' },
-  FAILED: { text: '失败', color: 'bg-red-500/20 text-red-400' },
+  PARSING: { text: '解析中', color: 'bg-[var(--cine-amber-dim)] text-[var(--cine-amber)]' },
+  EDITABLE: { text: '可编辑', color: 'bg-[var(--cine-green-dim)] text-[var(--cine-green)]' },
+  GENERATING: { text: '生成中', color: 'bg-[var(--cine-amber-dim)] text-[var(--cine-amber)]' },
+  PARTIAL: { text: '部分完成', color: 'bg-[var(--cine-amber-dim)] text-[var(--cine-amber)]' },
+  COMPLETED: { text: '已完成', color: 'bg-[var(--cine-green-dim)] text-[var(--cine-green)]' },
+  EXPORTED: { text: '已导出', color: 'bg-[var(--cine-green-dim)] text-[var(--cine-green)]' },
+  FAILED: { text: '失败', color: 'bg-[var(--cine-red-dim)] text-[var(--cine-red)]' },
 }
 
 function formatDate(dateStr: string): string {
@@ -128,7 +128,7 @@ export default function DashboardPage() {
         <Link
           href="/dashboard/project/new"
           data-onboarding="new-project"
-          className="inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)]"
+          className="inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-[var(--cine-ink)] transition-colors hover:bg-[var(--cine-gold-2)]"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -166,7 +166,7 @@ export default function DashboardPage() {
           <p className="mb-6 text-sm text-[var(--cine-text-3)]">上传一段视频开始创作</p>
           <Link
             href="/dashboard/project/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)]"
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-[var(--cine-ink)] transition-colors hover:bg-[var(--cine-gold-2)]"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

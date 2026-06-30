@@ -1,34 +1,69 @@
 /**
  * 本地视频渲染 Worker
  *
- * 处理 `render-local-video` BullMQ 队列任务。
- * 流程：
- * 1. 从 job.data 获取 { contentBriefId, userId }
- * 2. 调用 renderLocalVideoVariants() 执行渲染
- * 3. 渲染成功后，对每个 VideoVariant 自动入队 compliance-review 合规检查
- * 4. 错误不静默，抛出让 BullMQ 重试
+ * 处理 `render-local-video` BullMQ 队列任务，按 job.data.mode 分发三种渲染入口：
+ * 1. 缺省（整体渲染）：调用 renderLocalVideoVariants()，生成 3 种风格视频版本
+ * 2. REGEN_VARIANT（单版本重生成）：携带 videoVariantId，调用 regenerateSingleVariant()，
+ *    仅重生成指定版本，保留其它版本（需求 4.2）
+ * 3. RESHOOT_SCOPE（局部重拍）：携带 shotTaskId，调用 rerenderAffectedScope()，
+ *    仅重渲染受影响分镜组集合（被重拍组 ∪ 承接链后续同场景组），承接链一并重算避免画面断裂（需求 4.3/4.5）
+ *
+ * 渲染完成后，对涉及的每个 VideoVariant 自动入队 compliance-review 合规检查。
  *
  * Worker 配置：
  * - 队列名: render-local-video
  * - concurrency: 2（design.md 定义）
  *
  * 关键约束：
- * - local-render-service 内部已处理 锁/额度/超时，Worker 只需调用并处理返回值
+ * - local-render-service 内部已处理 锁/积分(RESERVE→CHARGE/REFUND)/超时/临时文件 finally 清理，
+ *   Worker 只负责按 mode 分发并处理返回值，不重复实现计费或回滚逻辑。
+ * - 局部重渲染范围内某组失败时，service 内部已 REFUND + 标记失败 + 承接链整体回滚（避免画面断裂），
+ *   Worker 不吞错，直接向上抛让 BullMQ 重试（不静默降级）。
  * - 使用共享 Redis 连接
  */
 
 import { Worker, Job, type ConnectionOptions } from 'bullmq'
 import { redis } from '@/lib/redis'
-import { renderLocalVideoVariants } from '@/lib/local-render-service'
+import {
+  renderLocalVideoVariants,
+  regenerateSingleVariant,
+  rerenderAffectedScope,
+  type RenderAdvancedParams,
+} from '@/lib/local-render-service'
 import { complianceReviewQueue } from '@/lib/queue'
 
 // ========================
 // 类型定义
 // ========================
 
+/**
+ * 渲染模式：
+ * - 缺省/INTEGRAL：整体渲染全部 3 个版本
+ * - REGEN_VARIANT：单版本重生成（需 videoVariantId）
+ * - RESHOOT_SCOPE：局部重拍受影响范围重合成（需 shotTaskId）
+ */
+export type RenderLocalVideoMode = 'INTEGRAL' | 'REGEN_VARIANT' | 'RESHOOT_SCOPE'
+
 export interface RenderLocalVideoJobData {
-  contentBriefId: string
+  /** 内容任务 ID（整体渲染 / 局部重拍必填；单版本重生成可省略，由版本反查所属 brief） */
+  contentBriefId?: string
+  /** 操作用户 ID（计费主体） */
   userId: string
+  /** 渲染模式，缺省按整体渲染处理 */
+  mode?: RenderLocalVideoMode
+  /** 单版本重生成目标版本 ID（mode=REGEN_VARIANT 必填） */
+  videoVariantId?: string
+  /** 被重拍镜头 ID（mode=RESHOOT_SCOPE 必填） */
+  shotTaskId?: string
+  /** 运营型用户高级抽屉参数（可选，仅单版本重生成透传） */
+  advancedParams?: RenderAdvancedParams
+}
+
+/** 归一化后的待合规检查版本（统一携带所属 brief，供入队 compliance-review） */
+interface RenderedVariantRef {
+  id: string
+  type: string
+  contentBriefId: string
 }
 
 // ========================
@@ -36,22 +71,80 @@ export interface RenderLocalVideoJobData {
 // ========================
 
 async function processRenderLocalVideo(job: Job<RenderLocalVideoJobData>): Promise<void> {
-  const { contentBriefId, userId } = job.data
-  console.log(`[render-local-video] 开始渲染 contentBriefId=${contentBriefId}（attempt ${job.attemptsMade + 1}）`)
+  const { contentBriefId, userId, videoVariantId, shotTaskId, advancedParams } = job.data
+  const mode: RenderLocalVideoMode = job.data.mode ?? 'INTEGRAL'
 
-  // 调用渲染服务（内部已处理额度 RESERVE/CHARGE/REFUND、分布式锁、超时控制）
-  const variants = await renderLocalVideoVariants({ contentBriefId, userId })
+  console.log(
+    `[render-local-video] 开始渲染 mode=${mode} contentBriefId=${contentBriefId ?? '-'} ` +
+      `videoVariantId=${videoVariantId ?? '-'} shotTaskId=${shotTaskId ?? '-'}（attempt ${job.attemptsMade + 1}）`
+  )
 
-  console.log(`[render-local-video] 渲染完成，生成 ${variants.length} 个版本`)
+  // 按 mode 分发到对应渲染入口；各入口内部已处理积分/锁/超时/临时文件清理，
+  // 失败时内部已幂等退款 + 状态回滚并抛错，此处不捕获，直接向上抛让 BullMQ 重试（不静默降级）。
+  const variants = await dispatchRender({
+    mode,
+    contentBriefId,
+    userId,
+    videoVariantId,
+    shotTaskId,
+    advancedParams,
+  })
 
-  // 对每个 VideoVariant 入队合规检查
+  console.log(`[render-local-video] 渲染完成（mode=${mode}），涉及 ${variants.length} 个版本`)
+
+  // 对涉及的每个 VideoVariant 入队合规检查（重生成/重拍后内容已变，需重新过审）
   for (const variant of variants) {
     await complianceReviewQueue.add('compliance-review', {
-      contentBriefId,
+      contentBriefId: variant.contentBriefId,
       videoVariantId: variant.id,
     })
     console.log(`[render-local-video] 已入队合规检查: variantId=${variant.id}, type=${variant.type}`)
   }
+}
+
+/**
+ * 按 mode 分发到对应渲染入口，并将返回结果归一化为待合规检查的版本列表。
+ *
+ * 各分支的必填入参缺失时显式抛错（不静默回退），让任务失败由 BullMQ 处理。
+ */
+async function dispatchRender(params: {
+  mode: RenderLocalVideoMode
+  contentBriefId?: string
+  userId: string
+  videoVariantId?: string
+  shotTaskId?: string
+  advancedParams?: RenderAdvancedParams
+}): Promise<RenderedVariantRef[]> {
+  const { mode, contentBriefId, userId, videoVariantId, shotTaskId, advancedParams } = params
+
+  if (mode === 'REGEN_VARIANT') {
+    if (!videoVariantId) {
+      throw new Error('[render-local-video] REGEN_VARIANT 模式缺少 videoVariantId')
+    }
+    // 单版本重生成：仅重生成指定版本，保留其它版本（需求 4.2）
+    const variant = await regenerateSingleVariant({ videoVariantId, userId, advancedParams })
+    return [{ id: variant.id, type: variant.type, contentBriefId: variant.contentBriefId }]
+  }
+
+  if (mode === 'RESHOOT_SCOPE') {
+    if (!contentBriefId) {
+      throw new Error('[render-local-video] RESHOOT_SCOPE 模式缺少 contentBriefId')
+    }
+    if (!shotTaskId) {
+      throw new Error('[render-local-video] RESHOOT_SCOPE 模式缺少 shotTaskId')
+    }
+    // 局部重拍：仅重渲染受影响分镜组集合，承接链一并重算（需求 4.3/4.5）。
+    // 范围内某组失败时 service 内部已 REFUND + 承接链整体回滚，错误向上抛出。
+    const variants = await rerenderAffectedScope({ contentBriefId, shotTaskId, userId })
+    return variants.map((v) => ({ id: v.id, type: v.type, contentBriefId: v.contentBriefId }))
+  }
+
+  // 缺省：整体渲染全部 3 个版本
+  if (!contentBriefId) {
+    throw new Error('[render-local-video] 整体渲染模式缺少 contentBriefId')
+  }
+  const variants = await renderLocalVideoVariants({ contentBriefId, userId })
+  return variants.map((v) => ({ id: v.id, type: v.type, contentBriefId }))
 }
 
 // ========================

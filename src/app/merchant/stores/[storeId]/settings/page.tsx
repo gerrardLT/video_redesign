@@ -20,7 +20,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Badge } from '@/components/ui/badge'
-import { Save, Plus, Trash2, ArrowLeft } from 'lucide-react'
+import { Save, Plus, Trash2, ArrowLeft, Sparkles, RefreshCw, Crown } from 'lucide-react'
+import Link from 'next/link'
+import { PlatformAccountLinkCard } from '@/components/merchant'
 
 // ========================
 // 数据获取
@@ -416,6 +418,149 @@ function OffersManagement({ storeId }: { storeId: string }) {
 }
 
 // ========================
+// 门店画像展示组件（消费已就绪的 GET /profile，read-only + 重新生成）
+// ========================
+
+interface StoreProfileData {
+  contentPositioning: string | null
+  recommendedPersona: string | null
+  visualStyle: string | null
+  aiSummary: string | null
+  status: string
+  contentDos: string[] | null
+  contentDonts: string[] | null
+  hookKeywords: string[] | null
+  forbiddenClaims: string[] | null
+  preferredCta: string[] | null
+}
+
+/** 标签组小节 */
+function TagSection({ title, items, tone }: { title: string; items: string[] | null; tone: string }) {
+  if (!items || items.length === 0) return null
+  return (
+    <div>
+      <p className="text-xs text-gray-400 font-medium mb-1.5">{title}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item, i) => (
+          <span key={i} className={`px-2 py-0.5 rounded-full text-xs ${tone}`}>{item}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function StoreProfileCard({ storeId }: { storeId: string }) {
+  const { data, error, isLoading } = useSWR(
+    `/api/stores/${storeId}/profile`,
+    async (url: string) => {
+      const res = await fetch(url)
+      if (res.status === 404) return { notReady: true }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: { message: '请求失败' } }))
+        throw new Error(err.error?.message || '请求失败')
+      }
+      return res.json()
+    },
+    { revalidateOnFocus: false }
+  )
+  const [regenerating, setRegenerating] = useState(false)
+
+  // 触发重新生成画像（POST /profile/regenerate，BullMQ 异步）
+  const handleRegenerate = async () => {
+    setRegenerating(true)
+    try {
+      const res = await fetch(`/api/stores/${storeId}/profile/regenerate`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: { message: '操作失败' } }))
+        throw new Error(err.error?.message || '操作失败')
+      }
+      // 稍后刷新（画像由 Worker 异步生成）
+      setTimeout(() => mutate(`/api/stores/${storeId}/profile`), 5000)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '重新生成失败')
+    } finally {
+      setRegenerating(false)
+    }
+  }
+
+  const profile: StoreProfileData | null =
+    data && !data.notReady ? (data.profile as StoreProfileData) : null
+
+  return (
+    <Card className="border-amber-100 rounded-2xl">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-1.5 text-amber-900">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            AI 门店画像
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRegenerate}
+            disabled={regenerating}
+            className="border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs"
+          >
+            {regenerating ? <Spinner size="sm" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+            重新生成
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading && (
+          <div className="flex justify-center py-4"><Spinner size="sm" /></div>
+        )}
+
+        {error && (
+          <p className="text-sm text-red-500">{error.message}</p>
+        )}
+
+        {/* 画像尚未生成 / 生成中 */}
+        {!isLoading && !error && !profile && (
+          <p className="text-sm text-gray-400 text-center py-4">
+            画像生成中或尚未生成，点击右上角「重新生成」稍后查看
+          </p>
+        )}
+
+        {/* 画像内容 */}
+        {profile && (
+          <>
+            {profile.aiSummary && (
+              <p className="text-sm text-gray-700 leading-relaxed bg-amber-50/60 rounded-xl p-3">
+                {profile.aiSummary}
+              </p>
+            )}
+            {profile.contentPositioning && (
+              <div>
+                <p className="text-xs text-gray-400 font-medium mb-1">内容定位</p>
+                <p className="text-sm text-gray-700">{profile.contentPositioning}</p>
+              </div>
+            )}
+            {profile.recommendedPersona && (
+              <div>
+                <p className="text-xs text-gray-400 font-medium mb-1">推荐人设</p>
+                <p className="text-sm text-gray-700">{profile.recommendedPersona}</p>
+              </div>
+            )}
+            {profile.visualStyle && (
+              <div>
+                <p className="text-xs text-gray-400 font-medium mb-1">视觉风格</p>
+                <p className="text-sm text-gray-700">{profile.visualStyle}</p>
+              </div>
+            )}
+            <TagSection title="钩子关键词" items={profile.hookKeywords} tone="bg-blue-50 text-blue-700" />
+            <TagSection title="推荐做的" items={profile.contentDos} tone="bg-green-50 text-green-700" />
+            <TagSection title="禁止做的" items={profile.contentDonts} tone="bg-red-50 text-red-600" />
+            <TagSection title="违禁词" items={profile.forbiddenClaims} tone="bg-red-50 text-red-600" />
+            <TagSection title="推荐引导语" items={profile.preferredCta} tone="bg-amber-50 text-amber-700" />
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ========================
 // 主页面
 // ========================
 
@@ -469,6 +614,28 @@ export default function StoreSettingsPage() {
 
       {/* 门店信息编辑 */}
       <StoreInfoForm store={store} storeId={storeId} />
+
+      {/* AI 门店画像展示 */}
+      <StoreProfileCard storeId={storeId} />
+
+      {/* 自营平台账号关联（自动抓取数据，需求 7） */}
+      <PlatformAccountLinkCard storeId={storeId} />
+
+      {/* 会员与积分入口 */}
+      <Link href={`/merchant/stores/${storeId}/membership`} className="block">
+        <Card className="border-amber-100 rounded-2xl hover:border-orange-300 transition-all cursor-pointer">
+          <CardContent className="flex items-center gap-3 py-4">
+            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+              <Crown className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-gray-800">会员与积分</h3>
+              <p className="text-xs text-gray-500 mt-0.5">升级会员解锁 1080p、多门店，或充值积分</p>
+            </div>
+            <ArrowLeft className="h-4 w-4 text-gray-300 rotate-180" />
+          </CardContent>
+        </Card>
+      </Link>
 
       {/* 优惠管理 */}
       <OffersManagement storeId={storeId} />

@@ -223,6 +223,17 @@ export const syncMetricsQueue = lazyQueue('sync-metrics', {
   removeOnFail: 100,
 })
 
+/**
+ * 自营账号数据自动抓取（需求 7.5/7.6）—— 受控定时调度
+ * 单账号失败在 Worker 内做隔离（标记 NEEDS_RELINK + 触发 CRAWL_FAILED 通知），
+ * 不依赖 BullMQ 重试伪造，故 attempts=1，避免整批重跑导致重复通知。
+ */
+export const crawlPlatformMetricsQueue = lazyQueue('crawl-platform-metrics', {
+  attempts: 1,
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
 /** 商家周报（第一阶段占位，后续实现自动周报） */
 export const weeklyMerchantReportQueue = lazyQueue('weekly-merchant-report', {
   attempts: 2,
@@ -252,6 +263,13 @@ export async function registerCommercializationSchedules() {
     'expiry-reminder',
     {},
     { repeat: { pattern: '0 10 * * *' } }
+  )
+
+  // 发布超时提醒：每小时扫描超过 remindAfterH（默认 24h）仍未标记发布的待发布清单项（需求 8.3）
+  await notificationQueue.add(
+    'publish-reminder',
+    {},
+    { repeat: { pattern: '0 * * * *' } }
   )
 
   // 订单过期：每 5 分钟扫描超时未支付订单
@@ -287,5 +305,14 @@ export async function registerCommercializationSchedules() {
     'reconcile-counters',
     {},
     { repeat: { pattern: '*/5 * * * *' } }
+  )
+
+  // 平台数据自动抓取：每小时触发一次扫描（需求 7.5）
+  // 实际是否抓取由 Worker 按账号 lastCrawledAt 门控（系统级最小间隔 ≥6h），
+  // 高频调度仅保证「到点即抓」，不会突破账号级频率上限。
+  await crawlPlatformMetricsQueue.add(
+    'crawl-all-accounts',
+    {},
+    { repeat: { pattern: '0 * * * *' } }
   )
 }

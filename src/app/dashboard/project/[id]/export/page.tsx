@@ -309,7 +309,7 @@ export default function ExportPage() {
             <button
               onClick={handleExport}
               disabled={!allCompleted || exporting || insufficientCredits}
-              className="rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)] disabled:cursor-not-allowed disabled:bg-[var(--cine-gold)]/50 disabled:text-[var(--cine-text-2)]"
+              className="rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-[var(--cine-ink)] transition-colors hover:bg-[var(--cine-gold-2)] disabled:cursor-not-allowed disabled:bg-[var(--cine-gold)]/50 disabled:text-[var(--cine-text-2)]"
             >
               {exporting ? '提交中...' : insufficientCredits ? '积分不足' : exportStatus?.status === 'COMPLETED' ? '重新导出（选择新分辨率）' : '开始导出'}
             </button>

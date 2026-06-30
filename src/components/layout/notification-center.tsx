@@ -207,7 +207,7 @@ export function NotificationCenter() {
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
-                className="text-xs text-[var(--cine-gold)] transition-colors hover:text-[#818cf8]"
+                className="text-xs text-[var(--cine-gold)] transition-colors hover:text-[var(--cine-gold-2)]"
               >
                 全部已读
               </button>

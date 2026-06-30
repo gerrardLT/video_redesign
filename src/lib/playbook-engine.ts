@@ -52,6 +52,35 @@ export interface PlaybookSegment {
   durationSec: number
 }
 
+/** 溯源引用所属的画像字段（需求 5.1, 5.2） */
+export type ProvenanceField = 'sellingPoint' | 'hookKeyword' | 'persona' | 'cta'
+
+/** 溯源引用被使用的位置 */
+export type ProvenanceUsedIn = 'hook' | 'caption' | 'title' | 'cta' | 'shot'
+
+/**
+ * 内容任务溯源结构体（生成时快照，落库到 ContentBrief.provenance）
+ *
+ * 记录本条 brief 在剧本实例化时实际引用了门店画像的哪些依据，用于前端「可解释」展示。
+ * - references 每条 value 必须来自画像真实取值集合（卖点/钩子词/人设/CTA），绝不伪造（需求 5.1, 5.2）
+ * - 无任何画像引用时 isGenericTemplate=true，前端如实显示「通用模板」（需求 5.6）
+ */
+export interface BriefProvenance {
+  /** 本条 brief 引用的画像依据（需求 5.1, 5.2） */
+  references: {
+    /** 引用的画像字段类别 */
+    field: ProvenanceField
+    /** 实际引用的画像内容，如「现熬8小时骨汤」 */
+    value: string
+    /** 引用被用在哪里 */
+    usedIn: ProvenanceUsedIn
+    /** 通俗话术（不暴露字段名），如「这条用了你的招牌『现熬8小时骨汤』」 */
+    plainText: string
+  }[]
+  /** 无任何画像引用时为 true → 前端显示「通用模板」（需求 5.6），不伪造 */
+  isGenericTemplate: boolean
+}
+
 /** Prisma Store 模型简化类型（仅剧本引擎所需字段） */
 export interface Store {
   id: string
@@ -153,8 +182,10 @@ export async function selectPlaybooks(input: {
   offers: ProductOffer[]
   days: number
   excludePlaybookIds?: string[]
+  // 复用权重名单（需求 1.3）：来自上轮复盘建议「复用剧本」，命中的剧本在同 goal 候选中优先选用
+  preferredPlaybookIds?: string[]
 }): Promise<Playbook[]> {
-  const { industry, goals, storeProfile, offers, days, excludePlaybookIds = [] } = input
+  const { industry, goals, storeProfile, offers, days, excludePlaybookIds = [], preferredPlaybookIds = [] } = input
 
   // 1. 从 DB 查询该行业所有激活的剧本
   const rawPlaybooks = await prisma.playbook.findMany({
@@ -226,16 +257,25 @@ export async function selectPlaybooks(input: {
     // 4. 按 scoreWeight 加权排序（views + conversion 之和，越高越优先）
     const sorted = sortByScoreWeight(candidates, offers)
 
+    // 4.1 复用权重（需求 1.3）：上轮复盘采纳的「复用剧本」在同 goal 候选中前置，
+    //     保持原有评分次序作为次级排序，命中名单者整体提到队首
+    const reuseBoosted = preferredPlaybookIds.length > 0
+      ? [
+          ...sorted.filter((pb) => preferredPlaybookIds.includes(pb.id)),
+          ...sorted.filter((pb) => !preferredPlaybookIds.includes(pb.id)),
+        ]
+      : sorted
+
     // 5. 排除连续使用超过 MAX_CONSECUTIVE_PLAYBOOK_USE 次的剧本
-    const selected = pickNonConsecutive(sorted, consecutiveTracker)
+    const selected = pickNonConsecutive(reuseBoosted, consecutiveTracker)
 
     if (selected) {
       selectedPlaybooks.push(selected)
       consecutiveTracker.push(selected.id)
     } else {
       // 所有剧本都连续使用超限，取最高分的
-      selectedPlaybooks.push(sorted[0])
-      consecutiveTracker.push(sorted[0].id)
+      selectedPlaybooks.push(reuseBoosted[0])
+      consecutiveTracker.push(reuseBoosted[0].id)
     }
   }
 
@@ -255,6 +295,8 @@ export async function selectPlaybooks(input: {
  * - 使用 LLM（qwen）润色 hook 和 caption，确保自然且不违规
  * - 生成 ShotTask 时使用日常用语描述（不用专业术语）
  * - 返回 ContentBriefDraft 类型
+ *
+ * 注意：内部委托给 instantiatePlaybookWithProvenance，仅返回 draft（保持向后兼容）。
  */
 export async function instantiatePlaybook(input: {
   playbook: Playbook
@@ -263,16 +305,43 @@ export async function instantiatePlaybook(input: {
   offer?: ProductOffer
   scheduledDate: Date
 }): Promise<ContentBriefDraft> {
+  const { draft } = await instantiatePlaybookWithProvenance(input)
+  return draft
+}
+
+/**
+ * 将剧本模板实例化为 ContentBrief 数据，同时记录画像引用溯源（需求 5.1, 5.2, 5.6）
+ *
+ * 在 instantiatePlaybook 的基础上，于「生成时」记录本条 brief 实际引用了门店画像的哪些依据：
+ * - 仅当模板真实引用了画像取值（卖点/钩子词/人设/CTA）才记录，value 必属于对应取值集合，绝不伪造
+ * - 每条引用附带通俗话术 plainText（不暴露字段名），供前端「可解释」展示
+ * - 无任何引用时 isGenericTemplate=true，前端如实显示「通用模板」（需求 5.6）
+ *
+ * 返回的 provenance 由调用方落库到 ContentBrief.provenance，作为生成时快照（需求 5.4 不回溯）。
+ */
+export async function instantiatePlaybookWithProvenance(input: {
+  playbook: Playbook
+  store: Store
+  profile: StoreProfile
+  offer?: ProductOffer
+  scheduledDate: Date
+}): Promise<{ draft: ContentBriefDraft; provenance: BriefProvenance }> {
   const { playbook, store, profile, offer, scheduledDate } = input
 
   // 构建模板变量上下文
   const vars = buildTemplateVars(store, profile, offer)
 
-  // 从模板中随机选一个并替换变量
-  const rawHook = replaceTemplateVars(pickRandom(playbook.hookTemplates), vars)
-  const rawCaption = replaceTemplateVars(pickRandom(playbook.captionTemplates), vars)
-  const rawCoverTitle = replaceTemplateVars(pickRandom(playbook.coverTitleTemplates), vars)
-  const rawCta = replaceTemplateVars(pickRandom(playbook.ctaTemplates), vars)
+  // 从模板中随机选取原始模板（保留未替换的占位符，用于溯源定位）
+  const rawHookTemplate = pickRandom(playbook.hookTemplates)
+  const rawCaptionTemplate = pickRandom(playbook.captionTemplates)
+  const rawCoverTitleTemplate = pickRandom(playbook.coverTitleTemplates)
+  const rawCtaTemplate = pickRandom(playbook.ctaTemplates)
+
+  // 替换变量
+  const rawHook = replaceTemplateVars(rawHookTemplate, vars)
+  const rawCaption = replaceTemplateVars(rawCaptionTemplate, vars)
+  const rawCoverTitle = replaceTemplateVars(rawCoverTitleTemplate, vars)
+  const rawCta = replaceTemplateVars(rawCtaTemplate, vars)
 
   // 使用 LLM 润色 hook 和 caption（失败降级为模板原文）
   const [polishedHook, polishedCaption] = await polishWithLLM(
@@ -302,6 +371,8 @@ export async function instantiatePlaybook(input: {
   // 构建 aiReasoning 说明
   const aiReasoning = buildAiReasoning(playbook, store, offer, scheduledDate)
 
+  const tags = buildTags(store, profile, offer)
+
   const draft: ContentBriefDraft = {
     title,
     goal: playbook.goal,
@@ -312,12 +383,27 @@ export async function instantiatePlaybook(input: {
     suggestedCaption: polishedCaption,
     suggestedCta: rawCta,
     platformCopies,
-    tags: buildTags(store, profile, offer),
+    tags,
     aiReasoning,
     shotTasks,
   }
 
-  return draft
+  // 生成时记录画像引用溯源（需求 5.2）
+  const provenance = buildProvenance({
+    rawTemplates: {
+      hook: rawHookTemplate,
+      caption: rawCaptionTemplate,
+      coverTitle: rawCoverTitleTemplate,
+      cta: rawCtaTemplate,
+    },
+    vars,
+    store,
+    profile,
+    offer,
+    tags,
+  })
+
+  return { draft, provenance }
 }
 
 // ========================
@@ -500,6 +586,107 @@ function replaceTemplateVars(template: string, vars: TemplateVars): string {
 function pickRandom<T>(arr: T[]): T {
   if (arr.length === 0) throw new Error('pickRandom: 模板数组为空')
   return arr[Math.floor(Math.random() * arr.length)]
+}
+
+// ========================
+// 画像引用溯源（需求 5.1, 5.2, 5.6）
+// ========================
+
+/** 去重并过滤空白字符串 */
+function uniqueNonEmpty(arr: (string | null | undefined)[]): string[] {
+  const cleaned = arr.filter(
+    (s): s is string => typeof s === 'string' && s.trim().length > 0
+  )
+  return Array.from(new Set(cleaned))
+}
+
+/**
+ * 定位某个占位符被用在哪个模板字段
+ * 按 hook > caption > title > cta 的优先级返回第一个命中的位置；都未命中返回 null
+ */
+function locatePlaceholderUsage(
+  placeholder: string,
+  rawTemplates: { hook: string; caption: string; coverTitle: string; cta: string }
+): ProvenanceUsedIn | null {
+  if (rawTemplates.hook.includes(placeholder)) return 'hook'
+  if (rawTemplates.caption.includes(placeholder)) return 'caption'
+  if (rawTemplates.coverTitle.includes(placeholder)) return 'title'
+  if (rawTemplates.cta.includes(placeholder)) return 'cta'
+  return null
+}
+
+/**
+ * 构建溯源结构体（生成时快照）
+ *
+ * 仅记录模板「真实引用」了画像取值的情况，保证 references 每条 value 必属于对应字段取值集合：
+ * - sellingPoint：value 来自 offer.sellingPoints ∪ store.mainSellingPoints，且模板含 {sellingPoint} 占位符
+ * - cta：value 来自 profile.preferredCta，且模板含 {cta} 占位符
+ * - hookKeyword：value 来自 profile.hookKeywords，且最终落入 draft.tags（标签展示在平台文案中）
+ * - persona：当前剧本实例化未将人设注入文案，故不记录，避免伪造（需求 5.6）
+ *
+ * 兜底取值（如卖点缺失时的「新鲜现做」、CTA 缺失时的默认引导语）不在任何画像集合内，
+ * 不会被记录，从而 isGenericTemplate 如实为 true。
+ */
+function buildProvenance(args: {
+  rawTemplates: { hook: string; caption: string; coverTitle: string; cta: string }
+  vars: TemplateVars
+  store: Store
+  profile: StoreProfile
+  offer?: ProductOffer
+  tags: string[]
+}): BriefProvenance {
+  const { rawTemplates, vars, store, profile, offer, tags } = args
+  const references: BriefProvenance['references'] = []
+
+  // 1. 卖点（sellingPoint）：实际填入 {sellingPoint} 的值须来自真实卖点集合
+  const sellingPointSet = uniqueNonEmpty([
+    ...(offer?.sellingPoints ?? []),
+    ...store.mainSellingPoints,
+  ])
+  if (sellingPointSet.includes(vars.sellingPoint)) {
+    const usedIn = locatePlaceholderUsage('{sellingPoint}', rawTemplates)
+    if (usedIn) {
+      references.push({
+        field: 'sellingPoint',
+        value: vars.sellingPoint,
+        usedIn,
+        plainText: `这条用了你的招牌『${vars.sellingPoint}』`,
+      })
+    }
+  }
+
+  // 2. CTA：实际填入 {cta} 的值须来自画像 preferredCta 集合
+  const ctaSet = uniqueNonEmpty(profile.preferredCta ?? [])
+  if (ctaSet.includes(vars.cta)) {
+    const usedIn = locatePlaceholderUsage('{cta}', rawTemplates)
+    if (usedIn) {
+      references.push({
+        field: 'cta',
+        value: vars.cta,
+        usedIn,
+        plainText: `这条用了你设置的引导语『${vars.cta}』`,
+      })
+    }
+  }
+
+  // 3. 钩子词（hookKeyword）：落入标签的钩子词才算被引用（标签展示于平台文案）
+  const hookKeywordSet = uniqueNonEmpty(profile.hookKeywords ?? [])
+  for (const keyword of hookKeywordSet) {
+    if (tags.includes(keyword)) {
+      references.push({
+        field: 'hookKeyword',
+        value: keyword,
+        usedIn: 'caption',
+        plainText: `这条带上了你常用的吸睛点『${keyword}』`,
+      })
+    }
+  }
+
+  return {
+    references,
+    // 无任何画像引用 → 如实标记为通用模板，绝不伪造（需求 5.6）
+    isGenericTemplate: references.length === 0,
+  }
 }
 
 // ========================

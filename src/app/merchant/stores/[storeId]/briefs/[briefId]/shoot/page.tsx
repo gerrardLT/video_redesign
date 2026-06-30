@@ -8,24 +8,31 @@
  *
  * 功能：
  * - ShotTask 列表（按 order 排序），每个显示标题、说明、状态
+ * - 拍摄前可视化引导（需求 3.1, 3.2, 3.6）：竖屏构图框示意 + 关键要点清单，小白默认全展开
+ * - 量化阈值通俗转述（需求 3.3）：用日常语言说明达标条件，不暴露技术术语
+ * - 参考图对照（需求 3.5）：展示已生成参考图；可一键生成参考画面供对照（消耗积分）
  * - 每个 ShotTask 有上传按钮（file input accept="video/*"）
  * - 上传后显示质量检测结果（QualityReportBadge）
- * - 检测不通过显示具体失败原因 + 重新上传按钮
+ * - 检测不通过显示具体失败原因 + 针对失败维度的重拍建议（需求 3.4）+ 重新上传按钮
  * - 顶部显示整体进度（X/Y 个必拍镜头已完成）
  * - 底部 "生成视频" 按钮（仅所有必拍镜头 passed 时启用）
  * - 渲染中显示进度动画（复用 SSE 进度推送）
  *
  * API 调用：
  * - GET /api/content-briefs/{briefId}/shot-tasks
+ * - GET /api/shot-tasks/{shotTaskId}/guide（拍摄前可视化引导，不消耗积分）
+ * - GET /api/shot-tasks/{shotTaskId}/reshoot-advice（质检失败重拍建议，不消耗积分）
+ * - POST /api/shot-tasks/{shotTaskId}/reference-image（生成参考图，消耗积分）
  * - POST /api/content-briefs/{briefId}/assets (FormData)
  * - DELETE /api/content-briefs/{briefId}/assets/{assetId}
  * - POST /api/content-briefs/{briefId}/render
  *
- * Requirements: 5.1, 5.2, 5.4, 5.5, 5.7, 6.7, 15.3, 15.4
+ * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 5.1, 5.2, 5.4, 5.5, 5.7, 6.7, 15.3, 15.4
  */
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import useSWR from 'swr'
 import {
   Upload,
@@ -36,12 +43,22 @@ import {
   Video,
   Trash2,
   RefreshCw,
+  Film,
+  Smartphone,
+  ListChecks,
+  Lightbulb,
+  ImageIcon,
+  Sparkles,
+  Camera,
+  Mic,
+  MicOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { useSSEProgress } from '@/hooks/use-sse-progress'
+import { BriefProvenanceCard } from '@/components/merchant'
 
 // ─── 类型定义 ───
 
@@ -83,6 +100,35 @@ interface ContentBrief {
   status: string
 }
 
+// ─── 拍摄引导相关类型（与 capture-director 服务层结构一致） ───
+
+/** 拍摄前可视化引导（GET /api/shot-tasks/[id]/guide 响应中的 guide） */
+interface CaptureGuide {
+  /** 构图示意：竖屏框 + 主体位置 + 运镜 */
+  framing: { aspect: '9:16'; subjectPosition: string; movement: string }
+  /** 已生成的参考图/示例片段 URL */
+  referenceUrls: string[]
+  /** 关键要点清单（日常语言） */
+  checklist: string[]
+  /** 硬性质检阈值（量化），前端仅用 needsAudio 与时长区间做通俗呈现 */
+  qualityThresholds: {
+    aspectRatio: { target: number; tolerancePct: number }
+    minShortSidePx: number
+    durationSec: { min: number; max: number }
+    minAvgBrightness: number
+    needsAudio: boolean
+  }
+  /** 用通俗语言转述的达标条件（不暴露技术术语） */
+  plainLanguageTips: string[]
+}
+
+/** 单条重拍建议（GET /api/shot-tasks/[id]/reshoot-advice 响应中的 advices 项） */
+interface ReshootAdvice {
+  dimension: 'orientation' | 'resolution' | 'duration' | 'brightness' | 'audio'
+  failedValue: string
+  advice: string
+}
+
 // ─── SWR Fetcher ───
 
 const fetcher = async (url: string) => {
@@ -109,7 +155,7 @@ const QUALITY_DIMENSION_LABELS: Record<string, string> = {
 
 export default function ShootUploadPage() {
   const params = useParams<{ storeId: string; briefId: string }>()
-  const { briefId } = params
+  const { storeId, briefId } = params
 
   // 获取 ShotTask 列表
   const {
@@ -157,6 +203,20 @@ export default function ShootUploadPage() {
 
   // 是否正在渲染
   const isRendering = briefStatus === 'RENDERING' || renderingState === 'rendering'
+
+  // 渲染完成（视频已生成）：brief 进入生成后态，引导去成片导出页
+  const GENERATED_STATUSES = ['GENERATED', 'COMPLIANCE_REVIEW', 'READY_TO_EXPORT', 'EXPORTED', 'PUBLISHED']
+  const isGenerated = GENERATED_STATUSES.includes(briefStatus)
+
+  // 渲染进行中时，监听 SSE 进度完成事件，及时刷新 brief 状态以翻转到「已生成」
+  useEffect(() => {
+    if (!isRendering) return
+    const entry = progressMap.get(briefId)
+    const done = entry?.status === 'completed' || (entry?.progress ?? 0) >= 100
+    if (done) {
+      void mutateBrief()
+    }
+  }, [isRendering, progressMap, briefId, mutateBrief])
 
   // ─── 上传素材 ───
   const handleUpload = useCallback(async (taskId: string, file: File) => {
@@ -272,8 +332,34 @@ export default function ShootUploadPage() {
       {/* 渲染中状态 */}
       {isRendering && <RenderingProgress progressMap={progressMap} briefId={briefId} />}
 
-      {/* ShotTask 列表 */}
+      {/* 内容溯源展示 + 画像调整入口（需求 5.1/5.3/5.5/5.6）：拍摄前知道为啥拍这条 */}
       {!isRendering && (
+        <div className="mt-4">
+          <BriefProvenanceCard storeId={storeId} briefId={briefId} />
+        </div>
+      )}
+
+      {/* 渲染完成：引导去成片导出页（闭环后半段入口） */}
+      {!isRendering && isGenerated && (
+        <div className="mt-8 flex flex-col items-center gap-4 py-12">
+          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
+            <CheckCircle2 className="h-10 w-10 text-green-500" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-800">视频已生成</h2>
+          <p className="text-sm text-gray-500 text-center">
+            已生成 3 个版本（促销/氛围/口播），去挑选并导出
+          </p>
+          <Link href={`/merchant/stores/${storeId}/briefs/${briefId}/variants`} className="w-full max-w-xs">
+            <Button className="w-full h-12 rounded-xl text-base font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-200">
+              <Film className="h-5 w-5 mr-2" />
+              查看成片并导出
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {/* ShotTask 列表 */}
+      {!isRendering && !isGenerated && (
         <div className="mt-4 space-y-3">
           {shotTasks.map((task) => (
             <ShotTaskCard
@@ -288,7 +374,7 @@ export default function ShootUploadPage() {
       )}
 
       {/* 底部生成按钮 */}
-      {!isRendering && (
+      {!isRendering && !isGenerated && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-sm border-t border-amber-100">
           <div className="max-w-lg mx-auto">
             <Button
@@ -391,6 +477,11 @@ function ShotTaskCard({ task, isUploading, onUpload, onDelete }: ShotTaskCardPro
         建议时长 {task.durationSec} 秒
       </p>
 
+      {/* 拍摄前可视化引导（小白默认全展开，需求 3.1/3.2/3.3/3.5/3.6） */}
+      <div className="mt-3 pl-9">
+        <CaptureGuidePanel shotTaskId={task.id} />
+      </div>
+
       {/* 已上传素材 & 质量检测结果 */}
       {latestAsset && (
         <div className="mt-3 pl-9">
@@ -414,6 +505,8 @@ function ShotTaskCard({ task, isUploading, onUpload, onDelete }: ShotTaskCardPro
               {latestAsset.qualityReport && (
                 <FailedDimensionsList report={latestAsset.qualityReport} />
               )}
+              {/* 针对失败维度的具体重拍建议（需求 3.4，反哺下一次拍摄） */}
+              <ReshootAdvicePanel shotTaskId={task.id} />
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
@@ -550,6 +643,293 @@ function RenderingProgress({
       <p className="text-xs text-gray-400 mt-4">
         请耐心等待，通常需要 2-5 分钟
       </p>
+    </div>
+  )
+}
+
+// ─── 重拍建议维度的中文标签（日常用语） ───
+
+const RESHOOT_DIMENSION_LABELS: Record<ReshootAdvice['dimension'], string> = {
+  orientation: '竖屏拍摄',
+  resolution: '画面清晰度',
+  duration: '拍摄时长',
+  brightness: '光线亮度',
+  audio: '声音录制',
+}
+
+// ─── 拍摄前可视化引导面板 ───
+//
+// 拉取 GET /api/shot-tasks/[id]/guide，把构图/清单/通俗达标提示/参考图对照
+// 一并展开呈现（小白默认全展开、不暴露技术术语）。
+
+function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
+  const { data, error, isLoading, mutate } = useSWR<{ guide: CaptureGuide }>(
+    `/api/shot-tasks/${shotTaskId}/guide`,
+    fetcher
+  )
+
+  // 参考图生成状态
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+  // 本次会话内刚生成的参考图（接口仅返回 URL、未落库为 RawAsset，故本地暂存即时展示）
+  const [generatedUrls, setGeneratedUrls] = useState<string[]>([])
+
+  const handleGenerateReference = useCallback(async () => {
+    setGenerating(true)
+    setGenError(null)
+    try {
+      const res = await fetch(`/api/shot-tasks/${shotTaskId}/reference-image`, {
+        method: 'POST',
+      })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // 积分不足等显式提示，不静默
+        const msg =
+          result?.error?.code === 'INSUFFICIENT_CREDITS'
+            ? '账户余额不足，充值后再生成参考图'
+            : result?.error?.message || '参考图生成失败，请稍后再试'
+        setGenError(msg)
+        return
+      }
+      // 即时展示刚生成的参考图，并刷新引导以同步后端已落库的参考图
+      if (typeof result?.referenceUrl === 'string' && result.referenceUrl) {
+        setGeneratedUrls((prev) => [result.referenceUrl, ...prev])
+      }
+      await mutate()
+    } catch {
+      setGenError('网络异常，请稍后再试')
+    } finally {
+      setGenerating(false)
+    }
+  }, [shotTaskId, mutate])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        正在准备拍摄引导...
+      </div>
+    )
+  }
+
+  // 引导拉取失败时不阻断上传主流程，给出轻提示 + 重试
+  if (error || !data?.guide) {
+    return (
+      <button
+        onClick={() => mutate()}
+        className="text-xs text-gray-400 hover:text-amber-600 flex items-center gap-1 py-2 transition-colors"
+      >
+        <RefreshCw className="h-3 w-3" />
+        拍摄引导加载失败，点此重试
+      </button>
+    )
+  }
+
+  const guide = data.guide
+  // 合并后端已落库的参考图与本次会话刚生成的参考图（去重）
+  const referenceUrls = Array.from(new Set([...generatedUrls, ...guide.referenceUrls]))
+
+  return (
+    <div className="rounded-xl bg-amber-50/60 border border-amber-100 p-3 space-y-3">
+      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-700">
+        <Camera className="h-3.5 w-3.5" />
+        拍之前先看这里
+      </div>
+
+      {/* 构图示意 + 参考图对照 */}
+      <div className="flex gap-3">
+        <VerticalFramePreview subjectPosition={guide.framing.subjectPosition} />
+
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="text-[11px] leading-relaxed text-gray-600">
+            <span className="font-medium text-gray-700">画面这样摆：</span>
+            {guide.framing.subjectPosition}
+          </div>
+          <div className="text-[11px] leading-relaxed text-gray-600">
+            <span className="font-medium text-gray-700">镜头怎么动：</span>
+            {guide.framing.movement}
+          </div>
+          {/* 是否需要录声音（通俗呈现，不暴露「音轨」术语） */}
+          <div className="flex items-center gap-1 text-[11px] text-gray-500">
+            {guide.qualityThresholds.needsAudio ? (
+              <>
+                <Mic className="h-3 w-3 text-amber-600" />
+                这个镜头要把说话声录清楚
+              </>
+            ) : (
+              <>
+                <MicOff className="h-3 w-3 text-gray-400" />
+                这个镜头不录声音也行
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 参考图对照（需求 3.5） */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600">
+          <ImageIcon className="h-3.5 w-3.5 text-amber-600" />
+          参考画面对照
+        </div>
+        {referenceUrls.length > 0 ? (
+          <div className="grid grid-cols-3 gap-2">
+            {referenceUrls.map((url) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={url}
+                src={url}
+                alt="拍摄参考画面"
+                className="aspect-[9/16] w-full rounded-lg object-cover border border-amber-100 bg-white"
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-[11px] text-gray-400">
+            还没有参考画面，点下面按钮生成一张照着拍就行
+          </p>
+        )}
+
+        <Button
+          size="sm"
+          variant="outline"
+          className="text-xs h-7 rounded-lg border-amber-300 text-amber-600 hover:bg-amber-50"
+          onClick={handleGenerateReference}
+          disabled={generating}
+        >
+          {generating ? (
+            <>
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              生成中...
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3 w-3 mr-1" />
+              {referenceUrls.length > 0 ? '再生成一张参考图' : '生成参考图'}
+            </>
+          )}
+        </Button>
+        {genError && <p className="text-[11px] text-red-500">{genError}</p>}
+      </div>
+
+      {/* 关键要点清单 */}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600">
+          <ListChecks className="h-3.5 w-3.5 text-amber-600" />
+          照着这几条拍
+        </div>
+        <ul className="space-y-1">
+          {guide.checklist.map((item, idx) => (
+            <li key={idx} className="flex items-start gap-1.5 text-[11px] text-gray-600 leading-relaxed">
+              <CheckCircle2 className="h-3 w-3 text-amber-400 flex-shrink-0 mt-0.5" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* 通俗达标提示（量化阈值的日常语言转述，不暴露技术术语） */}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600">
+          <Lightbulb className="h-3.5 w-3.5 text-amber-600" />
+          这样拍才算合格
+        </div>
+        <ul className="space-y-1">
+          {guide.plainLanguageTips.map((tip, idx) => (
+            <li key={idx} className="flex items-start gap-1.5 text-[11px] text-gray-500 leading-relaxed">
+              <span className="text-amber-400 flex-shrink-0">·</span>
+              <span>{tip}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+// ─── 竖屏构图框示意（9:16） ───
+//
+// 用纯 CSS 绘制竖屏框 + 三分构图参考线 + 主体位置标记，
+// 让小白老板拍之前直观看到画面该怎么摆。
+
+function VerticalFramePreview({ subjectPosition }: { subjectPosition: string }) {
+  return (
+    <div className="flex-shrink-0">
+      <div className="relative aspect-[9/16] w-20 rounded-lg border-2 border-amber-300 bg-gradient-to-b from-amber-100/40 to-amber-50 overflow-hidden">
+        {/* 三分构图参考线 */}
+        <div className="absolute inset-0">
+          <div className="absolute left-1/3 top-0 bottom-0 w-px bg-amber-200/70" />
+          <div className="absolute left-2/3 top-0 bottom-0 w-px bg-amber-200/70" />
+          <div className="absolute top-1/3 left-0 right-0 h-px bg-amber-200/70" />
+          <div className="absolute top-2/3 left-0 right-0 h-px bg-amber-200/70" />
+        </div>
+        {/* 主体位置标记（画面中心） */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="h-6 w-6 rounded-full border-2 border-dashed border-amber-500/80 flex items-center justify-center">
+              <Camera className="h-3 w-3 text-amber-500" />
+            </div>
+            <span className="text-[8px] text-amber-600 font-medium">主体</span>
+          </div>
+        </div>
+        {/* 竖屏标识 */}
+        <div className="absolute top-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 text-[7px] text-amber-500 font-medium">
+          <Smartphone className="h-2.5 w-2.5" />
+          竖屏
+        </div>
+      </div>
+      <p className="mt-1 text-center text-[8px] text-gray-400 w-20 leading-tight" title={subjectPosition}>
+        手机竖着拍
+      </p>
+    </div>
+  )
+}
+
+// ─── 质检失败后的重拍建议面板 ───
+//
+// 拉取 GET /api/shot-tasks/[id]/reshoot-advice，仅针对未通过维度展示具体重拍话术。
+// 无质检结果时如实提示，不伪造建议。
+
+function ReshootAdvicePanel({ shotTaskId }: { shotTaskId: string }) {
+  const { data, isLoading } = useSWR<
+    | { hasReport: true; advices: ReshootAdvice[] }
+    | { hasReport: false; message: string }
+  >(`/api/shot-tasks/${shotTaskId}/reshoot-advice`, fetcher)
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-[11px] text-gray-400 py-1">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        正在分析怎么重拍...
+      </div>
+    )
+  }
+
+  if (!data) return null
+
+  // 无质检结果：如实提示，不伪造
+  if (!data.hasReport) {
+    return <p className="text-[11px] text-gray-400">{data.message}</p>
+  }
+
+  if (data.advices.length === 0) return null
+
+  return (
+    <div className="rounded-xl bg-orange-50 border border-orange-200 p-3 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-bold text-orange-700">
+        <Lightbulb className="h-3.5 w-3.5" />
+        这样重拍就能过
+      </div>
+      <ul className="space-y-1.5">
+        {data.advices.map((adv) => (
+          <li key={adv.dimension} className="flex items-start gap-1.5 text-[11px] leading-relaxed">
+            <span className="flex-shrink-0 rounded-md bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700">
+              {RESHOOT_DIMENSION_LABELS[adv.dimension]}
+            </span>
+            <span className="text-gray-600">{adv.advice}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

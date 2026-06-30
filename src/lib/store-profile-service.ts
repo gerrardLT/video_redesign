@@ -10,6 +10,8 @@
 
 import { prisma } from '@/lib/db'
 import { Prisma } from '@/generated/prisma'
+import type { StoreProfile } from '@/generated/prisma'
+import { ApiError } from '@/lib/api-error'
 import { ABSOLUTE_CLAIMS, FALSE_POPULARITY, WEEKLY_GOAL_SCHEDULE } from '@/constants/merchant'
 import type { MerchantIndustry, WeeklyCadenceEntry } from '@/types/merchant'
 
@@ -491,4 +493,112 @@ export async function createStoreProfile(input: {
   })
 
   return storeProfile
+}
+
+// ============ 画像调整（可干预 + 可反哺）============
+
+/** 将 Prisma Json 字段安全转为 string[]（仅保留字符串元素） */
+function asStringArray(value: Prisma.JsonValue | null | undefined): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string')
+}
+
+/** 画像调整补丁 — 各字段均为可选，仅对提供的字段做调整 */
+export interface AdjustStoreProfilePatch {
+  /** 需剔除的钩子关键词（从 StoreProfile.hookKeywords 移除） */
+  removeHookKeywords?: string[]
+  /** 卖点替换（在 Store.mainSellingPoints 中将 from 替换为 to） */
+  updateSellingPoints?: { from: string; to: string }[]
+  /** 修改推荐人设（覆盖 StoreProfile.recommendedPersona） */
+  updatePersona?: string
+  /** 修改首选 CTA（整体覆盖 StoreProfile.preferredCta） */
+  updateCta?: string[]
+}
+
+/**
+ * 调整门店画像依据（需求 5.3）：剔除钩子词 / 修改卖点 / 修改人设 / 修改 CTA。
+ *
+ * 不回溯保证（需求 5.4 / Property 18）：本函数只更新 StoreProfile（及 Store 上的卖点）
+ * 的当前值，绝不改写既有 ContentBrief 的 provenance 快照——既有 brief 的溯源是生成
+ * 时的快照，天然不受影响。调整只对调整之后发起的实例化生效（后续 instantiate 读取
+ * 调整后的画像，被剔除的钩子词不再出现于新 provenance）。
+ *
+ * 卖点存储在 Store.mainSellingPoints；其余字段存储在 StoreProfile。两表更新放入同一
+ * 事务，保证一致性。纯写库操作，不消耗积分。
+ *
+ * @throws {ApiError} 门店或画像不存在时抛出 NOT_FOUND
+ * @returns 调整后的 StoreProfile
+ */
+export async function adjustStoreProfile(input: {
+  storeId: string
+  patch: AdjustStoreProfilePatch
+}): Promise<StoreProfile> {
+  const { storeId, patch } = input
+
+  return prisma.$transaction(async (tx) => {
+    // ====== 1. 读取当前门店与画像 ======
+    const store = await tx.store.findUnique({
+      where: { id: storeId },
+      select: { id: true, mainSellingPoints: true },
+    })
+    if (!store) {
+      throw new ApiError('NOT_FOUND', `门店不存在：${storeId}`, 404)
+    }
+
+    const profile = await tx.storeProfile.findUnique({
+      where: { storeId },
+    })
+    if (!profile) {
+      throw new ApiError('NOT_FOUND', `门店画像不存在：${storeId}`, 404)
+    }
+
+    // ====== 2. 计算 Store 卖点调整（mainSellingPoints 的 from→to 替换）======
+    let nextSellingPoints: string[] | undefined
+    if (patch.updateSellingPoints && patch.updateSellingPoints.length > 0) {
+      const current = asStringArray(store.mainSellingPoints)
+      // 逐条替换：将命中 from 的卖点替换为 to；未命中的保持不变
+      const replaced = current.map((point) => {
+        const hit = patch.updateSellingPoints!.find((u) => u.from === point)
+        return hit ? hit.to : point
+      })
+      // 去重，避免替换后产生重复卖点
+      nextSellingPoints = Array.from(new Set(replaced))
+    }
+
+    // ====== 3. 计算 StoreProfile 字段调整 ======
+    const profileUpdate: Prisma.StoreProfileUpdateInput = {}
+
+    // 剔除钩子关键词
+    if (patch.removeHookKeywords && patch.removeHookKeywords.length > 0) {
+      const removeSet = new Set(patch.removeHookKeywords)
+      const remaining = asStringArray(profile.hookKeywords).filter((kw) => !removeSet.has(kw))
+      profileUpdate.hookKeywords = remaining as unknown as Prisma.InputJsonValue
+    }
+
+    // 修改人设
+    if (patch.updatePersona !== undefined) {
+      profileUpdate.recommendedPersona = patch.updatePersona
+    }
+
+    // 修改首选 CTA（整体覆盖）
+    if (patch.updateCta !== undefined) {
+      profileUpdate.preferredCta = patch.updateCta as unknown as Prisma.InputJsonValue
+    }
+
+    // ====== 4. 落库（仅更新当前画像，不触碰任何既有 brief 的 provenance）======
+    if (nextSellingPoints !== undefined) {
+      await tx.store.update({
+        where: { id: storeId },
+        data: { mainSellingPoints: nextSellingPoints as unknown as Prisma.InputJsonValue },
+      })
+    }
+
+    // 即使 profileUpdate 为空也执行 update，确保返回最新 StoreProfile（updatedAt 刷新）
+    const updatedProfile = await tx.storeProfile.update({
+      where: { storeId },
+      data: profileUpdate,
+    })
+
+    return updatedProfile
+  })
 }

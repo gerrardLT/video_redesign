@@ -6,26 +6,33 @@
  * 2. 检查 ComplianceCheck 存在且 riskLevel ≠ BLOCKED (Req 10.2)
  *    - 无 ComplianceCheck 时先执行合规检查 (Req 9.10)
  *    - riskLevel=HIGH 需 acknowledgedAt 不为空 (Req 10.2)
- * 3. 确定输出分辨率（根据 tier: GROWTH+ → 1080x1920, 其他 → 720x1280）(Req 10.4)
+ * 3. 确定输出分辨率（由统一权益 getMerchantPrivileges().exportResolution 决定：
+ *    1080p → 1080x1920, 720p → 720x1280）
  * 4. FFmpeg 烧录字幕 + 重编码
  * 5. 上传到 OSS (key: merchant/{storeId}/exports/{jobId}.mp4)
  * 6. 创建 PublishJob(status=EXPORTED)
+ * 6.1 加入待发布清单 enqueueForPublish（需求 8.1，幂等）
  * 7. 返回签名下载 URL (24h 有效)
+ *
+ * 计费说明（merchant-billing-unification Req 3.5）：
+ * 本路由仅做转码 + 字幕烧录，不包含超分（upscale）处理，与视频重塑
+ * 「合并导出不扣、仅超分扣」一致，因此导出本身不扣减积分。
  *
  * 超时 180s (Req 10.1)
  * 失败时 PublishJob.status=FAILED (Req 10.6)
  *
- * Requirements: 10.1-10.7
+ * Requirements: 10.1-10.7, 2.3, 3.5, 5.3, 5.4, 8.1
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest, getMerchantByUserId } from '@/lib/merchant-auth'
-import { getMerchantTier } from '@/lib/merchant-quota-service'
+import { getMerchantPrivileges } from '@/lib/privilege-engine'
 import { runComplianceCheck } from '@/lib/compliance-service'
+import { enqueueForPublish } from '@/lib/publish-queue-service'
 import { getSignedObjectUrl, uploadFile } from '@/lib/storage'
 import { ApiError } from '@/lib/api-error'
-import { EXPORT_URL_EXPIRY_SECONDS, SUBSCRIPTION_TIERS } from '@/constants/merchant'
+import { EXPORT_URL_EXPIRY_SECONDS } from '@/constants/merchant'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { writeFile, unlink, mkdir } from 'fs/promises'
@@ -145,10 +152,11 @@ export async function POST(
       )
     }
 
-    // ─── Step 3: 确定输出分辨率 (Req 10.4) ───
-    const tier = await getMerchantTier(userId)
-    const tierConfig = SUBSCRIPTION_TIERS[tier]
-    const exportResolution = tierConfig.exportResolution // '1080p' | '720p'
+    // ─── Step 3: 确定输出分辨率（统一权益 Req 5.3 / 5.4） ───
+    // 由 getMerchantPrivileges().exportResolution 决定：FREE→720p，MONTHLY/YEARLY→1080p
+    const privileges = await getMerchantPrivileges(userId)
+    const exportResolution = privileges.exportResolution // '1080p' | '720p'
+    const tier = privileges.tier
     const outputWidth = exportResolution === '1080p' ? 1080 : 720
     const outputHeight = exportResolution === '1080p' ? 1920 : 1280
 
@@ -208,6 +216,16 @@ export async function POST(
       },
     })
     publishJobId = publishJob.id
+
+    // ─── Step 6.1: 导出成功后加入待发布清单（需求 8.1）───
+    // 导出落库（PublishJob=EXPORTED）后，将该 variant 纳入待发布清单，记录目标平台维度发布状态。
+    // enqueueForPublish 幂等：重复导出同一 variant 不产生重复清单项（每个已导出 variant 恰一个 PublishQueueItem）。
+    // 入列是发布闭环（清单 + 超时提醒）的起点，失败不静默——直接抛出让本次导出显式失败并可重试，
+    // 而非吞掉错误导致内容游离于清单之外、提醒永不触发。
+    await enqueueForPublish({
+      videoVariantId: variantId,
+      contentBriefId,
+    })
 
     // ─── Step 7: 返回签名下载 URL (24h 有效) ───
     const downloadUrl = getSignedObjectUrl(ossKey, EXPORT_URL_EXPIRY_SECONDS)

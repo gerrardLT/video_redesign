@@ -3,10 +3,16 @@
  *
  * 流程：
  * 1. 验证素材就绪（所有 required ShotTask 有 qualityScore >= 60 的素材）
- * 2. 额度检查 checkMerchantQuota(RENDER_VIDEO)
- * 3. 同质化检查 calculateContentEntropy（< 40 拒绝）
+ * 2. 同质化检查 calculateContentEntropy（< 40 拒绝）
+ * 3. 积分预检 + 入队前冻结：estimateRenderCost 估算应扣积分，
+ *    余额不足返回 402 INSUFFICIENT_CREDITS；余额足够则 reserveMerchantCredits 冻结
  * 4. 入队 render-local-video
  * 5. 返回 202 + jobId
+ *
+ * 计费模型：商家视频渲染统一消费视频重塑既有的「积分（Credit）」，
+ * 入队前按 estimateRenderCost（Σ 各分镜组 estimateGroupCreditCost）RESERVE 冻结，
+ * 渲染成功时 CHARGE 记账（差额退回）、失败时 REFUND 退款（由 local-render-service 承接）。
+ * 已废除此前本地生活自建的额度体系（checkMerchantQuota / RENDER_VIDEO）。
  *
  * 鉴权：验证 brief.store.merchant.userId === currentUserId
  *
@@ -14,26 +20,41 @@
  * - 202: { jobId: string, message: string }
  * - 400: 素材未就绪
  * - 401: 未认证
- * - 403: 无权限 / 额度不足
+ * - 402: 积分不足（含 required / balance）
+ * - 403: 无权限
  * - 404: ContentBrief 不存在
  * - 409: 已在渲染中
  * - 422: 同质化检测不通过（score < 40）
  * - 500: 服务器内部错误
  *
- * Requirements: 7.1, 7.4, 13.6, 14.7
+ * Requirements: 2.3, 3.1, 3.2, 3.7
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { checkMerchantQuota } from '@/lib/merchant-quota-service'
 import { calculateContentEntropy } from '@/lib/content-entropy-service'
+import { estimateRenderCost, reserveMerchantCredits } from '@/lib/merchant-billing-service'
+import { getBalance } from '@/lib/credit-service'
 import { renderLocalVideoQueue } from '@/lib/queue'
 import { ApiError } from '@/lib/api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>
 }
+
+/**
+ * 渲染输出的版本数量（PROMOTION / ATMOSPHERE / OWNER_TALKING）。
+ * 每个版本视为一个分镜组，参与 estimateRenderCost 求和。
+ * 与 local-render-service 中 variantTypes 的 3 个版本保持一致。
+ */
+const RENDER_VARIANT_COUNT = 3
+
+/**
+ * 渲染目标分辨率：local-render-service 固定输出 720p（720x1280 竖屏），
+ * 估算成本时透传给 estimateGroupCreditCost。
+ */
+const RENDER_RESOLUTION = '720p'
 
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
@@ -102,26 +123,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       )
     }
 
-    // 2. 额度检查
-    const quotaResult = await checkMerchantQuota(userId, 'RENDER_VIDEO')
-    if (!quotaResult.allowed) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'QUOTA_EXCEEDED',
-            message: '视频生成额度已用完',
-            details: {
-              current: quotaResult.current,
-              limit: quotaResult.limit,
-              resetDate: quotaResult.resetDate,
-            },
-          },
-        },
-        { status: 403 }
-      )
-    }
-
-    // 3. 同质化检查
+    // 2. 同质化检查
     const entropyResult = await calculateContentEntropy({
       contentBriefId: briefId,
       storeId: brief.storeId,
@@ -142,6 +144,64 @@ export async function POST(request: NextRequest, context: RouteContext) {
         },
         { status: 422 }
       )
+    }
+
+    // 3. 估算渲染积分成本并冻结（RESERVE）——入队前完成，余额不足拒绝入队
+    // 每个版本视为一个分镜组，组时长按本 brief 全部 ShotTask 的计划时长求和估算
+    // （素材编排时各版本均纳入有素材的镜头，此估值为保守上限，渲染成功后按实际时长 CHARGE，差额退回）。
+    const plannedGroupDuration = brief.shotTasks.reduce(
+      (sum, task) => sum + task.durationSec,
+      0
+    )
+    const groupDurations = Array.from(
+      { length: RENDER_VARIANT_COUNT },
+      () => plannedGroupDuration
+    )
+    const estimatedCost = estimateRenderCost(groupDurations, RENDER_RESOLUTION)
+
+    // 余额预检：不足则返回 402，携带 required / balance 供前端提示，绝不入队
+    const balance = await getBalance(userId)
+    if (balance < estimatedCost) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'INSUFFICIENT_CREDITS',
+            message: `积分不足：本次渲染需 ${estimatedCost} 积分，当前余额 ${balance}`,
+            details: { required: estimatedCost, balance },
+          },
+        },
+        { status: 402 }
+      )
+    }
+
+    // 正式冻结：经 withCreditLock 串行化写入 RESERVE 流水（jobId 恒为 null，关联走 CONTENT_BRIEF/briefId）。
+    // 并发场景下余额可能在预检后被其他操作扣减，reserveMerchantCredits 会再次校验并抛 402。
+    try {
+      await reserveMerchantCredits({
+        userId,
+        bizRefType: 'CONTENT_BRIEF',
+        bizRefId: briefId,
+        amount: estimatedCost,
+        remark: `[MERCHANT_RENDER] 渲染冻结 ${estimatedCost} 积分（brief=${briefId}）`,
+      })
+    } catch (reserveError) {
+      if (
+        reserveError instanceof ApiError &&
+        reserveError.code === 'INSUFFICIENT_CREDITS'
+      ) {
+        const latestBalance = await getBalance(userId)
+        return NextResponse.json(
+          {
+            error: {
+              code: 'INSUFFICIENT_CREDITS',
+              message: reserveError.message,
+              details: { required: estimatedCost, balance: latestBalance },
+            },
+          },
+          { status: 402 }
+        )
+      }
+      throw reserveError
     }
 
     // 4. 入队 render-local-video

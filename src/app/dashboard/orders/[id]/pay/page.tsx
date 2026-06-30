@@ -225,7 +225,7 @@ export default function PaymentWaitPage() {
             </p>
             <button
               onClick={() => router.push('/dashboard/packages')}
-              className="w-full rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)]"
+              className="w-full rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-[var(--cine-ink)] transition-colors hover:bg-[var(--cine-gold-2)]"
             >
               重新下单
             </button>

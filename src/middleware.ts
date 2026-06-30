@@ -12,7 +12,7 @@ const PUBLIC_API_PATHS = [
 ]
 
 // 需要保护的页面路径前缀
-const PROTECTED_PAGE_PREFIXES = ['/dashboard', '/admin', '/projects', '/project']
+const PROTECTED_PAGE_PREFIXES = ['/dashboard', '/admin', '/projects', '/project', '/merchant']
 
 function getJwtSecret(): Uint8Array {
   // 必须由环境变量 JWT_SECRET 提供；缺失即抛错，禁止默认回退密钥
@@ -77,15 +77,23 @@ export async function middleware(request: NextRequest) {
     }
 
     try {
-      await jwtVerify(token, getJwtSecret())
-      return NextResponse.next()
-    } catch {
-      // P1 修复：token 过期时清除无效 cookie 并跳转登录
+      const { payload } = await jwtVerify(token, getJwtSecret())
+      const userId = payload.userId as string
+      const userRole = payload.role as string
+
+      // 在请求头中注入用户信息供 Server Component 使用（与 API 分支行为一致）
+      const requestHeaders = new Headers(request.headers)
+      requestHeaders.set('x-user-id', userId)
+      requestHeaders.set('x-user-role', userRole)
+
+      return NextResponse.next({
+        request: { headers: requestHeaders },
+      })
+    } catch (err) {
+      console.error('[middleware] 页面保护 JWT 验证失败:', pathname, err instanceof Error ? err.message : String(err))
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
-      const response = NextResponse.redirect(loginUrl)
-      response.cookies.delete('token')
-      return response
+      return NextResponse.redirect(loginUrl)
     }
   }
 
@@ -93,5 +101,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/dashboard/:path*', '/admin/:path*', '/projects/:path*', '/project/:path*'],
+  matcher: ['/api/:path*', '/dashboard/:path*', '/admin/:path*', '/projects/:path*', '/project/:path*', '/merchant', '/merchant/:path*'],
 }

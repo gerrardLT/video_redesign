@@ -1,19 +1,30 @@
 'use client'
 
 /**
- * 数据建议页
+ * 数据复盘页
  *
- * 展示内容：
- * 1. 数据录入表单（MetricsInputForm）— 手动录入各平台表现数据
- * 2. 优化建议列表（PerformanceInsightCard）— 基于历史数据的智能建议
- * 3. 已录入数据历史表格 — 查看过往录入记录
+ * 把「AI 已算出但前端只读 / 未渲染」的复盘产物，接上「可解释 / 可干预 / 可反哺」三件套：
+ * 1. 数据录入表单（MetricsInputForm）— 手动录入各平台表现数据（brief 维度）
+ * 2. 复盘建议（门店维度）— 渲染 suggestions（含 evidence 通俗话术）；不足 3 条带数据的内容时
+ *    显式提示「再录入 N 条即可解锁优化建议」，不伪造（需求 1.1, 1.2, 1.6）
+ * 3. 「下周怎么做」应用面板（InsightsActionPanel）— 一键把推荐目标 / 复用 / 规避写入下一轮计划（需求 1.3, 1.7）
+ * 4. 指标趋势图（MetricTrendChart）— 门店历史在选定指标上的变化（需求 1.4）
+ * 5. 跨周对比（PeriodComparisonCard）— 本周 vs 上周关键指标增减（需求 1.5）
+ * 6. 已录入数据历史表格 — 查看过往录入记录
  *
- * API:
- * - POST /api/content-briefs/{briefId}/metrics — 提交数据
- * - GET /api/content-briefs/{briefId}/metrics — 获取历史数据
- * - GET /api/content-briefs/{briefId}/insights — 获取优化建议
+ * 复盘建议 / 趋势 / 跨周对比均为「门店维度」聚合，故调用 store-scoped API：
+ * - GET  /api/stores/{storeId}/insights                   解锁门控 + 洞察
+ * - POST /api/stores/{storeId}/insights/apply             应用建议（在子组件内）
+ * - GET  /api/stores/{storeId}/metrics/trend?metric=xxx   指标趋势（在子组件内）
+ * - GET  /api/stores/{storeId}/metrics/period-comparison  跨周对比（在子组件内）
  *
- * Requirements: 11.1, 12.1, 15.2
+ * 数据录入 / 历史仍为「内容维度」：
+ * - POST /api/content-briefs/{briefId}/metrics  提交数据
+ * - GET  /api/content-briefs/{briefId}/metrics  获取历史数据
+ *
+ * 以上读取均不消耗积分。
+ *
+ * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7
  */
 
 import { useParams } from 'next/navigation'
@@ -23,8 +34,11 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MetricsInputForm } from '@/components/merchant/MetricsInputForm'
 import { PerformanceInsightCard } from '@/components/merchant/PerformanceInsightCard'
-import { TrendingUp, History, Lightbulb } from 'lucide-react'
-import type { PublishPlatform, Suggestion } from '@/types/merchant'
+import { InsightsActionPanel } from '@/components/merchant/InsightsActionPanel'
+import { MetricTrendChart } from '@/components/merchant/MetricTrendChart'
+import { PeriodComparisonCard } from '@/components/merchant/PeriodComparisonCard'
+import { TrendingUp, History, Lightbulb, LineChart, CalendarRange, Lock } from 'lucide-react'
+import type { PublishPlatform, PerformanceInsights } from '@/types/merchant'
 
 // ========================
 // 类型定义
@@ -47,13 +61,14 @@ interface MetricRecord {
   capturedAt: string
 }
 
-/** 优化建议响应 */
-interface InsightsResponse {
-  suggestions: Suggestion[]
-  recommendedNextGoals: string[]
-  playbooksToReuse: string[]
-  playbooksToAvoid: string[]
-}
+/**
+ * 复盘洞察解锁门控响应（store-scoped）：
+ * - unlocked=false 时仅含 remaining（还需录入几条带数据的内容才解锁）
+ * - unlocked=true 时含完整 insights
+ */
+type InsightsGateResponse =
+  | { unlocked: false; remaining: number }
+  | { unlocked: true; insights: PerformanceInsights }
 
 /** 平台显示名映射 */
 const PLATFORM_LABELS: Record<PublishPlatform, string> = {
@@ -78,8 +93,9 @@ async function fetcher<T>(url: string): Promise<T> {
 export default function MetricsPage() {
   const params = useParams()
   const briefId = params.briefId as string
+  const storeId = params.storeId as string
 
-  // 使用 SWR 获取历史数据
+  // brief 维度：历史录入数据
   const {
     data: metricsData,
     isLoading: metricsLoading,
@@ -90,20 +106,20 @@ export default function MetricsPage() {
     { revalidateOnFocus: false }
   )
 
-  // 使用 SWR 获取优化建议
+  // 门店维度：复盘洞察（含解锁门控）
   const {
-    data: insights,
+    data: gate,
     isLoading: insightsLoading,
     mutate: mutateInsights,
-  } = useSWR<InsightsResponse>(
-    briefId ? `/api/content-briefs/${briefId}/insights` : null,
+  } = useSWR<InsightsGateResponse>(
+    storeId ? `/api/stores/${storeId}/insights` : null,
     fetcher,
     { revalidateOnFocus: false }
   )
 
   const metrics = metricsData ?? []
 
-  /** 录入成功后刷新数据 */
+  /** 录入成功后刷新数据（历史 + 洞察均可能变化） */
   function handleSubmitSuccess() {
     void mutateMetrics()
     void mutateInsights()
@@ -114,13 +130,13 @@ export default function MetricsPage() {
       {/* 页面标题 */}
       <div className="flex items-center gap-2">
         <TrendingUp className="h-6 w-6 text-amber-600" />
-        <h1 className="text-xl font-bold text-amber-900">数据与建议</h1>
+        <h1 className="text-xl font-bold text-amber-900">数据复盘</h1>
       </div>
 
-      {/* 数据录入表单 */}
+      {/* 数据录入表单（内容维度） */}
       <MetricsInputForm briefId={briefId} onSuccess={handleSubmitSuccess} />
 
-      {/* 优化建议列表 */}
+      {/* 优化建议（门店维度，含解锁门控） */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <Lightbulb className="h-5 w-5 text-amber-500" />
@@ -132,26 +148,49 @@ export default function MetricsPage() {
             <Skeleton className="h-24 rounded-xl" />
             <Skeleton className="h-24 rounded-xl" />
           </div>
-        ) : insights && insights.suggestions.length > 0 ? (
-          <div className="space-y-3">
-            {insights.suggestions.map((suggestion, index) => (
-              <PerformanceInsightCard key={index} suggestion={suggestion} />
-            ))}
-          </div>
+        ) : gate && gate.unlocked ? (
+          <InsightsUnlocked storeId={storeId} insights={gate.insights} />
+        ) : gate && !gate.unlocked ? (
+          // 不足 3 条带数据的内容：显式提示解锁门槛，不伪造建议
+          <Card className="border-amber-100 bg-amber-50/50">
+            <CardContent className="py-8 text-center">
+              <Lock className="h-7 w-7 text-amber-300 mx-auto mb-2" />
+              <p className="text-sm font-medium text-amber-800">
+                再录入 {gate.remaining} 条即可解锁优化建议
+              </p>
+              <p className="mt-1 text-xs text-amber-600">
+                录满 3 条带数据的内容后，系统会自动分析并给出可应用的下周建议
+              </p>
+            </CardContent>
+          </Card>
         ) : (
           <Card className="border-amber-100 bg-amber-50/50">
             <CardContent className="py-8 text-center">
-              <p className="text-sm text-amber-700">
-                {metrics.length < 3
-                  ? '录入至少 3 条数据后，系统将自动分析并给出优化建议'
-                  : '暂无优化建议'}
-              </p>
+              <p className="text-sm text-amber-700">复盘数据加载失败，请稍后重试</p>
             </CardContent>
           </Card>
         )}
       </section>
 
-      {/* 已录入数据历史 */}
+      {/* 指标趋势（门店维度） */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <LineChart className="h-5 w-5 text-amber-500" />
+          <h2 className="text-base font-semibold text-amber-900">指标趋势</h2>
+        </div>
+        <MetricTrendChart storeId={storeId} />
+      </section>
+
+      {/* 跨周对比（门店维度） */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <CalendarRange className="h-5 w-5 text-amber-500" />
+          <h2 className="text-base font-semibold text-amber-900">跨周对比</h2>
+        </div>
+        <PeriodComparisonCard storeId={storeId} />
+      </section>
+
+      {/* 已录入数据历史（内容维度） */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <History className="h-5 w-5 text-amber-500" />
@@ -179,6 +218,47 @@ export default function MetricsPage() {
           </Card>
         )}
       </section>
+    </div>
+  )
+}
+
+// ========================
+// 子组件：已解锁的洞察（建议列表 + 应用面板）
+// ========================
+
+function InsightsUnlocked({
+  storeId,
+  insights,
+}: {
+  storeId: string
+  insights: PerformanceInsights
+}) {
+  const hasSuggestions = insights.suggestions.length > 0
+
+  return (
+    <div className="space-y-3">
+      {/* 建议列表（含 evidence 可解释） */}
+      {hasSuggestions ? (
+        insights.suggestions.map((suggestion, index) => (
+          <PerformanceInsightCard key={index} suggestion={suggestion} />
+        ))
+      ) : (
+        <Card className="border-amber-100 bg-amber-50/50">
+          <CardContent className="py-6 text-center">
+            <p className="text-sm text-amber-700">
+              当前数据暂未发现明显的优化点，保持节奏继续创作即可
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 「下周怎么做」应用面板（可反哺） */}
+      <InsightsActionPanel
+        storeId={storeId}
+        recommendedNextGoals={insights.recommendedNextGoals}
+        playbooksToReuse={insights.playbooksToReuse}
+        playbooksToAvoid={insights.playbooksToAvoid}
+      />
     </div>
   )
 }

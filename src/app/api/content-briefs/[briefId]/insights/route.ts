@@ -3,23 +3,26 @@
  *
  * 流程：
  * 1. 鉴权并验证归属关系
- * 2. 额度检查 ACCESS_INSIGHTS（仅 GROWTH/AGENCY 可用）
+ * 2. 按 User_Tier 权益门控数据洞察（getMerchantPrivileges().insightsEnabled）
  * 3. 调用 performance-learning-service 生成洞察
+ *
+ * 计费说明：数据洞察访问（ACCESS_INSIGHTS）不按次扣减积分，
+ * 是否可访问改由统一会员权益（Privilege_Mapping）门控。
  *
  * 响应：
  * - 200: { insights: PerformanceInsights }
  * - 401: 未认证
- * - 403: 无权限 / 订阅等级不足
+ * - 403: 无权限 / 会员等级未开放数据洞察（INSIGHTS_NOT_AVAILABLE）
  * - 404: ContentBrief 不存在
  * - 500: 服务器内部错误
  *
- * Requirements: 12.1-12.7, 14.6
+ * Requirements: 2.3, 3.6, 5.6
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { checkMerchantQuota } from '@/lib/merchant-quota-service'
+import { getMerchantPrivileges } from '@/lib/privilege-engine'
 import { generatePerformanceInsights } from '@/lib/performance-learning-service'
 import { ApiError } from '@/lib/api-error'
 
@@ -57,14 +60,14 @@ export async function GET(
       )
     }
 
-    // 3. 额度检查 ACCESS_INSIGHTS（仅 GROWTH/AGENCY 可用）
-    const quotaResult = await checkMerchantQuota(userId, 'ACCESS_INSIGHTS')
-    if (!quotaResult.allowed) {
+    // 3. 数据洞察权益门控（不扣减积分，仅按 User_Tier 权益判定）
+    const privileges = await getMerchantPrivileges(userId)
+    if (!privileges.insightsEnabled) {
       return NextResponse.json(
         {
           error: {
-            code: 'QUOTA_EXCEEDED',
-            message: '当前订阅等级不支持数据分析功能，请升级到 GROWTH 或 AGENCY',
+            code: 'INSIGHTS_NOT_AVAILABLE',
+            message: '当前会员等级未开放数据洞察功能，升级到月卡或年卡会员即可使用',
           },
         },
         { status: 403 }

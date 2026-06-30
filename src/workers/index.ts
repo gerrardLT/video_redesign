@@ -236,6 +236,14 @@ async function startWorkers() {
     console.error('[Workers] ❌ weekly-merchant-report Worker 启动失败:', err)
   }
 
+  try {
+    const mod = await import('./crawl-platform-metrics')
+    registerWorker(mod)
+    console.log('[Workers] ✅ crawl-platform-metrics Worker 已启动')
+  } catch (err) {
+    console.error('[Workers] ❌ crawl-platform-metrics Worker 启动失败:', err)
+  }
+
   // 注册所有 Repeatable 定时调度任务（资产清理、过期提醒、订单过期、解析看门狗、订阅到期、并发对账）
   try {
     const { registerCommercializationSchedules } = await import('../lib/queue')

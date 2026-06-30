@@ -462,27 +462,3 @@ export interface EntropyResult {
   reasons: EntropyReason[]
 }
 
-
-// ========================
-// 订阅额度管理
-// ========================
-
-/** 需要额度检查的操作类型 */
-export type QuotaAction =
-  | 'CREATE_STORE'
-  | 'CREATE_CONTENT_PLAN'
-  | 'RENDER_VIDEO'
-  | 'EXPORT_VIDEO'
-  | 'ACCESS_INSIGHTS'
-
-/** 额度检查结果 */
-export interface QuotaCheckResult {
-  /** 是否允许执行该操作 */
-  allowed: boolean
-  /** 当前已使用数量 */
-  current: number
-  /** 额度上限（-1 表示无限） */
-  limit: number
-  /** 额度重置日期（仅月度额度有值，FREE 终身额度无重置日期） */
-  resetDate?: Date
-}

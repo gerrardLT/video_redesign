@@ -499,7 +499,7 @@ function CreditsTab({ packages }: { packages: CreditPackage[] }) {
             {/* 购买按钮 */}
             <button
               onClick={() => handleBuyClick(pkg)}
-              className="mt-6 w-full rounded-lg bg-[var(--cine-gold)] py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold)]/90"
+              className="mt-6 w-full rounded-lg bg-[var(--cine-gold)] py-2.5 text-sm font-medium text-[var(--cine-ink)] transition-colors hover:bg-[var(--cine-gold)]/90"
             >
               立即购买
             </button>

@@ -63,7 +63,7 @@ export default function DashboardLayout({
 
   return (
     <OnboardingProvider isAuthenticated={!!user}>
-      <div className="min-h-screen bg-[var(--cine-bg)]">
+      <div data-surface="studio" className="min-h-screen bg-[var(--cine-bg)]">
         {/* 顶部导航栏 */}
         <header className="sticky top-0 z-50 border-b border-[var(--cine-line-2)] bg-[var(--cine-bg-80)] backdrop-blur-sm">
           <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">

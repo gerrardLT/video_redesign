@@ -137,7 +137,7 @@ export default function ShowcaseDetailPage() {
         <p className="mb-4 text-lg text-[var(--cine-text-2)]">{error || '案例不存在'}</p>
         <button
           onClick={() => router.push('/showcase')}
-          className="inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)]"
+          className="inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-[var(--cine-ink)] transition-colors hover:bg-[var(--cine-gold-2)]"
         >
           返回案例列表
         </button>

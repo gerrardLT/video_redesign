@@ -288,6 +288,8 @@ model CreditLedger {
   orderId             String?  @map("order_id") // 充值订单关联
   projectId           String?  @map("project_id") // 解析阶段扣费关联（无 GenerationJob 时使用）
   subscriptionOrderId String?  @map("subscription_order_id") // 订阅积分发放关联
+  bizRefType          String?  @map("biz_ref_type") // 商家操作实体关联类型：CONTENT_BRIEF | CONTENT_PLAN | STORE（可空、无外键）
+  bizRefId            String?  @map("biz_ref_id") // 对应商家实体主键（无外键约束，避免 jobId 外键违约）
   action              String // RESERVE | CHARGE | REFUND | TOPUP | ADMIN_ADJUST | SUBSCRIPTION_GRANT
   amount              Int // 正数为增加，负数为减少
   balanceAfter        Int      @map("balance_after")
@@ -304,6 +306,7 @@ model CreditLedger {
   @@index([orderId])
   @@index([projectId])
   @@index([subscriptionOrderId])
+  @@index([bizRefType, bizRefId]) // 按商家实体关联键查询 / 幂等检查
   @@map("credit_ledger")
 }
 
@@ -893,6 +896,9 @@ model ContentBrief {
   platformCopies      Json? // Record<PublishPlatform, PlatformCopy> - 各平台文案
   tags                Json? // string[] - 标签列表
   aiReasoning         String? // AI 决策推理记录
+  provenance          Json? // BriefProvenance - 生成时的画像引用快照（需求 5.1,5.2,5.4）
+  copyEdited          Boolean            @default(false) // 人工修改文案标记，自动流程不得静默覆盖（需求 2.3,2.8）
+  planInputId         String? // 关联采纳的复盘建议输入 PlanGenerationInput.id（需求 1.7 反哺标注）
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -989,6 +995,7 @@ model VideoVariant {
   subtitles      Json? // { text: string, startSec: number, endSec: number }[] - 字幕序列
   renderParams   Json? // FFmpeg 渲染参数记录
   generationLog  Json? // Seedance 生成调用记录
+  regenScope     Json? // 上次局部重渲染的受影响分镜组集合（需求 4.5 追溯）
   score          Float? // AI 质量评分
   isSelected     Boolean          @default(false)
   createdAt      DateTime         @default(now())
@@ -1129,4 +1136,106 @@ model SocialAccount {
   @@index([storeId])
   @@index([platform])
   @@map("social_accounts")
+}
+
+// ============ 本地生活深化改造（三件套反馈控制回路）新增表 ============
+// 均为 additive-only：独立新表，不修改/删除既有表与列
+
+/// 复盘建议固化为下一轮内容计划生成输入（需求 1.3,1.7）
+/// 由 performance-learning-service.applyInsights 写入，content-calendar-service 一次性消费
+model PlanGenerationInput {
+  id                String    @id @default(cuid())
+  storeId           String
+  acceptedNextGoals Json? // ContentGoal[] - 采纳的推荐下周目标
+  reusePlaybookIds  Json? // string[] - 提升复用权重的剧本
+  avoidPlaybookIds  Json? // string[] - 规避名单
+  acceptedSummaries Json // string[] - 用于计划"已采纳上轮复盘建议:<摘要>"标注
+  consumedAt        DateTime? // 被某次 content-plan 生成消费的时间（一次性）
+  createdAt         DateTime  @default(now())
+
+  @@index([storeId])
+  @@index([consumedAt])
+  @@map("plan_generation_inputs")
+}
+
+/// 平台账号会话凭证（需求 7.3,7.4）—— cookie 加密存储，仅抓取商家本人账号数据
+model PlatformAccount {
+  id              String          @id @default(cuid())
+  storeId         String
+  platform        PublishPlatform
+  encryptedCookie String // 服务端加密后的会话凭证，禁止明文/禁止入 Git
+  authConfirmed   Boolean         @default(false) // 风险告知后的授权确认（需求 7.2）
+  status          String          @default("ACTIVE") // ACTIVE | NEEDS_RELINK（需求 7.6）
+  lastCrawledAt   DateTime? // 抓取频率门控（需求 7.5）
+  crawlIntervalH  Int             @default(24) // 6-24h 可配置
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([storeId, platform])
+  @@index([status])
+  @@index([lastCrawledAt])
+  @@map("platform_accounts")
+}
+
+/// 待发布清单（需求 8.1,8.2,8.4）—— 导出成功后加入，记录各平台发布状态
+model PublishQueueItem {
+  id                 String   @id @default(cuid())
+  storeId            String
+  contentBriefId     String
+  videoVariantId     String
+  exportedAt         DateTime @default(now())
+  remindAfterH       Int      @default(24) // 超时提醒时长（需求 8.3 可配置）
+  reminded           Boolean  @default(false)
+  publishedPlatforms Json     @default("[]") // { platform, publishedAt }[]（需求 8.4）
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([storeId])
+  @@index([contentBriefId])
+  @@index([reminded, exportedAt])
+  @@map("publish_queue_items")
+}
+
+/// 门店作用域通知中心（需求 9.3）—— 已读/未读，承接过期/发布/抓取失效/里程碑提醒
+/// 注：与既有 user 作用域 Notification 区分，命名为 StoreNotification（映射表 store_notifications）
+model StoreNotification {
+  id         String   @id @default(cuid())
+  storeId    String
+  type       String // EXPIRY | PUBLISH_REMINDER | CRAWL_FAILED | MILESTONE
+  title      String
+  body       String
+  actionHref String?
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([storeId, read])
+  @@index([createdAt])
+  @@map("store_notifications")
+}
+
+/// 计划某天锁定/跳过状态（需求 6.5）—— 下一轮自动生成尊重该状态
+model CalendarDayState {
+  id        String   @id @default(cuid())
+  storeId   String
+  date      DateTime
+  state     String   @default("NORMAL") // NORMAL | LOCKED | SKIPPED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, date])
+  @@index([storeId])
+  @@map("calendar_day_states")
+}
+
+/// 连续创作/里程碑记录（需求 11.1,11.2）—— 每门店一条
+model StreakRecord {
+  id             String    @id @default(cuid())
+  storeId        String    @unique
+  currentDays    Int       @default(0)
+  currentWeeks   Int       @default(0)
+  lastActiveDate DateTime?
+  milestones     Json      @default("[]") // 已达成里程碑标识[]
+  updatedAt      DateTime  @updatedAt
+
+  @@map("streak_records")
 }

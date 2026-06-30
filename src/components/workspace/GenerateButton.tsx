@@ -105,9 +105,9 @@ export function GenerateButton() {
       disabled={isDisabled}
       className={cn(
         'group relative inline-flex items-center gap-2 h-8 pl-3 pr-3.5 rounded-full text-xs font-medium transition-all duration-200',
-        'bg-gradient-to-r from-[var(--cine-gold)] to-amber-500',
+        'bg-gradient-to-r from-[var(--cine-gold)] to-[var(--cine-gold-2)]',
         'text-[var(--cine-bg)]',
-        'hover:brightness-110 hover:shadow-[0_4px_16px_rgba(245,166,35,0.3)]',
+        'hover:brightness-110 hover:shadow-[0_4px_16px_rgba(199,168,119,0.35)]',
         'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none',
         !isDisabled && 'animate-[gentle-pulse_3s_ease-in-out_infinite]'
       )}

@@ -24,8 +24,8 @@ export default async function MerchantHomePage() {
     redirect('/login')
   }
 
-  // 查询用户关联的商家及门店
-  const merchant = await prisma.merchant.findUnique({
+  // 查询用户关联的商家及门店（userId 非 unique，用 findFirst）
+  const merchant = await prisma.merchant.findFirst({
     where: { userId },
     include: {
       stores: {

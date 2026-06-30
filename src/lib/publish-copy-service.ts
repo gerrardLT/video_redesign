@@ -7,7 +7,16 @@
  * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6
  */
 
-import { PLATFORM_CAPTION_LIMITS } from '@/constants/merchant'
+import { randomUUID } from 'crypto'
+import { PLATFORM_CAPTION_LIMITS, CREDIT_COST_COPY_REWRITE } from '@/constants/merchant'
+import { prisma } from './db'
+import { ApiError } from './api-error'
+import { getBalance } from './credit-service'
+import {
+  reserveMerchantCredits,
+  chargeMerchantCredits,
+  refundMerchantCredits,
+} from './merchant-billing-service'
 import type {
   VideoVariantType,
   PublishPlatform,
@@ -168,6 +177,9 @@ export async function generatePublishCopy(input: {
 
 /**
  * 为单个平台调用 LLM 生成文案
+ *
+ * 当传入 existingCopy 时进入「按平台改写」模式（需求 2.4）：把现有文案作为输入，
+ * 要求 LLM 在保留核心卖点/优惠信息的前提下，按目标平台调性重写，而非凭空新作。
  */
 async function generatePlatformCopy(input: {
   platform: PublishPlatform
@@ -175,8 +187,10 @@ async function generatePlatformCopy(input: {
   store: Store
   profile: StoreProfile
   offer?: ProductOffer
+  /** 现有文案；存在时进入按平台改写模式（需求 2.4） */
+  existingCopy?: PlatformCopy | null
 }): Promise<PlatformCopy | null> {
-  const { platform, variantType, store, profile, offer } = input
+  const { platform, variantType, store, profile, offer, existingCopy } = input
 
   const captionLimit = PLATFORM_CAPTION_LIMITS[platform as keyof typeof PLATFORM_CAPTION_LIMITS] ?? 300
   const styleGuide = PLATFORM_STYLE_GUIDE[platform] ?? '自然口语化表达'
@@ -239,6 +253,18 @@ ${styleGuide}`
   userPrompt += `
 
 请为 ${platform} 平台生成发布文案，正文不超过 ${captionLimit} 个字符。`
+
+  // 按平台改写模式（需求 2.4）：注入现有文案，要求按目标平台调性重写而非凭空新作
+  if (existingCopy) {
+    userPrompt += `
+
+## 待改写的现有文案（请按 ${platform} 平台调性重写，保留门店核心卖点与优惠信息，仅调整表达风格/结构/标签）
+- 标题：${existingCopy.title}
+- 封面文字：${existingCopy.coverTitle}
+- 正文：${existingCopy.caption}
+- 标签：${existingCopy.tags.join('、')}
+- CTA：${existingCopy.cta}`
+  }
 
   try {
     const response = await fetch(`${LLM_API_URL}/chat/completions`, {
@@ -457,4 +483,308 @@ function getVariantLabel(variantType: VideoVariantType): string {
  */
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// ============================================================
+// 就地保存 / 重新生成 / 按平台改写（local-life-depth-enhancements 需求 2.1/2.2/2.4）
+//
+// 计费一致性（需求 0.6/0.7/0.8）：消耗积分的动作（重新生成文案 / 按平台改写）统一复用既有
+// credit-service（reserve→charge/refund）+ withCreditLock 全局锁；执行外部 LLM 推理前先做
+// 余额预检（不足显式抛 INSUFFICIENT_CREDITS，禁止先扣后退），绝不在 withCreditLock 内重入。
+//
+// 人工修改标记保护（需求 2.3/2.8）：目标 brief.copyEdited=true 且未 confirmOverwrite 时
+// 抛 CONFIRM_OVERWRITE_REQUIRED 需确认，不替换文案、不清除标记；仅当 confirmOverwrite=true
+// 或 copyEdited=false 时方可替换，并在替换后清除标记（置 copyEdited=false）。
+// ============================================================
+
+/** Prisma Json 数组字段安全转 string[]（非数组时返回空数组） */
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item)) : []
+}
+
+/** 文案上下文：从 ContentBrief 装配 LLM 生成所需的门店 / 画像 / 优惠信息 */
+interface CopyContext {
+  store: Store
+  profile: StoreProfile
+  offer?: ProductOffer
+  variantType: VideoVariantType
+  /** 现有平台文案（用于按平台改写模式的输入，可能不存在） */
+  existingCopy: PlatformCopy | null
+  /** 该 brief 是否已被人工编辑（人工修改标记） */
+  copyEdited: boolean
+}
+
+/**
+ * 装配指定 brief + 平台的文案生成上下文。
+ *
+ * 从 ContentBrief 读取关联门店与画像；存在 offerId 时加载优惠并采用 PROMOTION 版本类型
+ * （PROMOTION 必须含 offer），否则采用 ATMOSPHERE。画像缺失时显式抛错（无 fallback）。
+ */
+async function loadCopyContext(
+  contentBriefId: string,
+  platform: PublishPlatform
+): Promise<CopyContext> {
+  const brief = await prisma.contentBrief.findUniqueOrThrow({
+    where: { id: contentBriefId },
+    include: { store: { include: { profile: true } } },
+  })
+
+  if (!brief.store.profile) {
+    throw new ApiError(
+      'NOT_FOUND',
+      `[publish-copy] 门店画像缺失，无法生成文案：storeId=${brief.storeId}`,
+      404
+    )
+  }
+
+  // 加载关联优惠（若有）；PROMOTION 版本必须携带 offer
+  let offer: ProductOffer | undefined
+  if (brief.offerId) {
+    const offerRow = await prisma.productOffer.findUnique({ where: { id: brief.offerId } })
+    if (offerRow) {
+      offer = {
+        id: offerRow.id,
+        name: offerRow.name,
+        description: offerRow.description,
+        originalPrice: offerRow.originalPrice,
+        salePrice: offerRow.salePrice,
+        sellingPoints: asStringArray(offerRow.sellingPoints),
+        usageRules: offerRow.usageRules,
+      }
+    }
+  }
+
+  const variantType: VideoVariantType = offer ? 'PROMOTION' : 'ATMOSPHERE'
+
+  const store: Store = {
+    id: brief.store.id,
+    name: brief.store.name,
+    industry: brief.store.industry,
+    city: brief.store.city,
+    district: brief.store.district,
+    businessArea: brief.store.businessArea,
+    mainProducts: asStringArray(brief.store.mainProducts),
+    mainSellingPoints: asStringArray(brief.store.mainSellingPoints),
+  }
+
+  const profile: StoreProfile = {
+    id: brief.store.profile.id,
+    storeId: brief.store.profile.storeId,
+    contentPositioning: brief.store.profile.contentPositioning,
+    recommendedPersona: brief.store.profile.recommendedPersona,
+    hookKeywords: asStringArray(brief.store.profile.hookKeywords),
+    forbiddenClaims: asStringArray(brief.store.profile.forbiddenClaims),
+    preferredCta: asStringArray(brief.store.profile.preferredCta),
+  }
+
+  // 读取该平台现有文案（按平台改写模式的输入）
+  const platformCopies = (brief.platformCopies as Record<string, PlatformCopy> | null) ?? {}
+  const existingCopy = platformCopies[platform] ?? null
+
+  return { store, profile, offer, variantType, existingCopy, copyEdited: brief.copyEdited }
+}
+
+/**
+ * 对 LLM 原始文案做与 generatePublishCopy 一致的后处理：
+ * forbiddenClaims 二次扫描过滤 → CTA 强制取自 preferredCta → 完整性/字数校验。
+ */
+function postProcessCopy(
+  raw: PlatformCopy,
+  platform: PublishPlatform,
+  profile: StoreProfile
+): PlatformCopy {
+  const sanitized = sanitizeForbiddenClaims(raw, profile.forbiddenClaims ?? [])
+  const withCta = enforcePreferredCta(sanitized, profile.preferredCta ?? [])
+  validatePlatformCopy(withCta, platform)
+  return withCta
+}
+
+/**
+ * 重新生成 / 按平台改写的统一计费 + 落库流程（消耗积分）。
+ *
+ * 流程（严格遵循需求 0.6/0.7/0.8 计费一致性）：
+ * 1) 人工修改标记保护：copyEdited=true 且未确认覆盖 → 抛 CONFIRM_OVERWRITE_REQUIRED（不动文案/标记）；
+ * 2) 余额预检：余额 < 单价 → 抛 INSUFFICIENT_CREDITS，绝不 reserve、绝不调用 LLM（禁止先扣后退）；
+ * 3) RESERVE 冻结积分（经 credit-service + withCreditLock；关联键用唯一 opKey，避免与渲染冻结串键）；
+ * 4) 调用真实 LLM 生成/改写文案，无 fallback；返回空则抛错触发退款；
+ * 5) 成功：同事务内替换 platformCopies[platform]、清除 copyEdited 标记、CHARGE 实扣；
+ * 6) 失败：按 opKey 幂等 REFUND 全额退还，错误向上抛出（不静默）。
+ *
+ * @param mode 'GENERATE' 重新生成（需求 2.2）｜'REWRITE' 按平台改写（需求 2.4）
+ */
+async function produceCopyWithCredits(input: {
+  contentBriefId: string
+  platform: PublishPlatform
+  userId: string
+  confirmOverwrite: boolean
+  mode: 'GENERATE' | 'REWRITE'
+}): Promise<{ preview: PlatformCopy }> {
+  const { contentBriefId, platform, userId, confirmOverwrite, mode } = input
+
+  if (!LLM_API_URL || !LLM_API_KEY) {
+    throw new Error('[publish-copy] LLM 配置缺失：MERCHANT_LLM_API_URL 或 MERCHANT_LLM_API_KEY / DASHSCOPE_API_KEY 未设置')
+  }
+
+  const ctx = await loadCopyContext(contentBriefId, platform)
+
+  // Step 1: 人工修改标记保护（需求 2.3/2.8）——未确认覆盖则需确认，不动文案与标记
+  if (ctx.copyEdited && !confirmOverwrite) {
+    throw new ApiError(
+      'CONFIRM_OVERWRITE_REQUIRED',
+      '当前文案存在人工修改，重新生成/按平台改写将覆盖人工修改内容，请确认后重试',
+      409
+    )
+  }
+
+  // 按平台改写模式必须有现有文案作为输入（需求 2.4）
+  if (mode === 'REWRITE' && !ctx.existingCopy) {
+    throw new ApiError(
+      'NOT_FOUND',
+      `[publish-copy] 平台 ${platform} 暂无现有文案，无法按平台改写，请先生成文案`,
+      404
+    )
+  }
+
+  const cost = CREDIT_COST_COPY_REWRITE
+
+  // Step 2: 余额预检（需求 0.7）——不足在预检阶段显式拒绝，绝不 reserve、绝不调用 LLM
+  const balance = await getBalance(userId)
+  if (balance < cost) {
+    throw new ApiError(
+      'INSUFFICIENT_CREDITS',
+      `积分不足：本次文案操作需 ${cost} 积分，当前余额 ${balance}`,
+      402
+    )
+  }
+
+  // 唯一计费关联键：避免与同一 brief 的渲染冻结（CONTENT_BRIEF + briefId）撞键导致幂等误跳过
+  const opKey = `copy:${contentBriefId}:${platform}:${randomUUID()}`
+  const remark = `[MERCHANT_COPY] ${mode === 'REWRITE' ? '按平台改写' : '重新生成'}文案冻结 ${cost} 积分（${platform}）`
+
+  // Step 3: RESERVE 冻结（消耗外部资源前真实冻结，经 withCreditLock 全局锁串行化）
+  await reserveMerchantCredits({
+    userId,
+    bizRefType: 'CONTENT_BRIEF',
+    bizRefId: opKey,
+    amount: cost,
+    remark,
+  })
+
+  try {
+    // Step 4: 调用真实 LLM 生成/改写文案（无 fallback）
+    const raw = await generatePlatformCopy({
+      platform,
+      variantType: ctx.variantType,
+      store: ctx.store,
+      profile: ctx.profile,
+      offer: ctx.offer,
+      existingCopy: mode === 'REWRITE' ? ctx.existingCopy : null,
+    })
+
+    if (!raw) {
+      throw new Error(`[publish-copy] 平台 ${platform} 文案${mode === 'REWRITE' ? '改写' : '生成'}失败，未获取到有效文案`)
+    }
+
+    const preview = postProcessCopy(raw, platform, ctx.profile)
+
+    // Step 5: 成功——同事务内替换文案、清除人工修改标记、CHARGE 实扣
+    await prisma.$transaction(async (tx) => {
+      const fresh = await tx.contentBrief.findUniqueOrThrow({
+        where: { id: contentBriefId },
+        select: { platformCopies: true },
+      })
+      const copies = (fresh.platformCopies as Record<string, PlatformCopy> | null) ?? {}
+      copies[platform] = preview
+      await tx.contentBrief.update({
+        where: { id: contentBriefId },
+        // 替换后清除人工修改标记（新文案为 AI 产出，不再视为人工修改）
+        data: { platformCopies: copies, copyEdited: false },
+      })
+      await chargeMerchantCredits(tx, {
+        userId,
+        bizRefType: 'CONTENT_BRIEF',
+        bizRefId: opKey,
+        actualAmount: cost,
+      })
+    })
+
+    return { preview }
+  } catch (error) {
+    // Step 6: 失败——按 opKey 幂等全额退款（不静默），原始错误向上抛出
+    try {
+      await refundMerchantCredits({ userId, bizRefType: 'CONTENT_BRIEF', bizRefId: opKey })
+    } catch (refundErr) {
+      console.error('[publish-copy] 文案操作失败退款异常:', refundErr)
+    }
+    throw error
+  }
+}
+
+/**
+ * 就地保存人工编辑的平台文案（需求 2.1, 2.8）。
+ *
+ * 将商家手工编辑的标题/正文/标签/CTA 原样写回 ContentBrief.platformCopies[platform]，
+ * 并置 copyEdited=true（人工修改标记）。后续自动流程不得静默覆盖该文案（需求 2.8），
+ * 仅在显式二次确认（confirmOverwrite=true）后方可被重新生成/按平台改写替换并清除标记。
+ *
+ * 纯写库，不消耗积分。原样保存（不做违禁词过滤/CTA 强制等改写），保证编辑往返一致。
+ *
+ * @param input.contentBriefId 内容任务 ID
+ * @param input.platform 目标平台
+ * @param input.copy 人工编辑后的平台文案
+ */
+export async function saveManualCopy(input: {
+  contentBriefId: string
+  platform: PublishPlatform
+  copy: PlatformCopy
+}): Promise<void> {
+  const { contentBriefId, platform, copy } = input
+
+  await prisma.$transaction(async (tx) => {
+    const brief = await tx.contentBrief.findUniqueOrThrow({
+      where: { id: contentBriefId },
+      select: { platformCopies: true },
+    })
+    const copies = (brief.platformCopies as Record<string, PlatformCopy> | null) ?? {}
+    // 原样写回（不改写），保证 saveManualCopy 后读取等于入参（编辑往返一致）
+    copies[platform] = copy
+    await tx.contentBrief.update({
+      where: { id: contentBriefId },
+      data: { platformCopies: copies, copyEdited: true },
+    })
+  })
+}
+
+/**
+ * 重新生成文案（需求 2.2）。基于 StoreProfile + brief 上下文调用真实 LLM 产出新文案，
+ * 替换 platformCopies[platform] 并清除人工修改标记，返回新文案供前端展示采纳。
+ *
+ * 消耗积分：经 credit-service（reserve→charge/refund）+ withCreditLock 全局锁，先做余额预检
+ * （不足抛 INSUFFICIENT_CREDITS，禁止先扣后退）。目标 copyEdited=true 且未 confirmOverwrite 时
+ * 抛 CONFIRM_OVERWRITE_REQUIRED 需确认，不覆盖（需求 2.3）。
+ *
+ * @param input.confirmOverwrite 覆盖人工修改的显式确认（需求 2.3）
+ */
+export async function regenerateCopy(input: {
+  contentBriefId: string
+  platform: PublishPlatform
+  userId: string
+  confirmOverwrite: boolean
+}): Promise<{ preview: PlatformCopy }> {
+  return produceCopyWithCredits({ ...input, mode: 'GENERATE' })
+}
+
+/**
+ * 按平台调性改写文案（需求 2.4）。以现有平台文案为输入，按抖音/小红书/视频号等平台调性
+ * 重写（保留门店核心卖点与优惠信息），替换 platformCopies[platform] 并清除人工修改标记。
+ *
+ * 消耗积分：同 regenerateCopy 计费链路与余额预检；覆盖人工修改同样需 confirmOverwrite（需求 2.3）。
+ */
+export async function rewriteForPlatform(input: {
+  contentBriefId: string
+  platform: PublishPlatform
+  userId: string
+  confirmOverwrite: boolean
+}): Promise<{ preview: PlatformCopy }> {
+  return produceCopyWithCredits({ ...input, mode: 'REWRITE' })
 }

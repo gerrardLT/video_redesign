@@ -1,11 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 export default function LoginPage() {
-  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -26,14 +24,14 @@ export default function LoginPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        // P1 修复：统一读取新错误格式 { error: { code, message } } 或旧格式 { error: string }
         const errorMsg = typeof data.error === 'object' ? data.error.message : data.error
         setError(errorMsg || '登录失败')
         return
       }
 
-      // P1 修复：读取 redirect 参数，支持中间件跳转回目标页
-      const redirect = searchParams.get('redirect') || '/dashboard'
+      // 从 URL 中直接读取 redirect 参数（兼容所有 Next.js 版本）
+      const params = new URLSearchParams(window.location.search)
+      const redirect = params.get('redirect') || '/dashboard'
       window.location.href = redirect
     } catch {
       setError('网络错误，请稍后重试')
@@ -90,7 +88,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg bg-[var(--cine-gold)] px-4 py-2.5 text-sm font-medium text-[var(--cine-ink)] transition-colors hover:bg-[var(--cine-gold-2)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? '登录中...' : '登录'}
           </button>
@@ -98,7 +96,7 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-[var(--cine-text-2)]">
           还没有账户？{' '}
-          <Link href="/register" className="text-[var(--cine-gold)] hover:text-[#818cf8]">
+          <Link href="/register" className="text-[var(--cine-gold)] hover:text-[var(--cine-gold-2)]">
             去注册
           </Link>
         </p>

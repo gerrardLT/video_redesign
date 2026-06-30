@@ -365,7 +365,7 @@ export default function HelpArticlePage() {
             </p>
             <Link
               href="/help"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--cine-gold-2)]"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-[var(--cine-ink)] transition-colors hover:bg-[var(--cine-gold-2)]"
             >
               返回帮助中心
             </Link>

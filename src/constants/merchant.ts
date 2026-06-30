@@ -2,9 +2,10 @@
  * 商家营销平台常量定义
  *
  * 本文件定义本地生活营销平台的核心业务常量，包括合规词库、
- * 每日目标分配、质量检测规则、订阅配置、平台约束等。
+ * 每日目标分配、质量检测规则、会员权益映射、计费单价、平台约束等。
  * 不从 Prisma 导入枚举 — 常量文件应独立于生成代码。
  */
+import type { UserTier } from '@/constants/concurrency'
 
 // ============ 合规词库（Requirements 9.2, 9.3）============
 
@@ -54,52 +55,45 @@ export const QUALITY_THRESHOLDS = {
   qualityPassScore: 60,                  // 质量合格线
 } as const
 
-// ============ 订阅额度配置（Requirements 14.1-14.5）============
+// ============ 会员权益映射与计费单价（merchant-billing-unification）============
 
-/** 订阅等级配置 */
-export const SUBSCRIPTION_TIERS = {
-  FREE: {
-    label: '免费体验',
-    maxStores: 1,
-    maxContentPlans: 1,
-    maxGenerations: 3,
-    isLifetime: true,
-    exportResolution: '720p' as const,
-    hasComplianceCheck: false,
-    hasInsights: false,
-  },
-  BASIC: {
-    label: '单店基础',
-    maxStores: 1,
-    maxContentPlans: 10,
-    maxGenerations: 30,
-    isLifetime: false,
-    exportResolution: '720p' as const,
-    hasComplianceCheck: false,
-    hasInsights: false,
-  },
-  GROWTH: {
-    label: '单店增长',
-    maxStores: 1,
-    maxContentPlans: Infinity,
-    maxGenerations: 100,
-    isLifetime: false,
-    exportResolution: '1080p' as const,
-    hasComplianceCheck: true,
-    hasInsights: true,
-  },
-  AGENCY: {
-    label: '服务商',
-    maxStores: 20,
-    maxContentPlans: Infinity,
-    maxGenerations: 500,
-    isLifetime: false,
-    exportResolution: '1080p' as const,
-    hasComplianceCheck: true,
-    hasInsights: true,
-    maxSubAccounts: 50,
-    maxConcurrentBatch: 10,
-  },
+/**
+ * 内容计划生成固定积分单价（设计阶段确定，取值 ≥ 0）
+ * 内容计划生成走 RESERVE→CHARGE/REFUND 流程，按此固定单价冻结/扣费。
+ */
+export const CREDIT_COST_CONTENT_PLAN = 10
+
+/**
+ * 生成单张镜头参考图固定积分单价（设计阶段确定，取值 ≥ 0）
+ * 参考图为一次文生图调用（Seedream 5.0 lite），成本远低于视频渲染，
+ * 走 RESERVE→CHARGE/REFUND 流程，按此固定单价冻结/扣费（需求 3.5）。
+ */
+export const CREDIT_COST_SHOT_REFERENCE_IMAGE = 2
+
+/**
+ * 单平台文案生成/改写固定积分单价（需求 2.2 重新生成文案 / 2.4 按平台改写）
+ * 触发外部 LLM 推理，走 RESERVE→CHARGE/REFUND 流程，按此固定单价冻结/扣费。
+ * 取值远小于视频渲染：仅一次文本推理，按单平台单次计费。
+ */
+export const CREDIT_COST_COPY_REWRITE = 2
+
+/**
+ * UserTier → 本地生活会员权益映射（Privilege_Mapping）
+ * 由视频重塑既有订阅体系的 UserTier（FREE / MONTHLY / YEARLY）直接决定本地生活权益，
+ * 替代原按套餐 name 解读的 Merchant_Tier（SUBSCRIPTION_TIERS）。
+ * - FREE：720p 导出、关闭合规检测、关闭数据洞察、门店上限 1
+ * - MONTHLY：1080p 导出、开放合规检测、开放数据洞察、门店上限 3
+ * - YEARLY：1080p 导出、开放合规检测、开放数据洞察、门店上限 10
+ */
+export const MERCHANT_PRIVILEGE_MAPPING: Record<UserTier, {
+  exportResolution: '720p' | '1080p'
+  complianceCheckEnabled: boolean
+  insightsEnabled: boolean
+  maxStores: number
+}> = {
+  FREE:    { exportResolution: '720p',  complianceCheckEnabled: false, insightsEnabled: false, maxStores: 1 },
+  MONTHLY: { exportResolution: '1080p', complianceCheckEnabled: true,  insightsEnabled: true,  maxStores: 3 },
+  YEARLY:  { exportResolution: '1080p', complianceCheckEnabled: true,  insightsEnabled: true,  maxStores: 10 },
 } as const
 
 // ============ 平台文案约束（Requirement 8.2）============

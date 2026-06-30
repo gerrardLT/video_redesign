@@ -15,6 +15,7 @@ import {
   CONCURRENCY_LIMITS,
   QUEUE_PRIORITIES,
 } from '@/constants/concurrency'
+import { MERCHANT_PRIVILEGE_MAPPING } from '@/constants/merchant'
 
 // ========================
 // 类型定义
@@ -155,4 +156,68 @@ export async function getUserPrivileges(userId: string): Promise<UserPrivileges>
   const tier = determineTier(subscriptionStatus, planType)
 
   return determinePrivileges(tier)
+}
+
+// ========================
+// 本地生活会员权益（Merchant Privileges）
+// ========================
+
+/**
+ * 本地生活会员权益（由 UserTier 经 MERCHANT_PRIVILEGE_MAPPING 决定）
+ *
+ * 会员权益统一收敛到视频重塑既有的订阅体系（UserTier），
+ * 不再依据 SubscriptionPlan.name 解读已废除的 Merchant_Tier。
+ */
+export interface MerchantPrivileges {
+  /** 用户等级（FREE / MONTHLY / YEARLY） */
+  tier: UserTier
+  /** 导出最高分辨率（'720p' | '1080p'） */
+  exportResolution: '720p' | '1080p'
+  /** 是否启用合规检测 */
+  complianceCheckEnabled: boolean
+  /** 是否开放数据洞察 */
+  insightsEnabled: boolean
+  /** 名下门店数量上限 */
+  maxStores: number
+  /** 批量并发上限（复用 CONCURRENCY_LIMITS[tier].generate 语义） */
+  batchConcurrency: number
+}
+
+/**
+ * 纯函数：根据用户等级返回本地生活会员权益
+ *
+ * 无副作用，可用于属性测试。
+ * 导出分辨率、合规检测、数据洞察、门店上限直接查 MERCHANT_PRIVILEGE_MAPPING；
+ * 批量并发复用 CONCURRENCY_LIMITS[tier].generate 的项目级并发语义。
+ *
+ * @param tier - 用户等级
+ * @returns 本地生活会员权益配置
+ */
+export function determineMerchantPrivileges(tier: UserTier): MerchantPrivileges {
+  const mapping = MERCHANT_PRIVILEGE_MAPPING[tier]
+
+  return {
+    tier,
+    exportResolution: mapping.exportResolution,
+    complianceCheckEnabled: mapping.complianceCheckEnabled,
+    insightsEnabled: mapping.insightsEnabled,
+    maxStores: mapping.maxStores,
+    batchConcurrency: CONCURRENCY_LIMITS[tier].generate,
+  }
+}
+
+/**
+ * 异步：查询用户当前本地生活会员权益
+ *
+ * 复用既有 getUserPrivileges 的订阅查询路径得到 UserTier，
+ * 再经 determineMerchantPrivileges 映射为本地生活权益。
+ * 不新增任何按 SubscriptionPlan.name 解读的路径。
+ *
+ * @param userId - 用户 ID
+ * @returns 本地生活会员权益配置
+ */
+export async function getMerchantPrivileges(userId: string): Promise<MerchantPrivileges> {
+  const { tier } = await getUserPrivileges(userId)
+
+  return determineMerchantPrivileges(tier)
 }

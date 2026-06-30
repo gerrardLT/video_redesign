@@ -10,12 +10,16 @@
  * 5. 上传 OSS
  * 6. 创建 VideoVariant 记录
  *
- * 额度与锁集成：
- * - credit-service: RESERVE → CHARGE / REFUND
+ * 积分与锁集成（统一计费体系，RESERVE→CHARGE/REFUND）：
+ * - 计费模型：商家视频渲染统一消费视频重塑既有的「积分(credit)」。
+ *   入口 render/route.ts 在入队前按计划时长 RESERVE 冻结积分（关联键 CONTENT_BRIEF + briefId）；
+ *   本服务在渲染成功时按 3 个 VideoVariant 实际渲染时长经 estimateGroupCreditCost 求和执行 CHARGE
+ *   （多冻结差额自动 REFUND 退回），与置 GENERATED 同事务提交；
+ *   渲染失败时按关联键幂等 REFUND，全额退还入队前冻结的积分。
  * - distributed-lock: 防重复渲染（TTL 720s）
  * - progress-publisher: SSE 实时进度
  *
- * 超时控制：整体 600s 计时器，超时后 refund + FAILED
+ * 超时控制：整体 600s 计时器，超时后置 FAILED
  */
 
 import { randomUUID } from 'crypto'
@@ -26,11 +30,19 @@ import { mkdir, writeFile, rm, readFile } from 'fs/promises'
 import os from 'os'
 
 import { prisma } from './db'
-import { reserveCredits, chargeCredits, refundCredits } from './credit-service'
 import { acquireLock, releaseLock } from './distributed-lock'
 import { uploadBuffer, getSignedObjectUrl, downloadToTemp } from './storage'
 import { createSeedanceTask, getSeedanceTaskStatus } from './seedance'
 import * as progressPublisher from './progress-publisher'
+import { estimateGroupCreditCost, getBalance } from './credit-service'
+import {
+  estimateRenderCost,
+  reserveMerchantCredits,
+  chargeMerchantCredits,
+  refundMerchantCredits,
+} from './merchant-billing-service'
+import { computeReshootScope } from './impact-scope-service'
+import { ApiError } from './api-error'
 import {
   RENDER_TIMEOUT_MS,
   RENDER_LOCK_TTL_MS,
@@ -39,6 +51,8 @@ import {
 } from '@/constants/merchant'
 
 import type { VideoVariantType } from '@/types/merchant'
+import { Prisma } from '@/generated/prisma'
+import type { VideoVariant } from '@/generated/prisma'
 
 const execFileAsync = promisify(execFile)
 
@@ -77,6 +91,115 @@ interface RenderOutput {
   subtitles: Array<{ text: string; startSec: number; endSec: number }>
   renderParams: Record<string, unknown>
   generationLog: Record<string, unknown>[]
+}
+
+/**
+ * 运营型用户高级可调参数（需求 4.6，默认隐藏于「高级」抽屉）。
+ *
+ * 小白老板默认一键路径无需任何参数；仅运营型用户主动展开抽屉时填写。
+ * 取值均映射到 local-render 既有能力（不臆造模板）：
+ * - style：字幕样式预设，取值同版本类型（PROMOTION/ATMOSPHERE/OWNER_TALKING）；
+ * - durationSec：AI 补充片段目标时长（秒），落在 [1, MAX_FILLER_DURATION_SEC] 内；
+ * - templateId：镜头编排模板，取值同版本类型，决定镜头排序顺序。
+ *
+ * 本次实际生效的参数会被原样标注到结果 VideoVariant.renderParams（需求 4.7 可解释）。
+ */
+export interface RenderAdvancedParams {
+  /** 渲染风格：字幕样式预设，取值 PROMOTION/ATMOSPHERE/OWNER_TALKING 之一 */
+  style?: string
+  /** AI 补充片段目标时长（秒），须在 1 至 MAX_FILLER_DURATION_SEC 之间 */
+  durationSec?: number
+  /** 镜头编排模板：取值 PROMOTION/ATMOSPHERE/OWNER_TALKING 之一，决定镜头排序顺序 */
+  templateId?: string
+}
+
+/**
+ * 高级参数解析结果：将外部传入的 RenderAdvancedParams 校验并落地为渲染管线可用的具体取值。
+ */
+interface ResolvedAdvancedParams {
+  /** 镜头排序模板对应的版本类型（决定 VARIANT_SHOT_ORDER 选用哪套顺序） */
+  orderType: VideoVariantType
+  /** 字幕样式预设对应的版本类型 */
+  styleType: VideoVariantType
+  /** AI 补充片段时长上限（秒） */
+  fillerDurationCapSec: number
+  /** 本次实际生效的高级参数（仅含调用方真正提供的项，用于写入 renderParams 标注） */
+  applied: RenderAdvancedParams
+}
+
+/**
+ * 渲染目标分辨率：local-render 固定输出 720p（720x1280 竖屏），
+ * 成本估算时透传给 estimateGroupCreditCost，与渲染入口 render/route.ts 口径一致。
+ */
+const RENDER_RESOLUTION = '720p'
+
+/**
+ * 高级参数取值的合法集合：风格 / 模板均复用既有三种版本预设（local-render 已支持项），
+ * 不臆造模板。校验时不在此集合内的取值显式拒绝（不静默忽略，需求 0.3/0.4）。
+ */
+const VALID_RENDER_STYLES: VideoVariantType[] = ['PROMOTION', 'ATMOSPHERE', 'OWNER_TALKING']
+
+/**
+ * 校验并解析高级参数（需求 4.6, 4.7）。
+ *
+ * 非法取值（未知风格/模板、超范围时长）一律显式抛 ApiError，绝不静默忽略或回退。
+ * 返回的 applied 仅含调用方真正提供的项，供原样标注到 VideoVariant.renderParams（Property 16）。
+ *
+ * @param variantType    当前版本类型（作为未提供对应参数时的默认取值）
+ * @param advancedParams 运营型用户高级抽屉参数（可选）
+ */
+function resolveAdvancedParams(
+  variantType: VideoVariantType,
+  advancedParams?: RenderAdvancedParams
+): ResolvedAdvancedParams {
+  const applied: RenderAdvancedParams = {}
+  let orderType = variantType
+  let styleType = variantType
+  let fillerDurationCapSec = MAX_FILLER_DURATION_SEC
+
+  if (advancedParams) {
+    if (advancedParams.style !== undefined) {
+      if (!VALID_RENDER_STYLES.includes(advancedParams.style as VideoVariantType)) {
+        throw new ApiError(
+          'VALIDATION_ERROR',
+          `不支持的渲染风格：${advancedParams.style}（仅支持 ${VALID_RENDER_STYLES.join('/')}）`,
+          400
+        )
+      }
+      styleType = advancedParams.style as VideoVariantType
+      applied.style = advancedParams.style
+    }
+
+    if (advancedParams.templateId !== undefined) {
+      if (!VALID_RENDER_STYLES.includes(advancedParams.templateId as VideoVariantType)) {
+        throw new ApiError(
+          'VALIDATION_ERROR',
+          `不支持的编排模板：${advancedParams.templateId}（仅支持 ${VALID_RENDER_STYLES.join('/')}）`,
+          400
+        )
+      }
+      orderType = advancedParams.templateId as VideoVariantType
+      applied.templateId = advancedParams.templateId
+    }
+
+    if (advancedParams.durationSec !== undefined) {
+      if (
+        !Number.isFinite(advancedParams.durationSec) ||
+        advancedParams.durationSec < 1 ||
+        advancedParams.durationSec > MAX_FILLER_DURATION_SEC
+      ) {
+        throw new ApiError(
+          'VALIDATION_ERROR',
+          `不支持的时长参数：${advancedParams.durationSec}（须在 1-${MAX_FILLER_DURATION_SEC} 秒内）`,
+          400
+        )
+      }
+      fillerDurationCapSec = advancedParams.durationSec
+      applied.durationSec = advancedParams.durationSec
+    }
+  }
+
+  return { orderType, styleType, fillerDurationCapSec, applied }
 }
 
 // ========================
@@ -136,10 +259,8 @@ export async function renderLocalVideoVariants(input: {
   let timeoutReached = false
   const timeoutTimer = setTimeout(() => { timeoutReached = true }, RENDER_TIMEOUT_MS)
 
-  // results 声明在 try 外部，以便 catch 块访问已成功的 variant 数量进行精确退款
+  // results 声明在 try 外部，以便 catch 块在部分成功时也能访问已生成的 variant
   let results: Array<{ id: string; type: string; ossKey: string | null }> = []
-  // renderCost 在 try 外部声明，catch 中计算退款金额需要用到
-  const renderCost = 3 // 3 个版本各 1 积分
 
   try {
     // Step 1: 获取分布式锁，防止重复渲染（TTL 720s，与 RENDER_LOCK_TTL_MS 对应）
@@ -150,34 +271,17 @@ export async function renderLocalVideoVariants(input: {
       )
     }
 
-    // Step 2: 幂等冻结积分（RESERVE）
-    // 使用 contentBriefId 作为 jobId 关联积分流水
-    // 幂等语义：如果该 contentBriefId 已有活跃的 reserve（状态已为 RENDERING），跳过重复冻结
-
+    // Step 2: 置渲染中状态（幂等）
+    // 入口 render/route.ts 已在入队前按计划时长 RESERVE 冻结积分（关联键 CONTENT_BRIEF + briefId），
+    // 此处仅确保 ContentBrief 处于 RENDERING 状态（重复进入时幂等），实际 CHARGE / REFUND 在渲染收尾处理。
     const currentBrief = await prisma.contentBrief.findUniqueOrThrow({
       where: { id: contentBriefId },
       select: { status: true },
     })
 
     if (currentBrief.status === 'RENDERING') {
-      // 已经是 RENDERING 状态，说明之前的 reserve 已执行成功，跳过重复冻结
-      console.info(`[local-render] ContentBrief ${contentBriefId} 已处于 RENDERING 状态，跳过重复 reserve`)
+      console.info(`[local-render] ContentBrief ${contentBriefId} 已处于 RENDERING 状态`)
     } else {
-      try {
-        await reserveCredits(userId, contentBriefId, renderCost)
-      } catch (reserveError) {
-        // 区分「已存在 reserve」和「余额不足」的错误
-        const errMsg = reserveError instanceof Error ? reserveError.message : String(reserveError)
-        if (errMsg.includes('已存在') || errMsg.includes('ALREADY_RESERVED') || errMsg.includes('duplicate')) {
-          // 幂等：已有未结算的 reserve，跳过
-          console.info(`[local-render] ContentBrief ${contentBriefId} 已存在活跃 reserve，跳过重复冻结`)
-        } else {
-          // 余额不足或其他错误，直接抛出
-          throw reserveError
-        }
-      }
-
-      // Step 3: 更新状态为 RENDERING
       await prisma.contentBrief.update({
         where: { id: contentBriefId },
         data: { status: 'RENDERING' },
@@ -209,6 +313,8 @@ export async function renderLocalVideoVariants(input: {
     // results 声明提到外层以便 catch 块访问，用于精确退款计算
     results = []
     const generationLogs: Record<string, unknown>[] = []
+    // 收集 3 个 VideoVariant 的实际渲染时长，用于渲染成功后按组求和 CHARGE 实扣积分
+    const renderedDurations: number[] = []
 
     for (let vi = 0; vi < variantTypes.length; vi++) {
       const variantType = variantTypes[vi]
@@ -278,15 +384,31 @@ export async function renderLocalVideoVariants(input: {
         type: variant.type,
         ossKey: variant.ossKey,
       })
+
+      // 收集本版本的实际渲染时长，用于渲染成功后按组求和 CHARGE 实扣积分
+      renderedDurations.push(renderOutput.durationSec)
     }
 
-    // Step 6: 正式扣费（CHARGE）
-    await chargeCredits(userId, contentBriefId, renderCost)
+    // Step 6: 渲染成功——置 GENERATED 并在同一事务内 CHARGE 实扣积分。
+    // 入口 render/route.ts 已在入队前按计划时长 RESERVE 冻结积分（关联键 CONTENT_BRIEF + briefId）；
+    // 此处按 3 个 VideoVariant 的实际渲染时长经 estimateGroupCreditCost 逐组求和得到实扣额，
+    // 交由 chargeMerchantCredits 在同事务内记 CHARGE（多冻结差额自动 REFUND 退回，净扣 = 实扣额）。
+    const actualAmount = renderedDurations.reduce(
+      (sum, durationSec) => sum + estimateGroupCreditCost(durationSec, '720p'),
+      0
+    )
 
-    // Step 7: 更新状态为 GENERATED
-    await prisma.contentBrief.update({
-      where: { id: contentBriefId },
-      data: { status: 'GENERATED' },
+    await prisma.$transaction(async (tx) => {
+      await tx.contentBrief.update({
+        where: { id: contentBriefId },
+        data: { status: 'GENERATED' },
+      })
+      await chargeMerchantCredits(tx, {
+        userId,
+        bizRefType: 'CONTENT_BRIEF',
+        bizRefId: contentBriefId,
+        actualAmount,
+      })
     })
 
     // 发布完成事件
@@ -295,18 +417,8 @@ export async function renderLocalVideoVariants(input: {
     return results
 
   } catch (error) {
-    // 渲染失败：根据实际成功的 variant 数量精确退款
-    // results 在 catch 前可能已有部分成功的 variant
-    const successfulVariants = results.length
-    const refundAmount = renderCost - successfulVariants // 只退还未成功的部分
-    try {
-      if (refundAmount > 0) {
-        await refundCredits(userId, contentBriefId, refundAmount)
-      }
-    } catch (refundErr) {
-      console.error('[local-render] 退还积分失败:', refundErr)
-    }
-
+    // 渲染失败：置 FAILED 状态，并按关联键幂等 REFUND，全额退还入队前 RESERVE 冻结的积分。
+    // REFUND 幂等（已退款则跳过），故 BullMQ 重试安全：重试不会重复退款。
     try {
       await prisma.contentBrief.update({
         where: { id: contentBriefId },
@@ -314,6 +426,17 @@ export async function renderLocalVideoVariants(input: {
       })
     } catch (statusErr) {
       console.error('[local-render] 更新 FAILED 状态失败:', statusErr)
+    }
+
+    // 退还入队前冻结的积分（幂等全额退款）；退款本身失败仅记日志，不掩盖原始渲染错误
+    try {
+      await refundMerchantCredits({
+        userId,
+        bizRefType: 'CONTENT_BRIEF',
+        bizRefId: contentBriefId,
+      })
+    } catch (refundErr) {
+      console.error('[local-render] 退还冻结积分失败:', refundErr)
     }
 
     // 发布失败事件
@@ -347,6 +470,389 @@ export async function renderLocalVideoVariants(input: {
 }
 
 // ========================
+// 单版本重生成 / 局部重拍重合成（需求 4）
+// ========================
+
+/**
+ * 单版本重生成（需求 4.2）：仅重生成指定 VideoVariant，保留其它版本。
+ *
+ * 隔离性（Property 14）：就地更新该版本记录（保持同一 id 与 OSS 路径），版本总数不变，
+ * 其它版本的 id 与内容不受影响，仅本版本被新产物替换。
+ *
+ * 复用既有渲染管线（assembleVariantClips + compositeVideo + OSS 上传）与计费链路：
+ *   1. 余额预检（需求 4.8 / 0.7）：余额 < 成本时在预检阶段显式拒绝，绝不先扣后退；
+ *   2. RESERVE 冻结（经 withCreditLock 串行化，需求 4.2/0.8），关联键采用每次调用唯一的
+ *      CONTENT_BRIEF + bizRefId，与该 brief 整体渲染冻结键互不冲突、可重复重生成各自独立计费；
+ *   3. 成功 → 与就地更新同事务 CHARGE 实扣；失败/超时 → 幂等全额 REFUND + 状态回滚（不改动该版本），
+ *      错误抛出不静默（需求 0.4）。
+ *
+ * 高级参数（运营型用户，需求 4.6/4.7）：经 resolveAdvancedParams 校验后落入渲染管线，
+ * 并将本次实际生效的参数标注到结果 VideoVariant.renderParams（Property 16 可解释）。
+ *
+ * @param input.videoVariantId 待重生成的版本 ID
+ * @param input.userId         操作用户 ID（计费主体）
+ * @param input.advancedParams 运营型用户高级抽屉参数（可选，默认一键路径不传）
+ * @returns 重生成后的 VideoVariant
+ * @throws ApiError('INSUFFICIENT_CREDITS') 余额不足；ApiError('VALIDATION_ERROR') 高级参数非法；其它错误原样抛出
+ */
+export async function regenerateSingleVariant(input: {
+  videoVariantId: string
+  userId: string
+  advancedParams?: RenderAdvancedParams
+}): Promise<VideoVariant> {
+  const { videoVariantId, userId, advancedParams } = input
+
+  // 读取目标版本 + 所属 brief + 全部镜头与素材（重新合成所需上下文）
+  const variant = await prisma.videoVariant.findUniqueOrThrow({
+    where: { id: videoVariantId },
+    include: {
+      contentBrief: {
+        include: {
+          shotTasks: { include: { rawAssets: true }, orderBy: { order: 'asc' } },
+          store: true,
+        },
+      },
+    },
+  })
+
+  const brief = variant.contentBrief
+  const contentBriefId = brief.id
+  const variantType = variant.type
+
+  // 校验高级参数（非法取值显式拒绝，不静默忽略）
+  const resolved = resolveAdvancedParams(variantType, advancedParams)
+
+  // 成本估算：单版本视为一个分镜组，组时长 = 本 brief 全部镜头计划时长之和（与渲染入口口径一致）
+  const plannedGroupDuration = brief.shotTasks.reduce((sum, t) => sum + t.durationSec, 0)
+  const cost = estimateRenderCost([plannedGroupDuration], RENDER_RESOLUTION)
+
+  // 余额预检（需求 4.8 / 0.7）：不足在预检阶段显式拒绝，绝不进入 reserve/扣减
+  const balance = await getBalance(userId)
+  if (balance < cost) {
+    throw new ApiError(
+      'INSUFFICIENT_CREDITS',
+      `积分不足：重新生成此版本需 ${cost} 积分，当前余额 ${balance}`,
+      402
+    )
+  }
+
+  // 每次重生成独立计费键，互不幂等覆盖，且不与该 brief 整体渲染冻结键冲突
+  const bizRefId = `REGEN_VARIANT:${videoVariantId}:${randomUUID()}`
+  const lockKey = `render:variant:${videoVariantId}`
+  const lockValue = randomUUID()
+  const tempDir = path.join(os.tmpdir(), `regen-${videoVariantId}-${Date.now()}`)
+
+  // RESERVE 冻结（经 withCreditLock 串行化，需求 4.2/0.8）
+  await reserveMerchantCredits({
+    userId,
+    bizRefType: 'CONTENT_BRIEF',
+    bizRefId,
+    amount: cost,
+    remark: `[MERCHANT_REGEN] 单版本重生成冻结 ${cost} 积分（variant=${videoVariantId}）`,
+  })
+
+  let timeoutReached = false
+  const timeoutTimer = setTimeout(() => { timeoutReached = true }, RENDER_TIMEOUT_MS)
+
+  try {
+    // 获取版本级分布式锁，防止同一版本被并发重生成（TTL 720s）
+    const lockAcquired = await acquireLock(lockKey, lockValue)
+    if (!lockAcquired) {
+      throw new Error(
+        `重生成锁获取失败：VideoVariant ${videoVariantId} 正在被其他进程重生成（锁 TTL ${RENDER_LOCK_TTL_MS / 1000}s）`
+      )
+    }
+
+    await mkdir(tempDir, { recursive: true })
+
+    const generationLogs: Record<string, unknown>[] = []
+
+    // 编排素材（高级参数 templateId/durationSec 经 resolved 透传）
+    const assembly = await assembleVariantClips({
+      variantType,
+      shotOrderType: resolved.orderType,
+      fillerDurationCapSec: resolved.fillerDurationCapSec,
+      shotTasks: brief.shotTasks,
+      tempDir,
+      contentBriefId,
+      brief,
+      generationLogs,
+    })
+
+    if (timeoutReached) {
+      throw new Error(`重生成超时（${RENDER_TIMEOUT_MS / 1000}s）：VideoVariant ${videoVariantId}`)
+    }
+
+    // FFmpeg 合成（高级参数 style 经 resolved 透传字幕样式）
+    const renderOutput = await compositeVideo({
+      variantId: videoVariantId,
+      assembly,
+      tempDir,
+      subtitleStyleType: resolved.styleType,
+    })
+
+    // 上传新产物：沿用稳定 OSS 路径覆盖旧文件，保持 variantId 不变 → 仅本版本被替换（隔离性）
+    const storeId = brief.storeId
+    const videoOssKey = `merchant/${storeId}/variants/${videoVariantId}.mp4`
+    const coverOssKey = `merchant/${storeId}/variants/${videoVariantId}_cover.jpg`
+    await uploadBuffer(videoOssKey, renderOutput.videoBuffer)
+    await uploadBuffer(coverOssKey, renderOutput.coverBuffer)
+
+    // renderParams 标注本次实际生效的高级参数（需求 4.7 / Property 16 可解释）
+    const renderParams = { ...renderOutput.renderParams, advancedParams: resolved.applied }
+    // regenScope 记录本次重生成范围（单版本模式，便于追溯）
+    const regenScope = {
+      mode: 'SINGLE_VARIANT',
+      videoVariantId,
+      advancedParams: resolved.applied,
+      regeneratedAt: new Date().toISOString(),
+    }
+
+    // 就地更新该版本（同 id），其它版本不受影响（Property 14），与 CHARGE 同事务提交
+    const updated = await prisma.$transaction(async (tx) => {
+      const v = await tx.videoVariant.update({
+        where: { id: videoVariantId },
+        data: {
+          ossKey: videoOssKey,
+          coverOssKey,
+          durationSec: renderOutput.durationSec,
+          width: renderOutput.width,
+          height: renderOutput.height,
+          subtitles: renderOutput.subtitles,
+          renderParams: renderParams as unknown as Prisma.InputJsonValue,
+          generationLog: generationLogs as unknown as Prisma.InputJsonValue,
+          regenScope: regenScope as unknown as Prisma.InputJsonValue,
+        },
+      })
+      await chargeMerchantCredits(tx, {
+        userId,
+        bizRefType: 'CONTENT_BRIEF',
+        bizRefId,
+        actualAmount: cost,
+      })
+      return v
+    })
+
+    return updated
+  } catch (error) {
+    // 失败/超时：幂等全额 REFUND，不改动该版本（状态回滚到重生成前）；退款失败仅记日志，不掩盖原始错误
+    try {
+      await refundMerchantCredits({ userId, bizRefType: 'CONTENT_BRIEF', bizRefId })
+    } catch (refundErr) {
+      console.error('[local-render] 单版本重生成失败后退款失败:', refundErr)
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutTimer)
+    try {
+      await releaseLock(lockKey, lockValue)
+    } catch (lockErr) {
+      console.warn('[local-render] 释放锁失败:', lockErr)
+    }
+    try {
+      await rm(tempDir, { recursive: true, force: true })
+    } catch (cleanErr) {
+      console.warn('[local-render] 清理临时目录失败:', cleanErr)
+    }
+  }
+}
+
+/**
+ * 局部重拍重合成（需求 4.3, 4.5）：替换某 ShotTask 素材后，仅基于受影响范围重新合成。
+ *
+ * 受影响范围由 impact-scope-service.computeReshootScope 计算 = {被重拍镜头所属分镜组}
+ * ∪ {沿 frame-continuity 尾帧链依赖的后续同场景分镜组}。承接关系数据缺失时
+ * computeReshootScope 显式抛错，本函数让该错误向上传播（不吞错、不静默缩小范围，需求 4.5）。
+ *
+ * 承接链上的后续同场景组一并重算，保证画面承接不断裂（需求 4.5）：本 brief 的每个版本均
+ * 以当前最新素材（被重拍镜头素材已被替换）重合成，仅在全部版本成功后同事务批量就地更新；
+ * 任一版本失败则整体 REFUND 回滚，不留接不上的半成品。
+ *
+ * 计费仅按受影响分镜组时长计入（需求 4.9 仅重渲染受影响范围），复用既有计费链路：
+ * 余额预检 → RESERVE（withCreditLock 串行化）→ 成功 CHARGE / 失败 REFUND。
+ *
+ * @param input.contentBriefId 内容任务 ID
+ * @param input.shotTaskId     被重拍镜头（ShotTask）ID
+ * @param input.userId         操作用户 ID（计费主体）
+ * @returns 受影响范围重合成后的全部 VideoVariant
+ * @throws computeReshootScope 的承接数据缺失错误；ApiError('INSUFFICIENT_CREDITS') 余额不足；其它错误原样抛出
+ */
+export async function rerenderAffectedScope(input: {
+  contentBriefId: string
+  shotTaskId: string
+  userId: string
+}): Promise<VideoVariant[]> {
+  const { contentBriefId, shotTaskId, userId } = input
+
+  // 计算受影响范围；承接数据缺失时此处显式抛错，错误向上传播（不静默缩小范围，需求 4.5）
+  const scope = await computeReshootScope({ contentBriefId, shotTaskId })
+
+  // 读取 brief + 镜头 + 素材 + 既有版本（局部重拍以当前最新素材重合成，无需其它镜头重传）
+  const brief = await prisma.contentBrief.findUniqueOrThrow({
+    where: { id: contentBriefId },
+    include: {
+      shotTasks: { include: { rawAssets: true }, orderBy: { order: 'asc' } },
+      store: true,
+      videoVariants: true,
+    },
+  })
+
+  if (brief.videoVariants.length === 0) {
+    throw new Error(
+      `局部重拍失败：ContentBrief ${contentBriefId} 尚无任何已生成版本可重合成`
+    )
+  }
+
+  // 成本：仅按受影响分镜组（含承接链）时长计费（需求 4.9），跨全部待重合成版本求和
+  const affectedDuration = brief.shotTasks
+    .filter((t) => scope.affectedGroupIds.includes(t.id))
+    .reduce((sum, t) => sum + t.durationSec, 0)
+  const groupDurations = brief.videoVariants.map(() => affectedDuration)
+  const cost = estimateRenderCost(groupDurations, RENDER_RESOLUTION)
+
+  // 余额预检（需求 4.8 / 0.7）：不足在预检阶段显式拒绝，绝不进入 reserve/扣减
+  const balance = await getBalance(userId)
+  if (balance < cost) {
+    throw new ApiError(
+      'INSUFFICIENT_CREDITS',
+      `积分不足：局部重拍需 ${cost} 积分，当前余额 ${balance}`,
+      402
+    )
+  }
+
+  // 每次局部重拍独立计费键，互不幂等覆盖，且不与该 brief 整体渲染冻结键冲突
+  const bizRefId = `RESHOOT:${contentBriefId}:${shotTaskId}:${randomUUID()}`
+  const lockKey = `render:brief:${contentBriefId}`
+  const lockValue = randomUUID()
+  const tempDir = path.join(os.tmpdir(), `reshoot-${contentBriefId}-${Date.now()}`)
+
+  // RESERVE 冻结（经 withCreditLock 串行化，需求 4.8/0.8）
+  await reserveMerchantCredits({
+    userId,
+    bizRefType: 'CONTENT_BRIEF',
+    bizRefId,
+    amount: cost,
+    remark: `[MERCHANT_RESHOOT] 局部重拍冻结 ${cost} 积分（brief=${contentBriefId}, shot=${shotTaskId}）`,
+  })
+
+  let timeoutReached = false
+  const timeoutTimer = setTimeout(() => { timeoutReached = true }, RENDER_TIMEOUT_MS)
+
+  try {
+    // 获取 brief 级分布式锁，防止与整体渲染/其它局部重拍并发（TTL 720s）
+    const lockAcquired = await acquireLock(lockKey, lockValue)
+    if (!lockAcquired) {
+      throw new Error(
+        `局部重拍锁获取失败：ContentBrief ${contentBriefId} 正在被其他进程渲染（锁 TTL ${RENDER_LOCK_TTL_MS / 1000}s）`
+      )
+    }
+
+    await mkdir(tempDir, { recursive: true })
+
+    // regenScope 记录受影响范围（含承接链），写入每个被重合成版本以供追溯（需求 4.5）
+    const regenScope = {
+      mode: 'RESHOOT_SCOPE',
+      reshotShotTaskId: shotTaskId,
+      affectedGroupIds: scope.affectedGroupIds,
+      hasContinuityChain: scope.hasContinuityChain,
+      rerenderedAt: new Date().toISOString(),
+    }
+
+    // 先把全部版本以最新素材重合成并上传（任一失败直接抛错，进入 catch 整体退款回滚）
+    const rendered: Array<{
+      id: string
+      videoOssKey: string
+      coverOssKey: string
+      output: RenderOutput
+      generationLogs: Record<string, unknown>[]
+    }> = []
+
+    for (let i = 0; i < brief.videoVariants.length; i++) {
+      if (timeoutReached) {
+        throw new Error(`局部重拍超时（${RENDER_TIMEOUT_MS / 1000}s）：ContentBrief ${contentBriefId}`)
+      }
+
+      const existing = brief.videoVariants[i]
+      const generationLogs: Record<string, unknown>[] = []
+
+      const assembly = await assembleVariantClips({
+        variantType: existing.type,
+        shotTasks: brief.shotTasks,
+        tempDir,
+        contentBriefId,
+        brief,
+        generationLogs,
+      })
+
+      const output = await compositeVideo({
+        variantId: existing.id,
+        assembly,
+        tempDir,
+      })
+
+      const storeId = brief.storeId
+      const videoOssKey = `merchant/${storeId}/variants/${existing.id}.mp4`
+      const coverOssKey = `merchant/${storeId}/variants/${existing.id}_cover.jpg`
+      await uploadBuffer(videoOssKey, output.videoBuffer)
+      await uploadBuffer(coverOssKey, output.coverBuffer)
+
+      rendered.push({ id: existing.id, videoOssKey, coverOssKey, output, generationLogs })
+    }
+
+    // 全部受影响版本重合成成功后，同事务批量就地更新 + CHARGE（承接链一并重算，避免画面断裂）
+    const updated = await prisma.$transaction(async (tx) => {
+      const list: VideoVariant[] = []
+      for (const r of rendered) {
+        const v = await tx.videoVariant.update({
+          where: { id: r.id },
+          data: {
+            ossKey: r.videoOssKey,
+            coverOssKey: r.coverOssKey,
+            durationSec: r.output.durationSec,
+            width: r.output.width,
+            height: r.output.height,
+            subtitles: r.output.subtitles,
+            renderParams: r.output.renderParams as unknown as Prisma.InputJsonValue,
+            generationLog: r.generationLogs as unknown as Prisma.InputJsonValue,
+            regenScope: regenScope as unknown as Prisma.InputJsonValue,
+          },
+        })
+        list.push(v)
+      }
+      await chargeMerchantCredits(tx, {
+        userId,
+        bizRefType: 'CONTENT_BRIEF',
+        bizRefId,
+        actualAmount: cost,
+      })
+      return list
+    })
+
+    return updated
+  } catch (error) {
+    // 失败/超时：幂等全额 REFUND + 整体回滚（未提交事务则版本不变，避免承接链断裂的半成品）
+    try {
+      await refundMerchantCredits({ userId, bizRefType: 'CONTENT_BRIEF', bizRefId })
+    } catch (refundErr) {
+      console.error('[local-render] 局部重拍失败后退款失败:', refundErr)
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutTimer)
+    try {
+      await releaseLock(lockKey, lockValue)
+    } catch (lockErr) {
+      console.warn('[local-render] 释放锁失败:', lockErr)
+    }
+    try {
+      await rm(tempDir, { recursive: true, force: true })
+    } catch (cleanErr) {
+      console.warn('[local-render] 清理临时目录失败:', cleanErr)
+    }
+  }
+}
+
+// ========================
 // 素材编排
 // ========================
 
@@ -357,6 +863,10 @@ export async function renderLocalVideoVariants(input: {
  */
 async function assembleVariantClips(params: {
   variantType: VideoVariantType
+  /** 镜头排序模板覆盖（高级参数 templateId）；缺省时按 variantType 选用默认排序 */
+  shotOrderType?: VideoVariantType
+  /** AI 补充片段时长上限覆盖（高级参数 durationSec）；缺省时取 MAX_FILLER_DURATION_SEC */
+  fillerDurationCapSec?: number
   shotTasks: Array<{
     id: string
     type: string
@@ -379,7 +889,10 @@ async function assembleVariantClips(params: {
   generationLogs: Record<string, unknown>[]
 }): Promise<VariantAssembly> {
   const { variantType, shotTasks, tempDir, brief, generationLogs } = params
-  const shotOrder = VARIANT_SHOT_ORDER[variantType]
+  // 排序模板：高级参数 templateId 覆盖时按其顺序编排，否则按当前版本默认顺序
+  const shotOrder = VARIANT_SHOT_ORDER[params.shotOrderType ?? variantType]
+  // AI 补充片段时长上限：高级参数 durationSec 覆盖时取其值，否则取默认上限
+  const fillerDurationCap = params.fillerDurationCapSec ?? MAX_FILLER_DURATION_SEC
   const clips: ClipSegment[] = []
   let fillerCount = 0
 
@@ -403,8 +916,8 @@ async function assembleVariantClips(params: {
         shotType: task.type,
       })
     } else if (!task.required && fillerCount < MAX_FILLER_CLIPS_PER_VARIANT) {
-      // 可选镜头缺失：调用 Seedance 生成补充片段
-      const fillerDuration = Math.min(task.durationSec, MAX_FILLER_DURATION_SEC)
+      // 可选镜头缺失：调用 Seedance 生成补充片段（时长受 fillerDurationCap 约束，可由高级参数覆盖）
+      const fillerDuration = Math.min(task.durationSec, fillerDurationCap)
       const prompt = task.examplePrompt
         || buildFillerPrompt(task.type, task.instruction, brief)
 
@@ -620,9 +1133,13 @@ async function compositeVideo(params: {
   variantId: string
   assembly: VariantAssembly
   tempDir: string
+  /** 字幕样式预设覆盖（高级参数 style）；缺省时按 assembly.type 选用默认样式 */
+  subtitleStyleType?: VideoVariantType
 }): Promise<RenderOutput> {
   const { variantId, assembly, tempDir } = params
   const { clips, subtitles, type } = assembly
+  // 字幕样式：高级参数 style 覆盖时按其预设渲染，否则按当前版本默认样式
+  const subtitleStyleType = params.subtitleStyleType ?? type
 
   if (clips.length === 0) {
     throw new Error(`渲染失败：版本 ${type} 无可用素材片段`)
@@ -632,15 +1149,15 @@ async function compositeVideo(params: {
   const coverPath = path.join(tempDir, `${variantId}_cover.jpg`)
   const assPath = path.join(tempDir, `${variantId}_subs.ass`)
 
-  // 生成 ASS 字幕文件
-  await generateAssFile(assPath, subtitles, type)
+  // 生成 ASS 字幕文件（样式按 subtitleStyleType，可由高级参数覆盖）
+  await generateAssFile(assPath, subtitles, subtitleStyleType)
 
   // 构建 FFmpeg 合成命令
   if (clips.length === 1) {
     // 单片段：直接转码 + 字幕叠加
     await execFileAsync('ffmpeg', [
       '-i', clips[0].localPath,
-      '-vf', `scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,ass=${assPath}`,
+      '-vf', `scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,${buildAssFilter(assPath)}`,
       '-c:v', 'libx264', '-preset', 'medium', '-crf', '23',
       '-c:a', 'aac', '-b:a', '128k',
       '-movflags', '+faststart',
@@ -788,12 +1305,27 @@ async function compositeMultipleClips(
   // 叠加字幕
   await execFileAsync('ffmpeg', [
     '-i', intermediateOutput,
-    '-vf', `ass=${assPath}`,
+    '-vf', buildAssFilter(assPath),
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '23',
     '-c:a', 'copy',
     '-movflags', '+faststart',
     '-y', outputPath,
   ], { timeout: 120_000 })
+}
+
+/**
+ * 转义 ASS 字幕文件路径，供 ffmpeg -vf 滤镜安全引用。
+ *
+ * Windows 路径含盘符冒号与反斜杠，ffmpeg filtergraph 解析器会将冒号误判为选项分隔符、
+ * 吞掉反斜杠，导致路径被解析错误（如 "C:\\...\\x.ass" 变成 "Users...x.ass" 触发
+ * "Unable to parse option value ... as image size"）。需将反斜杠转为正斜杠、转义冒号，
+ * 并用单引号包裹（与 export 路由 buildFFmpegExportArgs 的处理保持一致）。
+ *
+ * @returns 形如 ass='C\:/path/to/subs.ass' 的可直接拼入 -vf 的片段
+ */
+function buildAssFilter(assPath: string): string {
+  const escaped = assPath.replace(/\\/g, '/').replace(/:/g, '\\:')
+  return `ass='${escaped}'`
 }
 
 // ========================

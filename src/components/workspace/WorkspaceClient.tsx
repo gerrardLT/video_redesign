@@ -50,7 +50,7 @@ export function WorkspaceClient() {
       <section className="relative flex flex-col items-center pt-16 pb-6 px-4">
         {/* 标题：渐变色 */}
         <h1 className="text-xl sm:text-2xl font-bold text-center mb-1 text-[var(--cine-text)]">
-          <span className="bg-gradient-to-r from-[var(--cine-gold)] to-amber-400 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-[var(--cine-gold)] to-[#E8D5B0] bg-clip-text text-transparent">
             AI 视频生成
           </span>
           {' '}工作台
@@ -60,7 +60,7 @@ export function WorkspaceClient() {
         </p>
 
         {/* ===== 创作输入卡片（毛玻璃质感） ===== */}
-        <div className="w-full max-w-[900px] rounded-2xl border border-[var(--cine-line-2)] bg-[var(--cine-surface)]/90 backdrop-blur-sm p-5 transition-all duration-300 focus-within:border-[var(--cine-gold)]/60 focus-within:shadow-[0_0_0_3px_rgba(245,166,35,0.06),0_8px_32px_rgba(0,0,0,0.2)]">
+        <div className="w-full max-w-[900px] rounded-2xl border border-[var(--cine-line-2)] bg-[var(--cine-surface)]/90 backdrop-blur-sm p-5 transition-all duration-300 focus-within:border-[var(--cine-gold)]/60 focus-within:shadow-[0_0_0_3px_rgba(199,168,119,0.10),0_8px_32px_rgba(0,0,0,0.2)]">
           {/* 输入区：prompt + 上传（在同一个区块内） */}
           <div className="flex flex-col">
             <PromptInput />
