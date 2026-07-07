@@ -111,7 +111,7 @@ describe('POST /api/content-briefs/[briefId]/auto-render', () => {
 
   it('正常触发：入队渲染任务 + 更新 brief renderMode', async () => {
     // 准备
-    vi.mocked(prisma.contentBrief.findUnique).mockResolvedValue(makeBrief())
+    vi.mocked(prisma.contentBrief.findUnique).mockResolvedValue(makeBrief() as never)
 
     // 执行
     const response = await POST(makeRequest(), makeContext())
@@ -144,7 +144,7 @@ describe('POST /api/content-briefs/[briefId]/auto-render', () => {
 
   it('DRAFT 状态也允许触发一键出片', async () => {
     vi.mocked(prisma.contentBrief.findUnique).mockResolvedValue(
-      makeBrief({ status: 'DRAFT' })
+      makeBrief({ status: 'DRAFT' }) as never
     )
 
     const response = await POST(makeRequest(), makeContext())
@@ -154,7 +154,7 @@ describe('POST /api/content-briefs/[briefId]/auto-render', () => {
 
   it('已有进行中渲染时拒绝重复触发（409）', async () => {
     vi.mocked(prisma.contentBrief.findUnique).mockResolvedValue(
-      makeBrief({ status: 'RENDERING' })
+      makeBrief({ status: 'RENDERING' }) as never
     )
 
     const response = await POST(makeRequest(), makeContext())
@@ -170,7 +170,7 @@ describe('POST /api/content-briefs/[briefId]/auto-render', () => {
   it('brief 状态不允许触发时返回 400（非 DRAFT/READY_TO_SHOOT）', async () => {
     // MATERIALS_UPLOADED 不在允许列表中
     vi.mocked(prisma.contentBrief.findUnique).mockResolvedValue(
-      makeBrief({ status: 'MATERIALS_UPLOADED' })
+      makeBrief({ status: 'MATERIALS_UPLOADED' }) as never
     )
 
     const response = await POST(makeRequest(), makeContext())
@@ -184,7 +184,7 @@ describe('POST /api/content-briefs/[briefId]/auto-render', () => {
 
   it('GENERATED 状态不允许触发', async () => {
     vi.mocked(prisma.contentBrief.findUnique).mockResolvedValue(
-      makeBrief({ status: 'GENERATED' })
+      makeBrief({ status: 'GENERATED' }) as never
     )
 
     const response = await POST(makeRequest(), makeContext())
@@ -207,7 +207,7 @@ describe('POST /api/content-briefs/[briefId]/auto-render', () => {
   })
 
   it('积分不足时返回 402', async () => {
-    vi.mocked(prisma.contentBrief.findUnique).mockResolvedValue(makeBrief())
+    vi.mocked(prisma.contentBrief.findUnique).mockResolvedValue(makeBrief() as never)
     vi.mocked(getBalance).mockResolvedValue(10) // 余额不足
     vi.mocked(estimateRenderCost).mockReturnValue(500)
 
@@ -223,7 +223,7 @@ describe('POST /api/content-briefs/[briefId]/auto-render', () => {
 
   it('无权限访问时返回 403', async () => {
     vi.mocked(prisma.contentBrief.findUnique).mockResolvedValue(
-      makeBrief({ merchantUserId: 'other-user' })
+      makeBrief({ merchantUserId: 'other-user' }) as never
     )
 
     const response = await POST(makeRequest(), makeContext())
