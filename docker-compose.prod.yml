@@ -30,8 +30,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    # 启动前执行数据库迁移
-    command: ["sh", "-c", "node ./node_modules/prisma/build/index.js migrate deploy && node server.js"]
+    # 数据库迁移由 deploy.sh 在宿主机执行（runner 镜像精简后无完整 prisma 依赖）
+    command: ["node", "server.js"]
 
   # Workers（后台任务：视频解析/生成/合并/人物图等）
   workers:
