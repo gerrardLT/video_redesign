@@ -130,7 +130,7 @@ export default function LandingPage() {
           <a href="#features">功能</a>
           <a href="#showcase">案例</a>
           <Link href="/merchant">本地生活</Link>
-          <a href="/help">帮助</a>
+          <Link href="/help">帮助</Link>
           <Link href="/dashboard" className="lp-nav-cta">开始使用</Link>
         </div>
       </nav>

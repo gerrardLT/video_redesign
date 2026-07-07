@@ -1,4 +1,5 @@
-﻿/**
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+/**
  * 资产库增强 - 属性测试 (Property-Based Tests)
  *
  * 使用 fast-check 对资产库增强功能的核心服务层逻辑进行属性测试。

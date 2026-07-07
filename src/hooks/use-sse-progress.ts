@@ -171,6 +171,7 @@ export function useSSEProgress(token: string | null, enabled = true): UseSSEProg
     isConnected,
     progressMap,
     reconnect,
+    // eslint-disable-next-line react-hooks/refs
     pollingInterval: pollingIntervalRef.current,
   }
 }

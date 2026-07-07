@@ -154,7 +154,7 @@ export function CopyCompliancePanel({
     setError(null)
     setSavedHint(false)
     // 仅在平台切换或文案内容引用变化时重置草稿
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [activePlatform, activeCopy])
 
   // ─── 草稿字段更新 ───

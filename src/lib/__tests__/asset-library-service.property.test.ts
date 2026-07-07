@@ -1,4 +1,5 @@
-﻿/**
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+/**
  * 用户资产库 - 属性测试 (Property-Based Tests)
  *
  * 使用 fast-check v4.8.0 对核心服务层逻辑进行属性测试。

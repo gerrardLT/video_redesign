@@ -482,8 +482,10 @@ export async function saveBreakdownAsPlaybook(params: {
   // 创建 Playbook
   const playbook = await prisma.playbook.create({
     data: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       industry: industry as any, // MerchantIndustry enum
       name: name ?? `爆款拆解-${breakdown.hookType}-${breakdown.pacingType}节奏`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       goal: goal as any, // ContentGoal enum
       description: `来源: ${breakdown.videoUrl}\nHook: ${breakdown.hookDescription}\n节奏: ${breakdown.pacingType} (${breakdown.avgShotDuration.toFixed(1)}s/镜头)\n字幕风格: ${breakdown.subtitleStyle.tone}`,
       structure: JSON.parse(JSON.stringify(structure)),

@@ -1,4 +1,5 @@
-﻿import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 /**
  * 单元测试: video-export-upscale

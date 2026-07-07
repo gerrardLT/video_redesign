@@ -89,6 +89,7 @@ export function GenerateButton() {
       toast.success('生成中...')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '生成失败', {
+        // eslint-disable-next-line react-hooks/immutability
         action: { label: '重试', onClick: () => handleGenerate() },
       })
       setGenerateStatus('idle')

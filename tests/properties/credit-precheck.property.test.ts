@@ -1,4 +1,5 @@
-﻿// Feature: local-life-depth-enhancements, Property 1: 额度预检与守恒
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+// Feature: local-life-depth-enhancements, Property 1: 额度预检与守恒
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 

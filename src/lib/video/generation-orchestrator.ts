@@ -187,7 +187,7 @@ export async function orchestrateGeneration(params: OrchestrationParams): Promis
   // 商家画像前缀（仅 merchant 用户有门店时非空，拼到 prompt 最前）
   const merchantPrefixText = firstRef.merchantPrefix || ''
   let firstPrompt = merchantPrefixText + firstRef.characterPrefix + shotsPromptText
-  let referenceImages = firstRef.referenceImages
+  const referenceImages = firstRef.referenceImages
 
   // 尾帧衔接：检查第一个 pending 组前面是否有已 SUCCEEDED 的组（含 genVideoUrl）
   // reference_video 方案：无条件用前一组视频作衔接参考，不再做场景判定

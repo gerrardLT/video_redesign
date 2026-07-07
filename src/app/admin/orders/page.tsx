@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback } from 'react'
 
@@ -272,7 +272,7 @@ export default function AdminOrdersPage() {
               type="submit"
               className="rounded-lg bg-[var(--cine-gold)] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
             >
-              筛'            </button>
+              筛&apos;            </button>
             <button
               type="button"
               onClick={handleReset}

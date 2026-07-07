@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 本地生活营销平台 — 全流程端到端测试脚本
  *

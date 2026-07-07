@@ -21,7 +21,7 @@ export default async function HelpCenterPage() {
             帮助中心
           </h1>
           <p className="mt-3 text-base text-[var(--cine-text-2)]">
-            快速入门、操作指南与常见问题，帮你高效完成视频创'          </p>
+            快速入门、操作指南与常见问题，帮你高效完成视频创&apos;          </p>
           {/* Client-side search */}
           <HelpSearchClient />
         </div>

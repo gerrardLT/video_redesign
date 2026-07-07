@@ -1,4 +1,5 @@
-﻿/**
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+/**
  * Feature: video-export-upscale
  * 属性测试：视频导出超分功能正确性验证
  *

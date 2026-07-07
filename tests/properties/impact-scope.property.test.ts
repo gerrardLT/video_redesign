@@ -41,7 +41,7 @@ vi.mock('@/lib/shared/db', () => ({
 const { prisma } = await import('@/lib/shared/db')
 const { computeReshootScope } = await import('@/lib/merchant/impact-scope-service')
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const findMany = prisma.shotTask.findMany as unknown as ReturnType<typeof vi.fn>
 
 /** 与 frame-continuity.normScene 一致的场景归一化：去首尾空白、去内部空白、转小写 */

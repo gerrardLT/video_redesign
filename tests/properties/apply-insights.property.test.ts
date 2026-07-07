@@ -36,9 +36,9 @@ const { prisma } = await import('@/lib/shared/db')
 const { applyInsights } = await import('@/lib/merchant/performance-learning-service')
 
 // 类型收窄：mock 后的 prisma 方法
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const storeFindUnique = prisma.store.findUnique as unknown as ReturnType<typeof vi.fn>
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const planInputCreate = prisma.planGenerationInput.create as unknown as ReturnType<typeof vi.fn>
 
 // ContentGoal 枚举取值（与 src/types/merchant.ts ContentGoalSchema 对齐）

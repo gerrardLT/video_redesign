@@ -1,4 +1,5 @@
-﻿// Feature: local-life-depth-enhancements, Property 24: 授权确认前置
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+// Feature: local-life-depth-enhancements, Property 24: 授权确认前置
 /**
  * 属性测试：平台凭证「授权确认前置」（Property 24）
  *

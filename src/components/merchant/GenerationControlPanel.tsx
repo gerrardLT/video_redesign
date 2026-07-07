@@ -257,6 +257,7 @@ export function GenerationControlPanel({
     [briefId, onVariantsChanged]
   )
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleConfirmReshoot = useCallback(() => {
     const task = pendingReshoot
     setPendingReshoot(null)

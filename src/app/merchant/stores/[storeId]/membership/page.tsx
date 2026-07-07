@@ -120,6 +120,7 @@ export default function MembershipPage() {
   const handlePaymentParams = (pp: PaymentParams, title: string) => {
     if (pp.payUrl) {
       // 支付宝 PC 跳转
+      // eslint-disable-next-line react-hooks/immutability
       window.location.href = pp.payUrl
       return
     }

@@ -874,7 +874,7 @@ async function triggerNextChainGroup(params: {
 
   // 入队下一组：多模态参考模式——人物身份由 asset:// 锚定资产承载，每组独立装配参考图
   const nextRef = await buildGroupGenReference(nextGroup.id)
-  let referenceImages = nextRef.referenceImages
+  const referenceImages = nextRef.referenceImages
 
   // 构建下一组的完整 prompt：merchantPrefix + characterPrefix + 组内所有分镜 prompt 合并
   const nextGroupShots = await prisma.shot.findMany({

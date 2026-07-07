@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback } from 'react'
 import { SHOWCASE_CATEGORIES } from '@/constants/showcase-categories'
@@ -519,7 +519,7 @@ export default function AdminShowcasePage() {
           <div className="mx-4 w-full max-w-md rounded-xl border border-[var(--cine-line-2)] bg-[var(--cine-surface)] p-6 shadow-2xl">
             <h3 className="mb-2 text-lg font-semibold text-white">确认删除</h3>
             <p className="mb-6 text-sm text-[var(--cine-text-2)]">
-              确认删除案例「{deleteTarget.title}」？删除后将无法恢复，且该案例将从公开页面移'            </p>
+              确认删除案例「{deleteTarget.title}」？删除后将无法恢复，且该案例将从公开页面移&apos;            </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}

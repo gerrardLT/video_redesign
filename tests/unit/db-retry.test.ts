@@ -81,7 +81,7 @@ describe('withRetry', () => {
     let callCount = 0
     const op = async (): Promise<never> => {
       callCount++
-      throw 'string error' // eslint-disable-line no-throw-literal
+      throw 'string error'  
     }
 
     await expect(withRetry(op)).rejects.toBe('string error')

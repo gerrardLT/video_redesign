@@ -108,8 +108,10 @@ export async function listAssets(query: AssetLibraryQuery): Promise<PaginatedAss
 
   // 并行查询：总数 + 分页数据
   const [total, assets] = await Promise.all([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     prisma.asset.count({ where: where as any }),
     prisma.asset.findMany({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       where: where as any,
       include: {
         project: {

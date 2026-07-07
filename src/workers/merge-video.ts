@@ -855,6 +855,7 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
       // 替换音轨：保留视频流，用 BGM 替换音频流
       const bgmOutputPath = path.join(tempDir, `merged_bgm_${Date.now()}.mp4`)
       await new Promise<void>((resolve, reject) => {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const proc = (require('child_process') as typeof import('child_process')).execFile(
           'ffmpeg',
           [

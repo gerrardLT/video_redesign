@@ -234,7 +234,7 @@ export async function POST(
     // === Reference Video 无缝衔接（取代旧的同场景尾帧承接）===
     // 无条件查前一组已成功生成的视频 URL，作为 reference_video 传给 Seedance。
     // 不做场景判定——无论同场景/跨场景，模型都能自行理解如何从前段视频自然过渡。
-    let referenceImages = groupRef.referenceImages
+    const referenceImages = groupRef.referenceImages
     const prevGroupVideoUrl = await getPrevGroupVideoUrl(group.project.id, group.groupIndex)
     if (prevGroupVideoUrl) {
       seedancePrompt = `${seedancePrompt}${VIDEO_CONTINUATION_PROMPT_SUFFIX}`

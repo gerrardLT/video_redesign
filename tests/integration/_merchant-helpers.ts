@@ -76,7 +76,7 @@ export function computeGate(checks: Array<{ ok: boolean; miss: string }>): {
 
 /** 在跳过时打印清晰原因（收集阶段输出，便于开发者识别为何被跳过而非失败） */
 export function announceSkip(label: string, reason: string): void {
-  // eslint-disable-next-line no-console
+   
   console.warn(`[集成测试跳过] ${label}：${reason}（这是预期跳过，不是失败；齐备相应真实环境后将真实执行）`)
 }
 

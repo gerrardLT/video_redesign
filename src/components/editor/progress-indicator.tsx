@@ -42,10 +42,12 @@ export function ProgressIndicator({ taskId }: ProgressIndicatorProps) {
   const isRunning = !isTerminal && (eventType === 'progress_update' || eventType === 'state_change')
 
   // 格式化剩余时间
+  /* eslint-disable react-hooks/preserve-manual-memoization */
   const remainingText = useMemo(() => {
     if (estimatedRemaining == null || estimatedRemaining <= 0) return null
     return formatRemainingTime(estimatedRemaining)
   }, [estimatedRemaining])
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   return (
     <div className="space-y-3 py-3">

@@ -1,4 +1,5 @@
-﻿/**
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+/**
  * AssetLibraryService 单元测试
  * 覆盖：复用角色图 URL 一致、删除引用保留 OSS 文件、跨用户 403、displayName 派生、
  *       下载签名 URL 生成、跨项目角色图应用、项目与角色列表查询

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 
@@ -495,7 +495,7 @@ export default function AdminHelpArticlesPage() {
                 {articles.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-[var(--cine-text-3)]">
-                      暂无帮助文章，点?ldquo;新增文章&rdquo;创建第一'                    </td>
+                      暂无帮助文章，点?ldquo;新增文章&rdquo;创建第一&apos;                    </td>
                   </tr>
                 )}
               </tbody>
@@ -665,7 +665,7 @@ export default function AdminHelpArticlesPage() {
           <div className="mx-4 w-full max-w-md rounded-xl border border-[var(--cine-line-2)] bg-[var(--cine-surface)] p-6 shadow-2xl">
             <h3 className="mb-2 text-lg font-semibold text-white">确认删除</h3>
             <p className="mb-6 text-sm text-[var(--cine-text-2)]">
-              确定要删除文章「{deleteTarget.title}」吗？此操作不可撤'            </p>
+              确定要删除文章「{deleteTarget.title}」吗？此操作不可撤&apos;            </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}

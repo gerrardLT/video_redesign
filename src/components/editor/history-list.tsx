@@ -81,6 +81,7 @@ export function HistoryList({
   const records = cursor ? allRecords : (data?.records ?? [])
 
   // 加载更多
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const loadMore = useCallback(() => {
     if (data?.nextCursor) {
       setCursor(data.nextCursor)

@@ -237,6 +237,7 @@ export function PreviewModal({ asset, onClose, onDownload }: PreviewModalProps) 
   const scalePercent = Math.round(transform.scale * 100)
 
   // 判断是否可拖拽（图片超出视口）
+  // eslint-disable-next-line react-hooks/refs
   const viewport = getViewportSize()
   const canDrag = (transform.scale * imgSize.width > viewport.width) || (transform.scale * imgSize.height > viewport.height)
 
