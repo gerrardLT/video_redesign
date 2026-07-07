@@ -102,7 +102,9 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules/bullmq ./node_modules/bullmq
 COPY --from=builder /app/node_modules/ioredis ./node_modules/ioredis
 COPY --from=builder /app/node_modules/tsx ./node_modules/tsx
-COPY --from=builder /app/node_modules/esbuild ./node_modules/esbuild
+# esbuild 从 deps 阶段拷贝（builder 阶段 standalone 不含此包，且 pnpm 符号链接结构在 builder 中不可靠）
+COPY --from=deps /app/node_modules/esbuild ./node_modules/esbuild
+COPY --from=deps /app/node_modules/@esbuild ./node_modules/@esbuild
 COPY --from=builder /app/node_modules/ali-oss ./node_modules/ali-oss
 COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
 COPY --from=builder /app/node_modules/jose ./node_modules/jose
