@@ -7,7 +7,8 @@ export const metadata: Metadata = {
   description: '快速入门指南、详细操作说明和常见问题解答',
 }
 
-// ISR: ?60 秒重新'export const revalidate = 60
+// 动态渲染：构建时不预渲染（避免构建环境无数据库连接）
+export const dynamic = 'force-dynamic'
 
 export default async function HelpCenterPage() {
   const sections: GroupedArticles = await listBySection()
