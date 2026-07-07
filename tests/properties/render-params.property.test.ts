@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 16: 高级参数可解释标注
+﻿// Feature: local-life-depth-enhancements, Property 16: 高级参数可解释标注
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -38,7 +38,7 @@ const captured = vi.hoisted(() => ({
 // ========================
 // Mock Prisma（内存桩）
 // ========================
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   // 固定的 variant 上下文：单一已拍镜头（含 rawAssets），使 assembleVariantClips
   // 走「已有素材」单片段分支，无需 Seedance 补充，compositeVideo 走单片段分支。
   const buildVariant = () => ({
@@ -93,12 +93,12 @@ vi.mock('@/lib/db', () => {
 // ========================
 // Mock 计费链路（余额恒充足，reserve/charge/refund 内存桩）
 // ========================
-vi.mock('@/lib/credit-service', () => ({
+vi.mock('@/lib/shared/credit-service', () => ({
   getBalance: vi.fn(async () => 1_000_000),
   estimateGroupCreditCost: vi.fn(() => 10),
 }))
 
-vi.mock('@/lib/merchant-billing-service', () => ({
+vi.mock('@/lib/merchant/merchant-billing-service', () => ({
   estimateRenderCost: vi.fn(() => 10),
   reserveMerchantCredits: vi.fn(async () => undefined),
   chargeMerchantCredits: vi.fn(async () => undefined),
@@ -108,27 +108,27 @@ vi.mock('@/lib/merchant-billing-service', () => ({
 // ========================
 // Mock 存储 / 锁 / 外部生成 / SSE / 影响范围（内存桩）
 // ========================
-vi.mock('@/lib/storage', () => ({
+vi.mock('@/lib/shared/storage', () => ({
   uploadBuffer: vi.fn(async () => undefined),
   getSignedObjectUrl: vi.fn(() => 'https://example.com/signed'),
   downloadToTemp: vi.fn(async () => undefined),
 }))
 
-vi.mock('@/lib/distributed-lock', () => ({
+vi.mock('@/lib/shared/distributed-lock', () => ({
   acquireLock: vi.fn(async () => true),
   releaseLock: vi.fn(async () => undefined),
 }))
 
-vi.mock('@/lib/seedance', () => ({
+vi.mock('@/lib/video/seedance', () => ({
   createSeedanceTask: vi.fn(async () => ({ taskId: 'task_1' })),
   getSeedanceTaskStatus: vi.fn(async () => ({ status: 'succeeded', videoUrl: 'https://example.com/v.mp4' })),
 }))
 
-vi.mock('@/lib/progress-publisher', () => ({
+vi.mock('@/lib/shared/progress-publisher', () => ({
   publishProgress: vi.fn(async () => undefined),
 }))
 
-vi.mock('@/lib/impact-scope-service', () => ({
+vi.mock('@/lib/merchant/impact-scope-service', () => ({
   computeReshootScope: vi.fn(async () => ({ affectedGroupIds: [], hasContinuityChain: false })),
 }))
 
@@ -170,7 +170,7 @@ vi.mock('child_process', () => ({
 }))
 
 // 动态导入：确保上述 mock 在被测模块加载前生效
-const { regenerateSingleVariant } = await import('@/lib/local-render-service')
+const { regenerateSingleVariant } = await import('@/lib/merchant/local-render-service')
 
 // ========================
 // Arbitraries

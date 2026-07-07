@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/content-briefs/[briefId]/render — 触发视频生成
  *
  * 流程：
@@ -31,13 +31,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { calculateContentEntropy } from '@/lib/content-entropy-service'
-import { estimateRenderCost, reserveMerchantCredits } from '@/lib/merchant-billing-service'
-import { getBalance } from '@/lib/credit-service'
-import { renderLocalVideoQueue } from '@/lib/queue'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { calculateContentEntropy } from '@/lib/merchant/content-entropy-service'
+import { estimateRenderCost, reserveMerchantCredits } from '@/lib/merchant/merchant-billing-service'
+import { getBalance } from '@/lib/shared/credit-service'
+import { renderLocalVideoQueue } from '@/lib/shared/queue'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/asset-library/upload
  * 资产库上传接口 — 上传文件到 OSS 并写入 Asset 表
  *
@@ -10,9 +10,9 @@
  * Response: { id, url, thumbUrl, category, displayName }
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { uploadBuffer, getPublicUrl } from '@/lib/storage'
-import { validateFile } from '@/lib/workspace-validators'
+import { prisma } from '@/lib/shared/db'
+import { uploadBuffer, getPublicUrl } from '@/lib/shared/storage'
+import { validateFile } from '@/lib/video/workspace-validators'
 
 const VALID_CATEGORIES = ['CHARACTER', 'MATERIAL', 'AUDIO'] as const
 

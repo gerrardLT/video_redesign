@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 15: 受影响范围闭包不变式
+﻿// Feature: local-life-depth-enhancements, Property 15: 受影响范围闭包不变式
 import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
 
@@ -29,7 +29,7 @@ import fc from 'fast-check'
 // ========================
 // Mock Prisma（内存桩：捕获 where 过滤并按 order 升序返回，模拟真实 findMany）
 // ========================
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     shotTask: {
       findMany: vi.fn(),
@@ -38,8 +38,8 @@ vi.mock('@/lib/db', () => ({
 }))
 
 // 动态导入以确保 mock 生效
-const { prisma } = await import('@/lib/db')
-const { computeReshootScope } = await import('@/lib/impact-scope-service')
+const { prisma } = await import('@/lib/shared/db')
+const { computeReshootScope } = await import('@/lib/merchant/impact-scope-service')
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const findMany = prisma.shotTask.findMany as unknown as ReturnType<typeof vi.fn>

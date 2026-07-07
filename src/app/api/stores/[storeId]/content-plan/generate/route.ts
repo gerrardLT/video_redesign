@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/stores/[storeId]/content-plan/generate — 触发生成 7 天内容计划
  *
  * 验证商家权限后，按固定单价 CREDIT_COST_CONTENT_PLAN 冻结积分（RESERVE），
@@ -28,11 +28,11 @@
 
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { reserveMerchantCredits } from '@/lib/merchant-billing-service'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { reserveMerchantCredits } from '@/lib/merchant/merchant-billing-service'
 import { CREDIT_COST_CONTENT_PLAN } from '@/constants/merchant'
-import { generateContentPlanQueue } from '@/lib/queue'
-import { ApiError } from '@/lib/api-error'
+import { generateContentPlanQueue } from '@/lib/shared/queue'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

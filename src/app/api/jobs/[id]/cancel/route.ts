@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { canCancel, assertTransition } from '@/lib/state-machine'
-import { refundCredits } from '@/lib/credit-service'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/shared/db'
+import { canCancel, assertTransition } from '@/lib/shared/state-machine'
+import { refundCredits } from '@/lib/shared/credit-service'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * QualityReportBadge — 质量检测结果徽章
@@ -14,7 +14,7 @@
  */
 
 import { Check, X, AlertTriangle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 interface QualityReportBadgeProps {
   /** 质量评分 (0-100) */

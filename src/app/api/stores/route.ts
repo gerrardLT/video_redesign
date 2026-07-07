@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores — 获取当前用户所有门店列表
  * POST /api/stores — 新建门店（建店）
  *
@@ -22,26 +22,22 @@
  *
  * Requirements: 15.1, 16.5, 2.3, 3.4, 5.5
  */
-
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest, getMerchantByUserId } from '@/lib/merchant-auth'
-import { getMerchantPrivileges } from '@/lib/privilege-engine'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest, getMerchantByUserId } from '@/lib/merchant/merchant-auth'
+import { getMerchantPrivileges } from '@/lib/shared/privilege-engine'
 import { StoreInputSchema } from '@/lib/validations/merchant'
 import { MERCHANT_PRIVILEGE_MAPPING } from '@/constants/merchant'
 import type { UserTier } from '@/constants/concurrency'
-import { ApiError } from '@/lib/api-error'
-
+import { ApiError } from '@/lib/shared/api-error'
 /** UserTier 由低到高的等级序，用于推导可解除门店上限的最低等级 */
 const TIER_ORDER: readonly UserTier[] = ['FREE', 'MONTHLY', 'YEARLY']
-
 /** UserTier 中文展示名，用于升级提示文案 */
 const TIER_LABELS: Record<UserTier, string> = {
   FREE: '免费版',
   MONTHLY: '月卡会员',
   YEARLY: '年卡会员',
 }
-
 /**
  * 推导可解除门店数量限制的最低等级：
  * 从低到高遍历 UserTier，返回首个 maxStores 严格大于当前上限的等级标签。
@@ -58,12 +54,10 @@ function findMinUnlockTierLabel(currentMaxStores: number): string | null {
   }
   return null
 }
-
 export async function GET(request: NextRequest) {
   try {
     // 1. 鉴权
     const userId = getUserIdFromRequest(request)
-
     // 2. 查找商家及其门店
     const merchant = await getMerchantByUserId(userId)
     if (!merchant) {
@@ -72,7 +66,6 @@ export async function GET(request: NextRequest) {
         { status: 403 }
       )
     }
-
     // 3. 获取门店列表，包含 profile 和 offers 的基础统计
     const stores = await prisma.store.findMany({
       where: { merchantId: merchant.id },
@@ -82,7 +75,6 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { createdAt: 'desc' },
     })
-
     return NextResponse.json({ stores })
   } catch (error) {
     if (error instanceof ApiError) {
@@ -98,12 +90,10 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-
 export async function POST(request: NextRequest) {
   try {
     // 1. 鉴权
     const userId = getUserIdFromRequest(request)
-
     // 2. 校验商家身份（建店需已完成问诊）
     const merchant = await getMerchantByUserId(userId)
     if (!merchant) {
@@ -112,7 +102,6 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       )
     }
-
     // 3. 解析并校验请求体
     let body: unknown
     try {
@@ -123,7 +112,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
     const parseResult = StoreInputSchema.safeParse(body)
     if (!parseResult.success) {
       const fieldErrors = parseResult.error.issues.map((issue) => ({
@@ -135,16 +123,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
     const data = parseResult.data
-
     // 4. 门店数量权益门控（不扣减积分，仅按 User_Tier 权益判定）
     const privileges = await getMerchantPrivileges(userId)
     const maxStores = privileges.maxStores
     const currentStores = await prisma.store.count({
       where: { merchantId: merchant.id },
     })
-
     if (currentStores >= maxStores) {
       // 升级提示三要素：当前门店数、上限值、可解除限制的最低等级
       const minUnlockTierLabel = findMinUnlockTierLabel(maxStores)
@@ -152,7 +137,6 @@ export async function POST(request: NextRequest) {
         minUnlockTierLabel === null
           ? `门店数量已达上限（当前 ${currentStores} 家，上限 ${maxStores} 家），当前已是最高会员等级，暂无更高等级可解除该限制`
           : `门店数量已达上限（当前 ${currentStores} 家，上限 ${maxStores} 家），升级到${minUnlockTierLabel}即可创建更多门店`
-
       return NextResponse.json(
         {
           error: {
@@ -166,7 +150,6 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       )
     }
-
     // 5. 创建门店
     const store = await prisma.store.create({
       data: {
@@ -189,7 +172,6 @@ export async function POST(request: NextRequest) {
         hasReservation: data.hasReservation,
       },
     })
-
     return NextResponse.json({ store }, { status: 201 })
   } catch (error) {
     if (error instanceof ApiError) {

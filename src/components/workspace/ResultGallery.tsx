@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 结果画廊组件
@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import type { GalleryItem, GalleryTab } from '@/types/workspace'
 
 export function ResultGallery() {

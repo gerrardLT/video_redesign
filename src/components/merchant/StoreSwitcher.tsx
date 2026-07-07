@@ -129,11 +129,11 @@ export function StoreSwitcher({ currentStoreId, storeName }: StoreSwitcherProps)
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1 max-w-[55%] rounded-full px-2 py-1 -ml-2 text-amber-900 hover:bg-amber-100 transition-colors"
+        className="flex items-center gap-1 max-w-[55%] rounded-full px-2 py-1 -ml-2 text-[var(--ll-green-sb)] hover:bg-[var(--ll-green-light)] transition-colors"
         aria-label="切换门店"
       >
-        <span className="text-lg font-semibold truncate">{storeName}</span>
-        <ChevronDown className="h-4 w-4 shrink-0 text-amber-600" />
+        <span className="font-[var(--font-serif)] text-[18px] font-semibold tracking-[.02em] truncate">{storeName}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ll-text-3)]" strokeWidth={1.5} />
       </button>
 
       {/* 门店选择弹窗 */}

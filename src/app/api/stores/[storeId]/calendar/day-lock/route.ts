@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PUT /api/stores/[storeId]/calendar/day-lock — 锁定/跳过/恢复某天（需求 6.5）
  *
  * 写入 CalendarDayState（按 storeId + 自然日 UTC 零点为唯一键 upsert）。下一轮自动生成
@@ -23,9 +23,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { setDayLockState } from '@/lib/content-calendar-service'
-import { ApiError } from '@/lib/api-error'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { setDayLockState } from '@/lib/merchant/content-calendar-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

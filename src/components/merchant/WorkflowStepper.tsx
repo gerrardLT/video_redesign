@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * WorkflowStepper — 5 步线性工作流指示器
@@ -14,7 +14,7 @@
  */
 
 import { Check } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 /** 工作流步骤标签 — 使用日常用语 */
 const STEP_LABELS = ['看任务', '拍摄', '上传', '生成', '导出'] as const

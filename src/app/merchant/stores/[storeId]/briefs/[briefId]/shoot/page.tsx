@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 拍摄上传页 — /merchant/stores/[storeId]/briefs/[briefId]/shoot
@@ -53,7 +53,7 @@ import {
   Mic,
   MicOff,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -212,7 +212,7 @@ export default function ShootUploadPage() {
   useEffect(() => {
     if (!isRendering) return
     const entry = progressMap.get(briefId)
-    const done = entry?.status === 'completed' || (entry?.progress ?? 0) >= 100
+    const done = entry?.eventType === 'completed' || (entry?.progress ?? 0) >= 100
     if (done) {
       void mutateBrief()
     }
@@ -312,14 +312,14 @@ export default function ShootUploadPage() {
   return (
     <div className="max-w-lg mx-auto px-4 pb-32">
       {/* 顶部进度 */}
-      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm py-4 border-b border-amber-100">
+      <div className="sticky top-0 z-10 bg-[var(--ll-surface)]/95 backdrop-blur-sm py-4 border-b border-[var(--ll-hair)]">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-lg font-bold text-gray-800">拍摄上传</h1>
-          <span className="text-sm font-medium text-amber-600">
+          <h1 className="text-lg font-bold text-[var(--ll-text)]">拍摄上传</h1>
+          <span className="text-sm font-medium text-[var(--ll-green)]">
             {completedRequired.length}/{requiredTasks.length} 个必拍镜头
           </span>
         </div>
-        <Progress value={progressPercent} className="h-2.5 bg-amber-100" />
+        <Progress value={progressPercent} className="h-2" />
       </div>
 
       {/* 错误提示 */}
@@ -373,17 +373,18 @@ export default function ShootUploadPage() {
         </div>
       )}
 
-      {/* 底部生成按钮 */}
+      {/* 底部生成按钮 — 全部通过时脉冲发光，文案切换为「开始创作」 */}
       {!isRendering && !isGenerated && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-sm border-t border-amber-100">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-sm border-t border-[var(--ll-hair)]">
           <div className="max-w-lg mx-auto">
             <Button
               className={cn(
                 'w-full h-12 rounded-xl text-base font-bold transition-all',
                 allRequiredPassed
-                  ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-200'
+                  ? 'bg-[var(--ll-green)] hover:bg-[var(--ll-green)]/90 text-white shadow-lg shadow-[var(--ll-green)]/20'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               )}
+              style={allRequiredPassed ? { animation: 'zenPulse 2.4s ease-in-out infinite' } : undefined}
               disabled={!allRequiredPassed || renderingState === 'submitting'}
               onClick={handleRender}
             >
@@ -391,6 +392,11 @@ export default function ShootUploadPage() {
                 <>
                   <Loader2 className="h-5 w-5 animate-spin mr-2" />
                   提交中...
+                </>
+              ) : allRequiredPassed ? (
+                <>
+                  <Sparkles className="h-5 w-5 mr-2" />
+                  开始创作
                 </>
               ) : (
                 <>

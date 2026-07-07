@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { verifyToken } from '@/lib/auth'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/shared/db'
+import { verifyToken } from '@/lib/shared/auth'
 
 export const dynamic = 'force-dynamic'
 

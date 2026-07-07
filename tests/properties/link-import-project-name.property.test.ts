@@ -1,12 +1,21 @@
-import { describe, it, expect } from 'vitest'
+﻿import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
+
+// Mock db/redis 模块，避免 DATABASE_URL 缺失导致的初始化错误
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+vi.mock('@/lib/shared/redis', () => ({
+  redis: new Proxy({}, { get: () => vi.fn() })
+}))
+
 import {
   resolveImportedProjectName,
   buildProjectUpdateOnDownloadComplete,
   buildImportPlaceholderName,
   isBlank,
   PROJECT_NAME_MAX_LENGTH,
-} from '@/lib/video-import-service'
+} from '@/lib/shared/video-import-service'
 
 /**
  * Feature: link-import-project-name-fix

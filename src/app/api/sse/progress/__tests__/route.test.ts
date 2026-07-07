@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SSE Route Handler 单元测试
  *
  * 测试 GET /api/sse/progress 的核心行为：
@@ -33,7 +33,7 @@ vi.mock('@/lib/sse/redis-subscriber', () => ({
 }))
 
 // Mock logger
-vi.mock('@/lib/logger', () => ({
+vi.mock('@/lib/shared/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
@@ -82,11 +82,12 @@ describe('GET /api/sse/progress', () => {
       expect(response.status).toBe(200)
     })
 
-    it('无 x-user-id 但有 token query 参数时正常建立连接', async () => {
+    it('无 x-user-id 但有明文 token query 参数时返回 401（需 JWT 签名验证）', async () => {
       const request = createMockRequest({}, { token: 'user-456' })
       const response = await GET(request)
 
-      expect(response.status).toBe(200)
+      // token 需要是有效 JWT，明文 userId 无法通过 jwtVerify
+      expect(response.status).toBe(401)
     })
   })
 

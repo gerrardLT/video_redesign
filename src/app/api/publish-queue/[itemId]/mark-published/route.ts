@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/publish-queue/[itemId]/mark-published — 手动标记已发布（需求 8.4）
  *
  * 调用 publish-queue-service.markPublished：将「平台 + 发布时间」写入清单项的
@@ -26,11 +26,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { markPublished, PublishQueueError } from '@/lib/publish-queue-service'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { markPublished, PublishQueueError } from '@/lib/merchant/publish-queue-service'
 import { PublishPlatformSchema } from '@/types/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ itemId: string }>

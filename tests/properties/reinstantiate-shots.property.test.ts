@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 21: 换选题重实例化
+﻿// Feature: local-life-depth-enhancements, Property 21: 换选题重实例化
 //
 // 属性：对任意 更换 playbook 的 brief，重实例化后该 brief 的 shotTasks 类型集合
 //   SHALL 与新 playbook 的 requiredShots 相符（脚本与文案草稿基于新 playbook 重建）。
@@ -41,7 +41,7 @@ const h = vi.hoisted(() => {
   return { state }
 })
 
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const { state } = h
   const prisma = {
     store: {
@@ -82,8 +82,8 @@ vi.mock('@/lib/db', () => {
 })
 
 // instantiatePlaybookWithProvenance 走桩：按 playbook.requiredShots 派生 shotTasks（每类型一条）
-vi.mock('@/lib/playbook-engine', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/playbook-engine')>()
+vi.mock('@/lib/merchant/playbook-engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/merchant/playbook-engine')>()
   return {
     ...actual,
     instantiatePlaybookWithProvenance: vi.fn(
@@ -119,7 +119,7 @@ vi.mock('@/lib/playbook-engine', async (importOriginal) => {
   }
 })
 
-const { editContentBrief } = await import('@/lib/content-calendar-service')
+const { editContentBrief } = await import('@/lib/merchant/content-calendar-service')
 
 // ============================================================
 // 测试夹具

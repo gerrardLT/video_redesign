@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
-import { uploadBuffer } from '@/lib/storage'
+import { uploadBuffer } from '@/lib/shared/storage'
 
 export const dynamic = 'force-dynamic'
 

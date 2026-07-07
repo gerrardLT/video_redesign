@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 商家首页 — /merchant
  *
  * 根据用户门店情况进行重定向：
@@ -12,7 +12,7 @@
 
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 
 export default async function MerchantHomePage() {
   // 从 headers 获取 userId（由 middleware 注入）

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/content-briefs/[briefId]/copy/rewrite-platform — 按平台调性改写文案（需求 2.4, 2.3）
  *
  * 以该平台现有文案为输入，按抖音/小红书/视频号等平台调性重写（保留门店核心卖点与优惠信息），
@@ -27,11 +27,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { rewriteForPlatform } from '@/lib/publish-copy-service'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { rewriteForPlatform } from '@/lib/merchant/publish-copy-service'
 import { PublishPlatformSchema } from '@/types/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>

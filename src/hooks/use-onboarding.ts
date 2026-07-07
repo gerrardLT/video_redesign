@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * useOnboarding Hook
@@ -11,7 +11,7 @@
 
 import useSWR from 'swr'
 import { toast } from 'sonner'
-import type { OnboardingStepId, OnboardingProgress } from '@/lib/onboarding-service'
+import type { OnboardingStepId, OnboardingProgress } from '@/lib/shared/onboarding-service'
 
 // ========================
 // 类型定义

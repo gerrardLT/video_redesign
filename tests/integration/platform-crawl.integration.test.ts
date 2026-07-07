@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 集成测试 16.4：平台账号关联与受控抓取（真实凭证流程 + 写入 PublishMetric）
  *
  * 验证：真实凭证授权/加密存储流程 + 受控抓取写入 PublishMetric（source=API_SYNC，与 MANUAL 共存），
@@ -32,7 +32,7 @@ describe.skipIf(!enabled)('集成16.4 平台账号关联与受控抓取（真实
   const platform = (process.env.INTEGRATION_PLATFORM as PublishPlatform) || ('DOUYIN' as PublishPlatform)
 
   it('授权前置：requestAccountLink 返回风险告知 + authToken；saveCredential 在未确认时拒绝（Property 24）', async () => {
-    const { requestAccountLink, saveCredential } = await import('@/lib/platform-metrics-crawler')
+    const { requestAccountLink, saveCredential } = await import('@/lib/merchant/platform-metrics-crawler')
     const storeId = env('INTEGRATION_STORE_ID')
 
     const notice = await requestAccountLink({ storeId, platform })
@@ -48,8 +48,8 @@ describe.skipIf(!enabled)('集成16.4 平台账号关联与受控抓取（真实
   }, 60_000)
 
   it('凭证加密存储 + 成功抓取写入 PublishMetric(source=API_SYNC)，与 MANUAL 共存不覆盖', async () => {
-    const { saveCredential, crawlAccountMetrics, decryptCredential } = await import('@/lib/platform-metrics-crawler')
-    const { prisma } = await import('@/lib/db')
+    const { saveCredential, crawlAccountMetrics, decryptCredential } = await import('@/lib/merchant/platform-metrics-crawler')
+    const { prisma } = await import('@/lib/shared/db')
 
     const storeId = env('INTEGRATION_STORE_ID')
     const contentBriefId = env('INTEGRATION_BRIEF_ID')
@@ -97,8 +97,8 @@ describe.skipIf(!enabled)('集成16.4 平台账号关联与受控抓取（真实
   }, 120_000)
 
   it('抓取失败 → 标记 NEEDS_RELINK 且不写任何 metric（Property 27）', async () => {
-    const { saveCredential, crawlAccountMetrics } = await import('@/lib/platform-metrics-crawler')
-    const { prisma } = await import('@/lib/db')
+    const { saveCredential, crawlAccountMetrics } = await import('@/lib/merchant/platform-metrics-crawler')
+    const { prisma } = await import('@/lib/shared/db')
 
     const storeId = env('INTEGRATION_STORE_ID')
     // 重新关联复位为 ACTIVE，并把 lastCrawledAt 清空以通过频率门控

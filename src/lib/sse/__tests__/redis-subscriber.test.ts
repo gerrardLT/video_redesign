@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Redis Subscriber Manager 单元测试
  *
  * 测试 RedisSubscriberManager 的核心逻辑：
@@ -33,7 +33,7 @@ vi.mock('ioredis', () => {
   return { default: MockRedis }
 })
 
-vi.mock('@/lib/logger', () => ({
+vi.mock('@/lib/shared/logger', () => ({
   logger: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -41,7 +41,7 @@ vi.mock('@/lib/logger', () => ({
   },
 }))
 
-import { logger } from '@/lib/logger'
+import { logger } from '@/lib/shared/logger'
 
 // 每个测试需要一个全新的 redisSubscriber 实例
 let redisSubscriber: Awaited<typeof import('../redis-subscriber')>['redisSubscriber']
@@ -66,7 +66,7 @@ beforeEach(async () => {
     return { default: MockRedis }
   })
 
-  vi.doMock('@/lib/logger', () => ({
+  vi.doMock('@/lib/shared/logger', () => ({
     logger: {
       info: vi.fn(),
       warn: vi.fn(),
@@ -160,7 +160,7 @@ describe('RedisSubscriberManager', () => {
 
   describe('无效 JSON 消息被丢弃而非抛出异常', () => {
     it('收到无效 JSON 时不抛异常，记录错误日志', async () => {
-      const { logger: loggerMock } = await import('@/lib/logger')
+      const { logger: loggerMock } = await import('@/lib/shared/logger')
       const callback = vi.fn()
 
       redisSubscriber.subscribe('user-1', callback)

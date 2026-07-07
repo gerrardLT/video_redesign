@@ -1,4 +1,4 @@
-/**
+﻿/**
  * HappyHorse UI Enhancement — 属性化测试
  *
  * 使用 fast-check 对核心纯函数和逻辑进行属性测试，
@@ -12,8 +12,8 @@ import {
   removePlaceholderAndRenumber,
   validateReferenceImage,
   formatRemainingTime,
-} from '@/lib/placeholder-utils'
-import { estimateHappyHorseCreditCost } from '@/lib/credit-calc'
+} from '@/lib/shared/placeholder-utils'
+import { estimateHappyHorseCreditCost } from '@/lib/shared/credit-calc'
 
 // ============================================================
 // Property 3: 占位符插入位置正确性

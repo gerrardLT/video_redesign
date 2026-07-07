@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 6: 跨周对比差值一致性
+﻿// Feature: local-life-depth-enhancements, Property 6: 跨周对比差值一致性
 
 import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
@@ -23,16 +23,16 @@ import fc from 'fast-check'
 // Mock Prisma（仅 getPeriodComparison 用到的读取）
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     storeProfile: { findUnique: vi.fn() },
     contentBrief: { findMany: vi.fn() },
   },
 }))
 
-const { prisma } = await import('@/lib/db')
-const { getPeriodComparison } = await import('@/lib/performance-learning-service')
-const { resolvePeriods } = await import('@/lib/period-service')
+const { prisma } = await import('@/lib/shared/db')
+const { getPeriodComparison } = await import('@/lib/merchant/performance-learning-service')
+const { resolvePeriods } = await import('@/lib/merchant/period-service')
 
 // ========================
 // 常量与工具

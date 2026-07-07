@@ -1,6 +1,6 @@
-'use client'
+﻿'use client'
 
-import type { ExpiryStatus } from '@/lib/expiry-status'
+import type { ExpiryStatus } from '@/lib/shared/expiry-status'
 
 /**
  * 资产过期状态徽章组件

@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 24: 授权确认前置
+﻿// Feature: local-life-depth-enhancements, Property 24: 授权确认前置
 /**
  * 属性测试：平台凭证「授权确认前置」（Property 24）
  *
@@ -31,14 +31,14 @@ beforeAll(() => {
 // Mock Prisma：仅替换 platformAccount.upsert 写入，隔离纯授权/加密逻辑
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     platformAccount: { upsert: vi.fn() },
   },
 }))
 
-import { prisma } from '@/lib/db'
-import { saveCredential, CredentialAuthError } from '@/lib/platform-metrics-crawler'
+import { prisma } from '@/lib/shared/db'
+import { saveCredential, CredentialAuthError } from '@/lib/merchant/platform-metrics-crawler'
 import type { PublishPlatform } from '@/types/merchant'
 
 // upsert 内存桩：回显传入的 create 数据（含 encryptedCookie）作为返回账号
@@ -72,13 +72,13 @@ describe('Property 24: 授权确认前置（saveCredential）', () => {
   beforeEach(() => {
     upsertMock.mockReset()
     // 默认回显 create 数据，使返回结构含 encryptedCookie 供断言
-    upsertMock.mockImplementation(async (args: any) => ({
+    upsertMock.mockImplementation((async (args: any) => ({
       id: 'acc-test',
       ...args.create,
       lastCrawledAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
-    }))
+    })) as any)
   })
 
   it('authConfirmed !== true 时拒绝保存且不调用 upsert；=== true 时调用 upsert 且存储值非明文 cookie', async () => {

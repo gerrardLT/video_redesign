@@ -19,12 +19,28 @@ const activeWorkers: Worker[] = []
 
 /**
  * 注册 Worker 实例到全局列表（用于优雅退出时逐一 close）
+ * 支持单 Worker default 导出或多 Worker 命名导出（如 generate-content-plan 导出 storeProfileWorker + contentPlanWorker）
  */
-function registerWorker(workerModule: { default?: Worker } & Record<string, unknown>) {
-  // Worker 通常作为 default export 或命名导出
-  const worker = workerModule.default || Object.values(workerModule).find(v => v instanceof Worker)
-  if (worker instanceof Worker) {
-    activeWorkers.push(worker)
+function registerWorker(workerModule: { default?: Worker | Record<string, unknown> } & Record<string, unknown>) {
+  // 情况 1：default export 为单个 Worker 实例
+  if (workerModule.default instanceof Worker) {
+    activeWorkers.push(workerModule.default)
+    return
+  }
+  // 情况 2：default export 为包含多个 Worker 的对象（如 { storeProfileWorker, contentPlanWorker }）
+  if (workerModule.default && typeof workerModule.default === 'object') {
+    for (const val of Object.values(workerModule.default)) {
+      if (val instanceof Worker) {
+        activeWorkers.push(val)
+      }
+    }
+    return
+  }
+  // 情况 3：命名导出中查找所有 Worker 实例
+  for (const val of Object.values(workerModule)) {
+    if (val instanceof Worker) {
+      activeWorkers.push(val)
+    }
   }
 }
 
@@ -244,9 +260,17 @@ async function startWorkers() {
     console.error('[Workers] ❌ crawl-platform-metrics Worker 启动失败:', err)
   }
 
+  try {
+    const mod = await import('./matrix-publish')
+    registerWorker(mod)
+    console.log('[Workers] ✅ matrix-publish Worker 已启动')
+  } catch (err) {
+    console.error('[Workers] ❌ matrix-publish Worker 启动失败:', err)
+  }
+
   // 注册所有 Repeatable 定时调度任务（资产清理、过期提醒、订单过期、解析看门狗、订阅到期、并发对账）
   try {
-    const { registerCommercializationSchedules } = await import('../lib/queue')
+    const { registerCommercializationSchedules } = await import('../lib/shared/queue')
     await registerCommercializationSchedules()
     console.log('[Workers] ✅ 定时调度任务已注册')
   } catch (err) {

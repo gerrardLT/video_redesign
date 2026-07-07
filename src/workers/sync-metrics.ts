@@ -1,12 +1,12 @@
-/**
+﻿/**
  * 数据同步 Worker（第一阶段占位）
  *
  * 后续实现：通过平台 API 自动同步视频表现数据。
  * 当前阶段不处理任何 job，明确返回 NotImplemented 状态。
  */
 import { Worker, UnrecoverableError, type ConnectionOptions } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { logger } from '@/lib/shared/logger'
 
 const connection = redis as unknown as ConnectionOptions
 

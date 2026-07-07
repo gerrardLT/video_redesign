@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest'
 import {
   hasGroupAppearanceChanged,
   aggregateGroupAppearances,
-} from '@/lib/appearance-comparator'
+} from '@/lib/video/appearance-comparator'
 import type { AppearanceDescriptor, CharacterAppearanceRecord } from '@/types/appearance'
 
 // ========================

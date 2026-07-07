@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
-import { aggregateGroupAppearances } from '@/lib/appearance-comparator'
+import { aggregateGroupAppearances } from '@/lib/video/appearance-comparator'
 import type { AppearanceDescriptor } from '@/types/appearance'
 
 /** 外观描述涉及的四个维度 */

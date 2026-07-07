@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * ComplianceBadge — 合规状态徽章
@@ -15,7 +15,7 @@
  */
 
 import { Check, AlertTriangle, ShieldAlert, Ban } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import type { ComplianceRiskLevel } from '@/types/merchant'
 
 interface ComplianceBadgeProps {

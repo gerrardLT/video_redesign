@@ -1,10 +1,10 @@
-'use client'
+﻿'use client'
 
 import { useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 /**
  * 版本卡片组件 Props

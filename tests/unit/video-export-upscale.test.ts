@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+﻿import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 /**
  * 单元测试: video-export-upscale
@@ -9,16 +9,30 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  * - 导出状态流转正确性
  */
 
+// Mock db 模块，避免 DATABASE_URL 缺失导致的初始化错误
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, {
+    get: () => new Proxy({}, { get: () => vi.fn() })
+  })
+}))
+
+// Mock redis 模块，避免 REDIS_URL 缺失导致的初始化错误
+vi.mock('@/lib/shared/redis', () => ({
+  redis: new Proxy({}, {
+    get: () => vi.fn()
+  })
+}))
+
 // ========================
 // 1. 积分计算函数测试
 // ========================
 
 describe('estimateUpscaleCreditCost', () => {
-  let estimateUpscaleCreditCost: typeof import('@/lib/credit-service').estimateUpscaleCreditCost
+  let estimateUpscaleCreditCost: typeof import('@/lib/shared/credit-service').estimateUpscaleCreditCost
 
   beforeEach(async () => {
     vi.resetModules()
-    const mod = await import('@/lib/credit-service')
+    const mod = await import('@/lib/shared/credit-service')
     estimateUpscaleCreditCost = mod.estimateUpscaleCreditCost
   })
 
@@ -44,9 +58,10 @@ describe('estimateUpscaleCreditCost', () => {
   })
 
   it('非标准分辨率返回 0', () => {
-    expect(estimateUpscaleCreditCost(100, '360p')).toBe(0)
-    expect(estimateUpscaleCreditCost(100, '4k')).toBe(0)
-    expect(estimateUpscaleCreditCost(100, '')).toBe(0)
+    // 测试运行时对无效输入的处理（用 as any 绕过类型检查）
+    expect(estimateUpscaleCreditCost(100, '360p' as any)).toBe(0)
+    expect(estimateUpscaleCreditCost(100, '4k' as any)).toBe(0)
+    expect(estimateUpscaleCreditCost(100, '' as any)).toBe(0)
   })
 })
 
@@ -55,9 +70,9 @@ describe('estimateUpscaleCreditCost', () => {
 // ========================
 
 describe('WaveSpeed 客户端', () => {
-  let submitUpscaleTask: typeof import('@/lib/wavespeed').submitUpscaleTask
-  let getUpscaleResult: typeof import('@/lib/wavespeed').getUpscaleResult
-  let WaveSpeedApiError: typeof import('@/lib/wavespeed').WaveSpeedApiError
+  let submitUpscaleTask: typeof import('@/lib/video/wavespeed').submitUpscaleTask
+  let getUpscaleResult: typeof import('@/lib/video/wavespeed').getUpscaleResult
+  let WaveSpeedApiError: typeof import('@/lib/video/wavespeed').WaveSpeedApiError
 
   beforeEach(async () => {
     vi.resetModules()
@@ -73,7 +88,7 @@ describe('WaveSpeed 客户端', () => {
 
   it('无 API Key 时抛出明确错误', async () => {
     delete process.env.WAVESPEED_API_KEY
-    const mod = await import('@/lib/wavespeed')
+    const mod = await import('@/lib/video/wavespeed')
 
     await expect(
       mod.submitUpscaleTask({ video: 'https://example.com/v.mp4', targetResolution: '720p' })
@@ -91,7 +106,7 @@ describe('WaveSpeed 客户端', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const mod = await import('@/lib/wavespeed')
+    const mod = await import('@/lib/video/wavespeed')
     const result = await mod.submitUpscaleTask({
       video: 'https://oss.example.com/video.mp4',
       targetResolution: '1080p',
@@ -118,7 +133,7 @@ describe('WaveSpeed 客户端', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const mod = await import('@/lib/wavespeed')
+    const mod = await import('@/lib/video/wavespeed')
 
     await expect(
       mod.submitUpscaleTask({ video: 'https://x.com/v.mp4', targetResolution: '720p' })
@@ -140,7 +155,7 @@ describe('WaveSpeed 客户端', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const mod = await import('@/lib/wavespeed')
+    const mod = await import('@/lib/video/wavespeed')
     const result = await mod.getUpscaleResult('req-456')
 
     expect(result.status).toBe('completed')
@@ -163,7 +178,7 @@ describe('WaveSpeed 客户端', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const mod = await import('@/lib/wavespeed')
+    const mod = await import('@/lib/video/wavespeed')
     const result = await mod.getUpscaleResult('req-789')
 
     expect(result.status).toBe('failed')
@@ -171,7 +186,7 @@ describe('WaveSpeed 客户端', () => {
   })
 
   it('WaveSpeedApiError 正确分类 5xx 和 429', async () => {
-    const mod = await import('@/lib/wavespeed')
+    const mod = await import('@/lib/video/wavespeed')
 
     const err5xx = new mod.WaveSpeedApiError('Server Error', 502)
     expect(err5xx.isServerError).toBe(true)

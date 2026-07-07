@@ -1,17 +1,17 @@
-/**
+﻿/**
  * 视频合并 Worker
  * 处理 video-merge 队列任务
  *
  * 流程：下载各分镜视频 → 收集段信息 → 计算转场计划 → FFmpeg concat 合并（含转场 filter）→ 输出本地文件 → 更新数据库
  */
 import { Worker, type Job } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
-import { setExpiry } from '@/lib/asset-lifecycle-service'
-import { uploadFile, getPublicUrl, isOSSConfigured } from '@/lib/storage'
-import { logger } from '@/lib/logger'
-import { publishStateChange, publishCompleted, publishFailed } from '@/lib/progress-publisher'
-import { computeTransitionPlan, buildTransitionFilters, type SegmentInfo } from '@/lib/transition-engine'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
+import { setExpiry } from '@/lib/shared/asset-lifecycle-service'
+import { uploadFile, getPublicUrl, isOSSConfigured } from '@/lib/shared/storage'
+import { logger } from '@/lib/shared/logger'
+import { publishStateChange, publishCompleted, publishFailed } from '@/lib/shared/progress-publisher'
+import { computeTransitionPlan, buildTransitionFilters, type SegmentInfo } from '@/lib/video/transition-engine'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { writeFile, mkdir, unlink, readdir } from 'fs/promises'
@@ -710,7 +710,7 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
       }
 
       // FFmpeg concat 无损拼接（不加转场）
-      const { mergeSegments } = await import('@/lib/segment-service')
+      const { mergeSegments } = await import('@/lib/video/segment-service')
       const hhOutputPath = path.join(hhTempDir, `merged_${Date.now()}.mp4`)
       await mergeSegments(segPaths, hhOutputPath)
       await job.updateProgress(80)
@@ -849,7 +849,7 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
       const bgmLocalPath = path.join(tempDir, `bgm_${Date.now()}.mp3`)
       // 下载 BGM 到临时目录
       await resolveMediaUrlToLocal(
-        (await import('@/lib/storage')).getPublicUrl(projectForBgm.bgmKey),
+        (await import('@/lib/shared/storage')).getPublicUrl(projectForBgm.bgmKey),
         bgmLocalPath
       )
       // 替换音轨：保留视频流，用 BGM 替换音频流
@@ -888,7 +888,7 @@ async function processMergeVideo(job: Job<VideoMergeJobData>) {
 
     if (targetRes === '720p' || targetRes === '1080p') {
       // 超分流程：入队 videoUpscaleQueue，更新 exportStatus 为 UPSCALING
-      const { videoUpscaleQueue } = await import('@/lib/queue')
+      const { videoUpscaleQueue } = await import('@/lib/shared/queue')
       await videoUpscaleQueue.add('upscale-video', {
         projectId,
         userId,

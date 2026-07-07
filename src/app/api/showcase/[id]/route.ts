@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { showcaseService } from '@/lib/showcase-service'
-import { ApiError } from '@/lib/api-error'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { showcaseService } from '@/lib/shared/showcase-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 export const dynamic = 'force-dynamic'
 

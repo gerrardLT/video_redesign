@@ -22,7 +22,7 @@ import {
   aggregateGroupAppearances,
   normalizeAppearanceText,
   hasAppearanceChanged,
-} from '@/lib/appearance-comparator'
+} from '@/lib/video/appearance-comparator'
 import type { AppearanceDescriptor } from '@/types/appearance'
 
 /** 外观描述的四个维度 */

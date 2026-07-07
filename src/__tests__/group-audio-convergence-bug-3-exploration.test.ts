@@ -38,7 +38,7 @@ import path from 'path'
 import {
   buildGroupReferenceData,
   type GroupReferenceParams,
-} from '../lib/reference-builder'
+} from '../lib/video/reference-builder'
 
 /** 仓库根目录（vitest 以项目根为 cwd 运行） */
 const ROOT = process.cwd()

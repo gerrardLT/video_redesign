@@ -37,13 +37,13 @@ import {
   mergeTimelineScript,
   SUPPORTED_CAMERA_MOVES,
   type MergeInputShot,
-} from '../lib/script-merger'
-import { resolveReferences } from '../lib/prompt-parser'
+} from '../lib/video/script-merger'
+import { resolveReferences } from '../lib/video/prompt-parser'
 import {
   buildGroupReferenceData,
   buildReferenceData,
   type GroupReferenceParams,
-} from '../lib/reference-builder'
+} from '../lib/video/reference-builder'
 
 // ─── 公共构造 ────────────────────────────────────────────────────────────────
 

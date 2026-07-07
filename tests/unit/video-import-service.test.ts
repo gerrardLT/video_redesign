@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 /**
  * Feature: product-competitiveness
@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Mock Prisma 和队列
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     project: {
       create: vi.fn(),
@@ -24,17 +24,17 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-vi.mock('@/lib/queue', () => ({
+vi.mock('@/lib/shared/queue', () => ({
   videoDownloadQueue: {
     add: vi.fn(),
   },
 }))
 
 // 使用动态导入以确保 mock 生效
-const { prisma } = await import('@/lib/db')
-const { videoDownloadQueue } = await import('@/lib/queue')
+const { prisma } = await import('@/lib/shared/db')
+const { videoDownloadQueue } = await import('@/lib/shared/queue')
 const { validateShareLink, validateAndImport, getImportStatus } = await import(
-  '@/lib/video-import-service'
+  '@/lib/shared/video-import-service'
 )
 
 // ========================
@@ -74,13 +74,13 @@ describe('视频导入服务单元测试', () => {
     it('非 URL 格式返回错误', () => {
       const result = validateShareLink('not-a-url')
       expect(result.valid).toBe(false)
-      expect(result.error).toContain('http')
+      expect(result.error).toContain('未识别到视频链接')
     })
 
-    it('不支持的平台返回错误', () => {
+    it('未匹配已知平台的 URL 标记为 other 并放行', () => {
       const result = validateShareLink('https://www.youtube.com/watch?v=abc')
-      expect(result.valid).toBe(false)
-      expect(result.error).toContain('不支持')
+      expect(result.valid).toBe(true)
+      expect(result.platform).toBe('other')
     })
   })
 
@@ -123,10 +123,19 @@ describe('视频导入服务单元测试', () => {
       ).rejects.toThrow()
     })
 
-    it('不支持平台的链接抛出错误', async () => {
-      await expect(
-        validateAndImport('user-1', 'https://www.youtube.com/watch?v=abc')
-      ).rejects.toThrow('不支持')
+    it('YouTube 链接作为 other 平台导入成功', async () => {
+      const mockProject = { id: 'proj-yt', userId: 'user-1', name: '导入视频 - other', status: 'DOWNLOADING' }
+      const mockTask = { id: 'task-yt', projectId: 'proj-yt', userId: 'user-1', sourceUrl: 'https://www.youtube.com/watch?v=abc', platform: 'other', status: 'PENDING', progress: 0 }
+
+      vi.mocked(prisma.project.create).mockResolvedValue(mockProject as never)
+      vi.mocked(prisma.videoDownloadTask.create).mockResolvedValue(mockTask as never)
+      vi.mocked(videoDownloadQueue.add).mockResolvedValue({} as never)
+
+      const result = await validateAndImport('user-1', 'https://www.youtube.com/watch?v=abc')
+
+      expect(result.projectId).toBe('proj-yt')
+      expect(result.taskId).toBe('task-yt')
+      expect(result.platform).toBe('other')
     })
   })
 

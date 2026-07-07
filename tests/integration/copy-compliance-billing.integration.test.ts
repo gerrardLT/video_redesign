@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 集成测试 16.1：文案重生成 / 按平台改写 / 一键改写规避计费链路（真实 LLM 接口）
  *
  * 验证 reserve→charge/refund 与 withCreditLock 串行（需求 2.2, 2.4, 2.6, 0.6, 0.8）。
@@ -34,8 +34,8 @@ describe.skipIf(!enabled)('集成16.1 文案/合规计费链路（真实 LLM）'
   const platform = (process.env.INTEGRATION_PLATFORM as PublishPlatform) || ('DOUYIN' as PublishPlatform)
 
   it('重新生成文案：真实 LLM + reserve→charge，余额非负且产出合法文案', async () => {
-    const { regenerateCopy } = await import('@/lib/publish-copy-service')
-    const { getBalance } = await import('@/lib/credit-service')
+    const { regenerateCopy } = await import('@/lib/merchant/publish-copy-service')
+    const { getBalance } = await import('@/lib/shared/credit-service')
 
     const userId = env('INTEGRATION_USER_ID')
     const contentBriefId = env('INTEGRATION_BRIEF_ID')
@@ -57,7 +57,7 @@ describe.skipIf(!enabled)('集成16.1 文案/合规计费链路（真实 LLM）'
   }, 120_000)
 
   it('按平台改写：真实 LLM + 计费链路完成且文案合法', async () => {
-    const { rewriteForPlatform } = await import('@/lib/publish-copy-service')
+    const { rewriteForPlatform } = await import('@/lib/merchant/publish-copy-service')
     const userId = env('INTEGRATION_USER_ID')
     const contentBriefId = env('INTEGRATION_BRIEF_ID')
 
@@ -67,7 +67,7 @@ describe.skipIf(!enabled)('集成16.1 文案/合规计费链路（真实 LLM）'
   }, 120_000)
 
   it('一键改写规避：真实改写 + 自动重跑合规；未通过绝不标记通过（Property 11）', async () => {
-    const { rewriteToCompliant } = await import('@/lib/compliance-service')
+    const { rewriteToCompliant } = await import('@/lib/merchant/compliance-service')
     const userId = env('INTEGRATION_USER_ID')
     const contentBriefId = env('INTEGRATION_BRIEF_ID')
     const videoVariantId = env('INTEGRATION_VARIANT_ID')
@@ -84,7 +84,7 @@ describe.skipIf(!enabled)('集成16.1 文案/合规计费链路（真实 LLM）'
   }, 180_000)
 
   it('计费链路无悬挂 RESERVE：用户不存在未结算的孤立冻结（reserve 必有 charge/refund 收尾）', async () => {
-    const { prisma } = await import('@/lib/db')
+    const { prisma } = await import('@/lib/shared/db')
     const userId = env('INTEGRATION_USER_ID')
     const contentBriefId = env('INTEGRATION_BRIEF_ID')
 

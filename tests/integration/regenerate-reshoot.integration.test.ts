@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 集成测试 16.3：单版本重生成 / 局部重拍（真实 Seedance + 真实 FFmpeg + 真实 OSS + 计费）
  *
  * 覆盖 spec「local-life-depth-enhancements」需求 4.2 / 4.3 / 4.5：
@@ -19,11 +19,11 @@
 import { execFileSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
 import { describe, it, expect, afterAll } from 'vitest'
-import { prisma } from '@/lib/db'
-import { redis } from '@/lib/redis'
-import { regenerateSingleVariant, rerenderAffectedScope } from '@/lib/local-render-service'
-import { estimateRenderCost } from '@/lib/merchant-billing-service'
-import { uploadBuffer, deleteObject } from '@/lib/storage'
+import { prisma } from '@/lib/shared/db'
+import { redis } from '@/lib/shared/redis'
+import { regenerateSingleVariant, rerenderAffectedScope } from '@/lib/merchant/local-render-service'
+import { estimateRenderCost } from '@/lib/merchant/merchant-billing-service'
+import { uploadBuffer, deleteObject } from '@/lib/shared/storage'
 import {
   computeGate,
   announceSkip,

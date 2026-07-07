@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PATCH /api/stores/[storeId]/notifications/[notificationId]/read — 标记门店通知已读（置 read=true）
  *
  * 说明：本端点为「门店作用域」通知（StoreNotification）的标记已读。挂在门店作用域路径下，
@@ -26,10 +26,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { markNotificationRead, TaskCenterError } from '@/lib/task-center-service'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { markNotificationRead, TaskCenterError } from '@/lib/merchant/task-center-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string; notificationId: string }>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/upload-image
  * 通用图片上传接口（返回鉴权代理 URL）
  * 用于 HappyHorse 参考图等场景
@@ -7,7 +7,7 @@
  * Response: { url: string }
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { uploadBuffer, getPublicUrl, toMediaProxyUrl } from '@/lib/storage'
+import { uploadBuffer, getPublicUrl, toMediaProxyUrl } from '@/lib/shared/storage'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']

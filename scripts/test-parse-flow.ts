@@ -6,7 +6,7 @@
  */
 
 import 'dotenv/config'
-import { prisma } from '../src/lib/db'
+import { prisma } from '../src/lib/shared/db'
 
 const TEST_VIDEO_URL = 'https://video-redesign-sh.oss-cn-shanghai.aliyuncs.com/84bd44e4e685b2a7dd6171a424830929.mp4'
 

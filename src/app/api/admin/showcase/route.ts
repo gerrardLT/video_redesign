@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { showcaseService } from '@/lib/showcase-service'
-import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/api-error'
-import { requireAdmin } from '@/lib/auth-helpers'
+import { showcaseService } from '@/lib/shared/showcase-service'
+import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/shared/api-error'
+import { requireAdmin } from '@/lib/shared/auth-helpers'
 
 export const dynamic = 'force-dynamic'
 

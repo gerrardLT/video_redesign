@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/video-variants/[variantId]/export — 导出视频
  *
  * 流程：
@@ -25,14 +25,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest, getMerchantByUserId } from '@/lib/merchant-auth'
-import { getMerchantPrivileges } from '@/lib/privilege-engine'
-import { runComplianceCheck } from '@/lib/compliance-service'
-import { enqueueForPublish } from '@/lib/publish-queue-service'
-import { getSignedObjectUrl, uploadFile } from '@/lib/storage'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest, getMerchantByUserId } from '@/lib/merchant/merchant-auth'
+import { getMerchantPrivileges } from '@/lib/shared/privilege-engine'
+import { runComplianceCheck } from '@/lib/merchant/compliance-service'
+import { enqueueForPublish } from '@/lib/merchant/publish-queue-service'
+import { getSignedObjectUrl, uploadFile } from '@/lib/shared/storage'
+import { ApiError } from '@/lib/shared/api-error'
 import { EXPORT_URL_EXPIRY_SECONDS } from '@/constants/merchant'
+import { getPlatformPreset, buildCropScaleFilter, type PlatformId } from '@/lib/merchant/platform-presets'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { writeFile, unlink, mkdir } from 'fs/promises'
@@ -51,6 +52,11 @@ export async function POST(
 ) {
   const { variantId } = await params
   let publishJobId: string | null = null
+
+  // 解析请求体：可选的 platform 参数
+  const body = await request.json().catch(() => ({})) as Record<string, unknown>
+  const platformId = (body.platform as PlatformId) || null
+  const platformPreset = platformId ? getPlatformPreset(platformId) : null
 
   try {
     // ─── Step 1: 鉴权 + 归属验证 ───
@@ -152,13 +158,21 @@ export async function POST(
       )
     }
 
-    // ─── Step 3: 确定输出分辨率（统一权益 Req 5.3 / 5.4） ───
-    // 由 getMerchantPrivileges().exportResolution 决定：FREE→720p，MONTHLY/YEARLY→1080p
+    // ─── Step 3: 确定输出分辨率（统一权益 + 平台适配）───
     const privileges = await getMerchantPrivileges(userId)
     const exportResolution = privileges.exportResolution // '1080p' | '720p'
     const tier = privileges.tier
-    const outputWidth = exportResolution === '1080p' ? 1080 : 720
-    const outputHeight = exportResolution === '1080p' ? 1920 : 1280
+    
+    // 平台适配：如果指定了 platform，使用平台预设的分辨率
+    let outputWidth: number
+    let outputHeight: number
+    if (platformPreset) {
+      outputWidth = platformPreset.width
+      outputHeight = platformPreset.height
+    } else {
+      outputWidth = exportResolution === '1080p' ? 1080 : 720
+      outputHeight = exportResolution === '1080p' ? 1920 : 1280
+    }
 
     // ─── Step 4: FFmpeg 烧录字幕 + 重编码 ───
     const jobId = randomUUID()
@@ -170,7 +184,7 @@ export async function POST(
     let assPath: string | null = null
 
     // 从 OSS 下载源视频
-    const { downloadToTemp } = await import('@/lib/storage')
+    const { downloadToTemp } = await import('@/lib/shared/storage')
     const sourceUrl = getSignedObjectUrl(videoVariant.ossKey, 600)
     await downloadToTemp(sourceUrl, inputPath)
 
@@ -194,6 +208,7 @@ export async function POST(
       assPath,
       outputWidth,
       outputHeight,
+      useCrop: !!platformPreset, // 平台适配时使用裁切而非补边
     })
 
     // 执行 FFmpeg（180s 超时）
@@ -202,7 +217,8 @@ export async function POST(
     })
 
     // ─── Step 5: 上传到 OSS ───
-    const ossKey = `merchant/${storeId}/exports/${jobId}.mp4`
+    const platformSuffix = platformPreset ? `_${platformPreset.id}` : ''
+    const ossKey = `merchant/${storeId}/exports/${jobId}${platformSuffix}.mp4`
     await uploadFile(ossKey, outputPath)
 
     // ─── Step 6: 创建 PublishJob (status=EXPORTED) ───
@@ -239,6 +255,9 @@ export async function POST(
       expiresIn: EXPORT_URL_EXPIRY_SECONDS,
       resolution: `${outputWidth}x${outputHeight}`,
       tier,
+      platform: platformPreset?.id ?? null,
+      platformLabel: platformPreset?.label ?? null,
+      platformTips: platformPreset?.tips ?? null,
     })
   } catch (error) {
     // 失败时标记 PublishJob.status=FAILED (Req 10.6)
@@ -346,8 +365,9 @@ function buildFFmpegExportArgs(options: {
   assPath: string | null
   outputWidth: number
   outputHeight: number
+  useCrop?: boolean
 }): string[] {
-  const { inputPath, outputPath, assPath, outputWidth, outputHeight } = options
+  const { inputPath, outputPath, assPath, outputWidth, outputHeight, useCrop } = options
 
   const args: string[] = [
     '-y',
@@ -355,7 +375,14 @@ function buildFFmpegExportArgs(options: {
   ]
 
   // 视频滤镜链：缩放 + 字幕
-  let vfChain = `scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease,pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2`
+  let vfChain: string
+  if (useCrop) {
+    // 平台适配模式：裁切到目标比例后缩放（无黑边）
+    vfChain = `scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=increase,crop=${outputWidth}:${outputHeight}`
+  } else {
+    // 默认模式：缩放 + 补边
+    vfChain = `scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease,pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2`
+  }
 
   if (assPath) {
     // 注意：Windows 路径中的反斜杠和冒号需要转义

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SSE 连接注册表 — ConnectionRegistry
  *
  * 管理当前所有活跃的 SSE 连接。支持多用户、多标签页隔离，
@@ -10,7 +10,7 @@
 
 import { randomUUID } from 'crypto'
 import type { ConnectionEntry } from './types'
-import { logger } from '@/lib/logger'
+import { logger } from '@/lib/shared/logger'
 
 /** 每用户最大连接数 */
 const MAX_CONNECTIONS_PER_USER = 5

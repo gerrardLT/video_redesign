@@ -1,8 +1,17 @@
 // Feature: local-life-depth-enhancements, Property 25: 凭证加密往返
 // @vitest-environment node
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import fc from 'fast-check'
-import { encryptCredential, decryptCredential } from '@/lib/platform-metrics-crawler'
+
+// Mock db/redis 模块，避免 DATABASE_URL 缺失导致的初始化错误
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+vi.mock('@/lib/shared/redis', () => ({
+  redis: new Proxy({}, { get: () => vi.fn() })
+}))
+
+import { encryptCredential, decryptCredential } from '@/lib/merchant/platform-metrics-crawler'
 
 /**
  * Feature: local-life-depth-enhancements

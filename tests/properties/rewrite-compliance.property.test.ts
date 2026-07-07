@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 11: 改写后未通过不得标记通过
+﻿// Feature: local-life-depth-enhancements, Property 11: 改写后未通过不得标记通过
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 import { ABSOLUTE_CLAIMS } from '@/constants/merchant'
@@ -72,7 +72,7 @@ const fetchState = vi.hoisted(() => ({
 // Mock 依赖（内存桩）
 // ========================
 
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const prisma = {
     contentBrief: {
       // rewriteToCompliant 加载 brief 草稿
@@ -114,17 +114,17 @@ vi.mock('@/lib/db', () => {
   return { prisma }
 })
 
-vi.mock('@/lib/content-entropy-service', () => ({
+vi.mock('@/lib/merchant/content-entropy-service', () => ({
   // 按场景返回随机同质化评分，驱动重跑的 ENTROPY 维度（真实规则链据此判级）
   calculateContentEntropy: vi.fn(async () => ({ uniquenessScore: state.entropyScore })),
 }))
 
-vi.mock('@/lib/credit-service', () => ({
+vi.mock('@/lib/shared/credit-service', () => ({
   // 余额充足，使改写动作通过预检并执行（计费守恒由 Property 1 专门覆盖，此处不关注）
   getBalance: vi.fn(async () => 1000),
 }))
 
-vi.mock('@/lib/merchant-billing-service', () => ({
+vi.mock('@/lib/merchant/merchant-billing-service', () => ({
   reserveMerchantCredits: vi.fn(async () => undefined),
   chargeMerchantCredits: vi.fn(async () => undefined),
   refundMerchantCredits: vi.fn(async () => undefined),
@@ -146,7 +146,7 @@ process.env.MERCHANT_LLM_API_URL = 'https://test.local/v1'
 process.env.MERCHANT_LLM_API_KEY = 'test-key'
 
 // 动态导入以确保上述 mock / env 生效
-const { rewriteToCompliant } = await import('@/lib/compliance-service')
+const { rewriteToCompliant } = await import('@/lib/merchant/compliance-service')
 
 // ========================
 // Arbitraries

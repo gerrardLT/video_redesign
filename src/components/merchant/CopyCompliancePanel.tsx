@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * CopyCompliancePanel — variants 页文案/合规可操作面板（需求 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8）
@@ -36,7 +36,7 @@ import {
   Plus,
   RefreshCw,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 

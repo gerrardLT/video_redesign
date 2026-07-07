@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/onboarding/reset - 重置新手引导进度
  *
  * 鉴权：从 x-user-id header 获取用户 ID
@@ -7,10 +7,10 @@
  * Requirements: 6.4, 6.5
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserId } from '@/lib/auth-helpers'
-import { resetProgress, getProgress } from '@/lib/onboarding-service'
-import { hasSampleProject, createSampleProject } from '@/lib/sample-project-service'
-import { ApiError } from '@/lib/api-error'
+import { getUserId } from '@/lib/shared/auth-helpers'
+import { resetProgress, getProgress } from '@/lib/shared/onboarding-service'
+import { hasSampleProject, createSampleProject } from '@/lib/shared/sample-project-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 export async function POST(request: NextRequest) {
   try {

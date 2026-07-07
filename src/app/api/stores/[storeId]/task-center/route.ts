@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/task-center — 全局任务中心（当前门店作用域）
  *
  * 调用 task-center-service.getTaskCenter：按当前所选门店作用域聚合进行中的任务
@@ -18,9 +18,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { getTaskCenter } from '@/lib/task-center-service'
-import { ApiError } from '@/lib/api-error'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { getTaskCenter } from '@/lib/merchant/task-center-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

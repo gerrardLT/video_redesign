@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { faceDetectionService } from '@/lib/face-detection-service'
+import { prisma } from '@/lib/shared/db'
+import { faceDetectionService } from '@/lib/shared/face-detection-service'
 
 export const dynamic = 'force-dynamic'
 

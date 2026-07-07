@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { cancelSubscription } from '@/lib/subscription-service'
+import { cancelSubscription } from '@/lib/shared/subscription-service'
 
 export const dynamic = 'force-dynamic'
 

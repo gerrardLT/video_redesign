@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { getPaymentGateway } from '@/services/payment'
-import * as OrderService from '@/lib/order-service'
-import { logger } from '@/lib/logger'
+import * as OrderService from '@/lib/shared/order-service'
+import { logger } from '@/lib/shared/logger'
 
 export const dynamic = 'force-dynamic'
 

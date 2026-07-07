@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 9: 文案就地编辑往返
+﻿// Feature: local-life-depth-enhancements, Property 9: 文案就地编辑往返
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -27,7 +27,7 @@ const dbState = vi.hoisted(() => ({
   row: { platformCopies: null as Record<string, any> | null, copyEdited: false },
 }))
 
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   // tx 上的 contentBrief 读写实现，直接作用于内存行状态
   const contentBrief = {
     // 按 select 返回 platformCopies（saveManualCopy 仅 select platformCopies）
@@ -55,7 +55,7 @@ vi.mock('@/lib/db', () => {
 })
 
 // 动态导入以确保 mock 生效
-const { saveManualCopy } = await import('@/lib/publish-copy-service')
+const { saveManualCopy } = await import('@/lib/merchant/publish-copy-service')
 
 // PublishPlatform 枚举取值（与 src/types/merchant.ts PublishPlatformSchema 对齐）
 const PUBLISH_PLATFORMS = [

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 生成按钮组件（积分预估 + 生成 一体化）
@@ -10,9 +10,9 @@
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { estimateWorkspaceCost } from '@/lib/credit-calc'
+import { estimateWorkspaceCost } from '@/lib/shared/credit-calc'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import type { WorkspaceGenerateRequest } from '@/types/workspace'
 
 export function GenerateButton() {

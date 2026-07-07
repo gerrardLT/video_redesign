@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 分辨率选择器组件
@@ -11,7 +11,7 @@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 export type Resolution = '480p' | '720p' | '1080p'
 

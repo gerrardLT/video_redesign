@@ -1,14 +1,14 @@
-/**
+﻿/**
  * 单元测试：工作台生成 (Workspace Generation)
  *
  * 覆盖关键验收标准的示例和边界测试
  */
 import { describe, it, expect } from 'vitest'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { estimateWorkspaceCost, getDurationOptions } from '@/lib/credit-calc'
-import { validateFile, validatePromptLength, insertAssetReference } from '@/lib/workspace-validators'
-import { buildT2VRequestBody, buildR2VRequestBody } from '@/lib/happyhorse-workspace'
-import { buildSeedanceWorkspaceRequest } from '@/lib/workspace-request-builder'
+import { estimateWorkspaceCost, getDurationOptions } from '@/lib/shared/credit-calc'
+import { validateFile, validatePromptLength, insertAssetReference } from '@/lib/video/workspace-validators'
+import { buildT2VRequestBody, buildR2VRequestBody } from '@/lib/shared/happyhorse-workspace'
+import { buildSeedanceWorkspaceRequest } from '@/lib/video/workspace-request-builder'
 import {
   INSPIRATION_TEMPLATES,
   MODEL_DURATION_OPTIONS,
@@ -18,11 +18,11 @@ import {
 } from '@/constants/workspace'
 
 describe('工作台生成 - 单元测试', () => {
-  // Req 3.1: 默认模型为 Seedance 2.0
-  it('默认模型为 Seedance 2.0', () => {
+  // Req 3.1: 默认模型为 HappyHorse
+  it('默认模型为 HappyHorse', () => {
     const store = useWorkspaceStore.getState()
     store.reset()
-    expect(useWorkspaceStore.getState().model).toBe('seedance')
+    expect(useWorkspaceStore.getState().model).toBe('happyhorse')
   })
 
   // Req 4.1: 默认比例为 16:9

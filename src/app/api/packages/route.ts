@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

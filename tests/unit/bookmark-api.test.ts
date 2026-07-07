@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { computeExpiryStatus } from '@/lib/expiry-status'
+﻿import { describe, it, expect } from 'vitest'
+import { computeExpiryStatus } from '@/lib/shared/expiry-status'
 
 /**
  * Bookmark API 边界情况测试

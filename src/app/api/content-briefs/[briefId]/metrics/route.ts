@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/content-briefs/[briefId]/metrics — 录入表现数据
  * GET  /api/content-briefs/[briefId]/metrics — 获取表现数据
  *
@@ -11,10 +11,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { recordManualMetrics, MetricsValidationError, MetricsBusinessError } from '@/lib/metrics-ingestor'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { recordManualMetrics, MetricsValidationError, MetricsBusinessError } from '@/lib/merchant/metrics-ingestor'
+import { ApiError } from '@/lib/shared/api-error'
 import { PublishPlatformSchema } from '@/types/merchant'
 import { z } from 'zod/v4'
 

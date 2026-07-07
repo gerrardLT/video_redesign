@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 集成测试共享夹具与环境门控（local-life-depth-enhancements 任务 16.x）
  *
  * 设计原则（遵循 AGENTS.md + design「Testing Strategy」）：
@@ -15,7 +15,7 @@
 
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 
 // ============================================================
 // 环境门控判定

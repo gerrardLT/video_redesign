@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/content-briefs/[briefId]/compliance — 触发合规检查
  * GET /api/content-briefs/[briefId]/compliance — 获取合规检查结果
  *
@@ -23,10 +23,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { runComplianceCheck } from '@/lib/compliance-service'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { runComplianceCheck } from '@/lib/merchant/compliance-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>

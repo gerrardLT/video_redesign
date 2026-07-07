@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 人物图生成 Worker
  * 处理 'image-generate' 队列任务
  * 流程：获取人物 → 方舟 Seedream 5.0 lite 生成参考图（转存 OSS）→ 更新人物记录 → 自动入库到用户资产库
@@ -13,14 +13,14 @@
  */
 
 import { Worker, Job, type ConnectionOptions } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
-import { generateCharacterImage, editImage } from '@/lib/flux'
-import { buildStylePrompt } from '@/lib/style-service'
-import { ingestCharacterImage } from '@/lib/asset-ingestion-service'
-import { publishStateChange, publishCompleted, publishFailed } from '@/lib/progress-publisher'
-import { withCreditLock } from '@/lib/distributed-lock'
-import { ApiError } from '@/lib/api-error'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
+import { generateCharacterImage, editImage } from '@/lib/shared/flux'
+import { buildStylePrompt } from '@/lib/shared/style-service'
+import { ingestCharacterImage } from '@/lib/shared/asset-ingestion-service'
+import { publishStateChange, publishCompleted, publishFailed } from '@/lib/shared/progress-publisher'
+import { withCreditLock } from '@/lib/shared/distributed-lock'
+import { ApiError } from '@/lib/shared/api-error'
 
 export interface ImageGenerateJobData {
   characterId: string

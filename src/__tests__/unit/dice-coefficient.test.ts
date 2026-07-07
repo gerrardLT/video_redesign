@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Dice Coefficient 单元测试
  *
  * 验证 diceCoefficient 函数的核心行为：
@@ -13,11 +13,11 @@ import { describe, it, expect, vi } from 'vitest'
 import * as fc from 'fast-check'
 
 // Mock Prisma db 模块，避免 DATABASE_URL 依赖
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {},
 }))
 
-import { diceCoefficient } from '@/lib/content-entropy-service'
+import { diceCoefficient } from '@/lib/merchant/content-entropy-service'
 
 describe('diceCoefficient 单元测试', () => {
   // ========================

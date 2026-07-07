@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 14: 单版本重生成隔离性
+﻿// Feature: local-life-depth-enhancements, Property 14: 单版本重生成隔离性
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -22,7 +22,7 @@ import fc from 'fast-check'
  *   - FFmpeg（child_process.execFile）与 ffprobe：内存桩，ffprobe 返回固定元数据，ffmpeg no-op；
  *   - fs/promises（mkdir/writeFile/rm/readFile）：内存桩，readFile 返回固定 buffer；
  *   - @/lib/storage（uploadBuffer/getSignedObjectUrl/downloadToTemp）：内存桩；
- *   - @/lib/seedance / @/lib/distributed-lock / @/lib/progress-publisher / @/lib/impact-scope-service：内存桩；
+ *   - @/lib/video/seedance / @/lib/distributed-lock / @/lib/progress-publisher / @/lib/impact-scope-service：内存桩；
  *   - @/lib/credit-service.getBalance 返回充足余额（计费守恒由 Property 1 专门覆盖，此处只关注隔离性），
  *     @/lib/merchant-billing-service 的 reserve/charge/refund 为 no-op。
  * 被测控制流（读取目标版本→校验高级参数→预检→RESERVE→编排→合成→$transaction 内就地 update + CHARGE）
@@ -48,7 +48,7 @@ const dbState = vi.hoisted(() => ({
 // Mock 依赖（内存桩）
 // ========================
 
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const videoVariant = {
     // 读取目标版本 + 装配所属 brief（shotTasks/rawAssets/store）
     findUniqueOrThrow: vi.fn(async ({ where }: { where: { id: string } }) => {
@@ -104,39 +104,39 @@ vi.mock('fs/promises', () => ({
   readFile: vi.fn(async () => Buffer.from('fake-media-bytes')),
 }))
 
-vi.mock('@/lib/storage', () => ({
+vi.mock('@/lib/shared/storage', () => ({
   uploadBuffer: vi.fn(async () => undefined),
   getSignedObjectUrl: vi.fn(() => 'https://signed.local/asset'),
   downloadToTemp: vi.fn(async () => undefined),
 }))
 
-vi.mock('@/lib/seedance', () => ({
+vi.mock('@/lib/video/seedance', () => ({
   createSeedanceTask: vi.fn(async () => ({ taskId: 'seedance_test' })),
   getSeedanceTaskStatus: vi.fn(async () => ({ status: 'succeeded', videoUrl: 'https://x.local/v.mp4' })),
 }))
 
-vi.mock('@/lib/distributed-lock', () => ({
+vi.mock('@/lib/shared/distributed-lock', () => ({
   acquireLock: vi.fn(async () => true),
   releaseLock: vi.fn(async () => undefined),
 }))
 
-vi.mock('@/lib/progress-publisher', () => ({
+vi.mock('@/lib/shared/progress-publisher', () => ({
   publishStateChange: vi.fn(async () => undefined),
   publishCompleted: vi.fn(async () => undefined),
   publishFailed: vi.fn(async () => undefined),
 }))
 
-vi.mock('@/lib/impact-scope-service', () => ({
+vi.mock('@/lib/merchant/impact-scope-service', () => ({
   computeReshootScope: vi.fn(async () => ({ affectedGroupIds: [], hasContinuityChain: false })),
 }))
 
 // 余额充足 → 通过预检并执行（计费守恒由 Property 1 专门覆盖，此处只关注隔离性）
-vi.mock('@/lib/credit-service', () => ({
+vi.mock('@/lib/shared/credit-service', () => ({
   getBalance: vi.fn(async () => 1_000_000),
   estimateGroupCreditCost: vi.fn(() => 1),
 }))
 
-vi.mock('@/lib/merchant-billing-service', () => ({
+vi.mock('@/lib/merchant/merchant-billing-service', () => ({
   estimateRenderCost: vi.fn(() => 10),
   reserveMerchantCredits: vi.fn(async () => undefined),
   chargeMerchantCredits: vi.fn(async () => undefined),
@@ -144,7 +144,7 @@ vi.mock('@/lib/merchant-billing-service', () => ({
 }))
 
 // 动态导入以确保上述 mock 生效
-const { regenerateSingleVariant } = await import('@/lib/local-render-service')
+const { regenerateSingleVariant } = await import('@/lib/merchant/local-render-service')
 
 // ========================
 // Arbitraries

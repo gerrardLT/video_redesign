@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { getPaymentGateway } from '@/services/payment'
 import {
   handleSubscriptionPaymentCallback,
   handleRenewalCallback,
-} from '@/lib/subscription-service'
-import { logger } from '@/lib/logger'
-import { prisma } from '@/lib/db'
+} from '@/lib/shared/subscription-service'
+import { logger } from '@/lib/shared/logger'
+import { prisma } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

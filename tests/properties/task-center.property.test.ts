@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 32: 任务中心作用域、真实性与可跳转
+﻿// Feature: local-life-depth-enhancements, Property 32: 任务中心作用域、真实性与可跳转
 //
 // 属性测试：对任意门店 storeId 与多店混合数据，getTaskCenter(storeId) 返回的每一项：
 //   1) 作用域：briefId（及 variantId）必属于该 store 的真实数据，绝不混入其它门店；
@@ -45,7 +45,7 @@ const h = vi.hoisted(() => {
 // ============================================================
 // prisma 内存桩：忠实复现作用域过滤语义
 // ============================================================
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const { state } = h
   const prisma = {
     contentBrief: {
@@ -83,7 +83,7 @@ vi.mock('@/lib/db', () => {
 })
 
 // 动态导入以确保 mock 生效
-const { getTaskCenter } = await import('@/lib/task-center-service')
+const { getTaskCenter } = await import('@/lib/merchant/task-center-service')
 
 // ============================================================
 // 常量

@@ -5,7 +5,7 @@ import {
   type AvatarReferenceData,
   type BuildReferenceParamsV2,
   type ShotWithAssets,
-} from '@/lib/reference-builder'
+} from '@/lib/video/reference-builder'
 
 /**
  * Feature: virtual-avatar-reshaping

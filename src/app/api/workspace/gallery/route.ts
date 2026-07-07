@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/workspace/gallery
  * 工作台画廊列表接口
  *
@@ -15,7 +15,7 @@
  * Response: { items, total, hasMore }
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 import type { GalleryItem, GalleryResponse } from '@/types/workspace'
 
 export async function GET(request: NextRequest) {

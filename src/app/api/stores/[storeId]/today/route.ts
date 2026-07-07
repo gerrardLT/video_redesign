@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/today — 获取今日内容任务
  *
  * 查询条件：scheduledDate = 今天，storeId = 当前门店
@@ -18,10 +18,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { ApiError } from '@/lib/api-error'
-import { getMediaProxyUrl } from '@/lib/storage'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { ApiError } from '@/lib/shared/api-error'
+import { getMediaProxyUrl } from '@/lib/shared/storage'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

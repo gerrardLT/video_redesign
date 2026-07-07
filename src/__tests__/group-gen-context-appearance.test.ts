@@ -18,7 +18,7 @@ import {
   aggregateGroupAppearances,
   normalizeAppearanceText,
   formatAppearancePrompt,
-} from '@/lib/appearance-comparator'
+} from '@/lib/video/appearance-comparator'
 import type { AppearanceDescriptor, CharacterAppearanceRecord } from '@/types/appearance'
 
 // ========================

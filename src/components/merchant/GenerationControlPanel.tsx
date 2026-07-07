@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * GenerationControlPanel — variants 页生成可控性面板（需求 4.1, 4.2, 4.3, 4.5, 4.6, 4.7）
@@ -37,7 +37,7 @@ import {
   Wallet,
   Camera,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * HappyHorse 面板状态仓库
  *
  * 管理 HappyHorse 生成面板的所有本地状态，包括：
@@ -11,7 +11,7 @@
  */
 
 import { create } from 'zustand'
-import { insertPlaceholder, removePlaceholderAndRenumber } from '@/lib/placeholder-utils'
+import { insertPlaceholder, removePlaceholderAndRenumber } from '@/lib/shared/placeholder-utils'
 
 /** 参考图数据结构 */
 export interface ReferenceImage {

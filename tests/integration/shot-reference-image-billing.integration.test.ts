@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 集成测试 16.2：镜头参考图生成计费（真实方舟图像生成 + 真实计费链路）
  *
  * 覆盖 spec「local-life-depth-enhancements」需求 3.5：
@@ -12,11 +12,11 @@
  */
 
 import { describe, it, expect, afterAll } from 'vitest'
-import { prisma } from '@/lib/db'
-import { redis } from '@/lib/redis'
-import { generateShotReferenceImage } from '@/lib/capture-director'
+import { prisma } from '@/lib/shared/db'
+import { redis } from '@/lib/shared/redis'
+import { generateShotReferenceImage } from '@/lib/merchant/capture-director'
 import { CREDIT_COST_SHOT_REFERENCE_IMAGE } from '@/constants/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 import {
   computeGate,
   announceSkip,

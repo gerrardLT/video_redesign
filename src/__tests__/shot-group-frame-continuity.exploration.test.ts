@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Bug 条件探索测试 — 单组路径同场景尾帧承接缺失
  * Spec: shot-group-frame-continuity（bugfix，requirements-first）
  *
@@ -89,18 +89,18 @@ const {
   return { mockPrisma, mockQueue, mockEstimateGroupCreditCost, mockBuildGroupGenReference }
 })
 
-vi.mock('@/lib/db', () => ({ prisma: mockPrisma }))
-vi.mock('@/lib/queue', () => ({ videoGenerateQueue: mockQueue }))
-vi.mock('@/lib/credit-service', () => ({
+vi.mock('@/lib/shared/db', () => ({ prisma: mockPrisma }))
+vi.mock('@/lib/shared/queue', () => ({ videoGenerateQueue: mockQueue }))
+vi.mock('@/lib/shared/credit-service', () => ({
   estimateGroupCreditCost: (duration: number, resolution: string) =>
     mockEstimateGroupCreditCost(duration, resolution),
 }))
-vi.mock('@/lib/rate-limiter', () => ({ isRateLimited: () => false }))
+vi.mock('@/lib/shared/rate-limiter', () => ({ isRateLimited: () => false }))
 // 分布式锁在单测中直接放行：withCreditLock(fn) → fn()
-vi.mock('@/lib/distributed-lock', () => ({
+vi.mock('@/lib/shared/distributed-lock', () => ({
   withCreditLock: (fn: () => unknown) => fn(),
 }))
-vi.mock('@/lib/group-gen-context', () => ({
+vi.mock('@/lib/video/group-gen-context', () => ({
   buildGroupGenReference: (...args: unknown[]) => mockBuildGroupGenReference(...args),
 }))
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/content-briefs/[briefId]/compliance/rewrite — 一键改写规避 + 自动重跑合规（需求 2.5, 2.6, 2.7）
  *
  * 读取最近一次合规检查命中的违禁词/风险点(evidence) → 调用真实 LLM 产出去违禁的合规候选文案
@@ -27,10 +27,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { rewriteToCompliant } from '@/lib/compliance-service'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { rewriteToCompliant } from '@/lib/merchant/compliance-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>

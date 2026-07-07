@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useCallback, useMemo } from 'react'
-import { parseAssetReferences, validateReferences } from '@/lib/prompt-parser'
+import { parseAssetReferences, validateReferences } from '@/lib/video/prompt-parser'
 
 interface Asset {
   id: string

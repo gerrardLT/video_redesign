@@ -119,11 +119,10 @@ const payMethodArb: fc.Arbitrary<PayMethod> = fc.constantFrom('wechat', 'alipay'
 
 const userIdArb = fc.uuid()
 
-// 生成一个合理的时间戳范围（2024年内）
-const dateArb = fc.date({
-  min: new Date('2024-01-01T00:00:00Z'),
-  max: new Date('2025-12-31T23:59:59Z'),
-})
+// 生成一个合理的时间戳范围（2024年内），确保是有效 Date（毫秒级唯一性通过整数生成保证）
+const dateArb = fc
+  .integer({ min: new Date('2024-01-01T00:00:00Z').getTime(), max: new Date('2025-12-31T23:59:59Z').getTime() })
+  .map((ms) => new Date(ms))
 
 const orderStatusArb: fc.Arbitrary<OrderStatus> = fc.constantFrom(
   'PENDING',

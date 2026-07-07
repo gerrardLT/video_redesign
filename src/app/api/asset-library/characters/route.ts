@@ -1,9 +1,9 @@
-/**
+﻿/**
  * GET /api/asset-library/characters
  * 获取用户所有 CHARACTER 类型资产列表，供角色选择器使用
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { getCharacterAssets } from '@/lib/asset-library-service'
+import { getCharacterAssets } from '@/lib/shared/asset-library-service'
 
 export const dynamic = 'force-dynamic'
 

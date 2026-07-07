@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+﻿import { describe, it, expect } from 'vitest'
 import jwt from 'jsonwebtoken'
-import { signToken, verifyToken, hashPassword, comparePassword } from '@/lib/auth'
+import { signToken, verifyToken, hashPassword, comparePassword } from '@/lib/shared/auth'
 
 describe('auth - hashPassword & comparePassword', () => {
   it('正确密码应验证通过', async () => {

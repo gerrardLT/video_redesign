@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getImportStatus } from '@/lib/video-import-service'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getImportStatus } from '@/lib/shared/video-import-service'
 
 export const dynamic = 'force-dynamic'
 

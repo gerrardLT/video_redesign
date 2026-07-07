@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * PromptArea — 编辑指令文本区（增强版）
@@ -11,7 +11,7 @@
  */
 
 import { useRef, useCallback, useImperativeHandle, forwardRef } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 interface PromptAreaProps {
   /** 受控值 */

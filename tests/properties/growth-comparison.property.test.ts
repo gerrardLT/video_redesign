@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 38: 效果对比取真实最佳
+﻿// Feature: local-life-depth-enhancements, Property 38: 效果对比取真实最佳
 /**
  * 属性测试：留存激励服务「效果对比取真实最佳」（Property 38）
  *
@@ -22,14 +22,14 @@ import * as fc from 'fast-check'
 // Mock Prisma：仅替换 DB 读取，隔离纯计算逻辑
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     contentBrief: { findMany: vi.fn() },
   },
 }))
 
-import { prisma } from '@/lib/db'
-import { getGrowthComparison } from '@/lib/engagement-service'
+import { prisma } from '@/lib/shared/db'
+import { getGrowthComparison } from '@/lib/merchant/engagement-service'
 
 // ========================
 // 周期口径：与被测函数一致（基于真实 new Date() 的自然月）

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getActiveSubscription } from '@/lib/subscription-service'
-import { getUserPrivileges } from '@/lib/privilege-engine'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getActiveSubscription } from '@/lib/shared/subscription-service'
+import { getUserPrivileges } from '@/lib/shared/privilege-engine'
 
 export const dynamic = 'force-dynamic'
 

@@ -4,7 +4,7 @@ import {
   mergeTimelineScript,
   SUPPORTED_CAMERA_MOVES,
   type MergeInputShot,
-} from '@/lib/script-merger'
+} from '@/lib/video/script-merger'
 
 /**
  * Feature: multi-shot-merge-generation

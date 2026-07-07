@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
-import { listBySection } from '@/lib/help-center-service'
+﻿import { NextResponse } from 'next/server'
+import { listBySection } from '@/lib/shared/help-center-service'
 
 export const dynamic = 'force-dynamic'
 

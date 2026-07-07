@@ -1,12 +1,13 @@
-/**
+﻿/**
  * 本地视频渲染 Worker
  *
- * 处理 `render-local-video` BullMQ 队列任务，按 job.data.mode 分发三种渲染入口：
+ * 处理 `render-local-video` BullMQ 队列任务，按 job.data.mode 分发四种渲染入口：
  * 1. 缺省（整体渲染）：调用 renderLocalVideoVariants()，生成 3 种风格视频版本
  * 2. REGEN_VARIANT（单版本重生成）：携带 videoVariantId，调用 regenerateSingleVariant()，
  *    仅重生成指定版本，保留其它版本（需求 4.2）
  * 3. RESHOOT_SCOPE（局部重拍）：携带 shotTaskId，调用 rerenderAffectedScope()，
  *    仅重渲染受影响分镜组集合（被重拍组 ∪ 承接链后续同场景组），承接链一并重算避免画面断裂（需求 4.3/4.5）
+ * 4. AUTO_RENDER（一键出片）：调用 aiAutoRender()，全 AI 生成渲染（所有镜头由 Seedance 生成）
  *
  * 渲染完成后，对涉及的每个 VideoVariant 自动入队 compliance-review 合规检查。
  *
@@ -23,14 +24,15 @@
  */
 
 import { Worker, Job, type ConnectionOptions } from 'bullmq'
-import { redis } from '@/lib/redis'
+import { redis } from '@/lib/shared/redis'
 import {
   renderLocalVideoVariants,
   regenerateSingleVariant,
   rerenderAffectedScope,
-  type RenderAdvancedParams,
-} from '@/lib/local-render-service'
-import { complianceReviewQueue } from '@/lib/queue'
+} from '@/lib/merchant/local-render-service'
+import { type RenderAdvancedParams } from '@/lib/video/render-pipeline'
+import { aiAutoRender } from '@/lib/merchant/ai-auto-render-service'
+import { complianceReviewQueue } from '@/lib/shared/queue'
 
 // ========================
 // 类型定义
@@ -41,8 +43,9 @@ import { complianceReviewQueue } from '@/lib/queue'
  * - 缺省/INTEGRAL：整体渲染全部 3 个版本
  * - REGEN_VARIANT：单版本重生成（需 videoVariantId）
  * - RESHOOT_SCOPE：局部重拍受影响范围重合成（需 shotTaskId）
+ * - AUTO_RENDER：一键出片，全 AI 生成（需 contentBriefId）
  */
-export type RenderLocalVideoMode = 'INTEGRAL' | 'REGEN_VARIANT' | 'RESHOOT_SCOPE'
+export type RenderLocalVideoMode = 'INTEGRAL' | 'REGEN_VARIANT' | 'RESHOOT_SCOPE' | 'AUTO_RENDER'
 
 export interface RenderLocalVideoJobData {
   /** 内容任务 ID（整体渲染 / 局部重拍必填；单版本重生成可省略，由版本反查所属 brief） */
@@ -137,6 +140,15 @@ async function dispatchRender(params: {
     // 范围内某组失败时 service 内部已 REFUND + 承接链整体回滚，错误向上抛出。
     const variants = await rerenderAffectedScope({ contentBriefId, shotTaskId, userId })
     return variants.map((v) => ({ id: v.id, type: v.type, contentBriefId: v.contentBriefId }))
+  }
+
+  if (mode === 'AUTO_RENDER') {
+    if (!contentBriefId) {
+      throw new Error('[render-local-video] AUTO_RENDER 模式缺少 contentBriefId')
+    }
+    // 一键出片：全 AI 生成渲染（所有镜头由 Seedance 生成）
+    const variants = await aiAutoRender({ contentBriefId, userId })
+    return variants.map((v) => ({ id: v.id, type: v.type, contentBriefId }))
   }
 
   // 缺省：整体渲染全部 3 个版本

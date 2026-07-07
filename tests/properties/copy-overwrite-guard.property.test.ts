@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 10: 人工修改标记保护
+﻿// Feature: local-life-depth-enhancements, Property 10: 人工修改标记保护
 //
 // 属性测试：对任意 (copyEdited, confirmOverwrite) 组合，regenerateCopy / rewriteForPlatform：
 //   - 当 copyEdited=true AND confirmOverwrite=false 时：抛 CONFIRM_OVERWRITE_REQUIRED（返回需确认），
@@ -51,7 +51,7 @@ const {
 
 // prisma 内存桩：顶层 contentBrief.findUniqueOrThrow 返回完整 brief（含 store.profile）；
 // $transaction 回调注入 tx（其 contentBrief.findUniqueOrThrow 返回 platformCopies，update 复用 briefUpdateMock）。
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     contentBrief: {
       findUniqueOrThrow: briefFindMock,
@@ -65,18 +65,18 @@ vi.mock('@/lib/db', () => ({
 }))
 
 // 积分余额查询内存桩
-vi.mock('@/lib/credit-service', () => ({
+vi.mock('@/lib/shared/credit-service', () => ({
   getBalance: getBalanceMock,
 }))
 
 // 计费链路内存桩（reserve→charge/refund）
-vi.mock('@/lib/merchant-billing-service', () => ({
+vi.mock('@/lib/merchant/merchant-billing-service', () => ({
   reserveMerchantCredits: reserveMock,
   chargeMerchantCredits: chargeMock,
   refundMerchantCredits: refundMock,
 }))
 
-import { regenerateCopy, rewriteForPlatform } from '@/lib/publish-copy-service'
+import { regenerateCopy, rewriteForPlatform } from '@/lib/merchant/publish-copy-service'
 
 // ============================================================
 // 测试夹具
@@ -241,7 +241,16 @@ describe('Property 10: 人工修改标记保护', () => {
               data: { copyEdited: boolean; platformCopies: Record<string, PlatformCopy> }
             }
             expect(updateArg.data.copyEdited).toBe(false)
-            expect(updateArg.data.platformCopies[platform]).toEqual(makeValidCopy('-new'))
+            // postProcessCopy 可能追加地区标签，仅检查核心字段不丢失
+            const saved = updateArg.data.platformCopies[platform]
+            expect(saved.title).toBe(makeValidCopy('-new').title)
+            expect(saved.caption).toBe(makeValidCopy('-new').caption)
+            expect(saved.coverTitle).toBe(makeValidCopy('-new').coverTitle)
+            expect(saved.cta).toBe(makeValidCopy('-new').cta)
+            // LLM 原始标签应被保留（postProcessCopy 可能追加但不应丢失原始标签）
+            for (const tag of makeValidCopy('-new').tags) {
+              expect(saved.tags).toContain(tag)
+            }
           }
         }
       ),

@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 13: 重拍建议对应失败维度
+﻿// Feature: local-life-depth-enhancements, Property 13: 重拍建议对应失败维度
 import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
 
@@ -24,10 +24,10 @@ import fc from 'fast-check'
 // ========================
 // Mock Prisma（仅为打断模块加载期的 db 初始化副作用，被测纯函数不使用）
 // ========================
-vi.mock('@/lib/db', () => ({ prisma: {} }))
+vi.mock('@/lib/shared/db', () => ({ prisma: {} }))
 
 // 动态导入以确保 mock 生效
-const { buildReshootAdvice } = await import('@/lib/capture-director')
+const { buildReshootAdvice } = await import('@/lib/merchant/capture-director')
 type ReshootInput = Parameters<typeof buildReshootAdvice>[0]
 type Report = ReshootInput['report']
 type Thresholds = ReshootInput['thresholds']

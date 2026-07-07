@@ -3,12 +3,18 @@
  *
  * 测试 buildTransitionFilters 在不同段数场景下的 xfade/acrossfade filter 字符串正确性
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// Mock db 模块，避免 DATABASE_URL 缺失导致的初始化错误（frame-continuity 间接 import db）
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+
 import {
   computeTransitionPlan,
   buildTransitionFilters,
   type SegmentInfo,
-} from '@/lib/transition-engine'
+} from '@/lib/video/transition-engine'
 
 describe('buildTransitionFilters 单元测试', () => {
   it('2 段同场景：生成一个 xfade + 一个 acrossfade', () => {

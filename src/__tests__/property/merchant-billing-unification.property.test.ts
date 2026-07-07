@@ -1,4 +1,4 @@
-// 必须置于文件首行：vitest.config.ts 不会自动加载 .env，
+﻿// 必须置于文件首行：vitest.config.ts 不会自动加载 .env，
 // 这里通过 dotenv/config 副作用导入提前注入 DATABASE_URL / REDIS_URL 等，
 // 使 DB-backed 属性测试（Property 2，依赖 Prisma + withCreditLock）可连接真实 PostgreSQL/Redis。
 import 'dotenv/config'
@@ -25,17 +25,17 @@ import { describe, it, expect, afterEach, afterAll } from 'vitest'
 import * as fc from 'fast-check'
 import { randomUUID } from 'crypto'
 import type { UserTier } from '@/constants/concurrency'
-import { determineMerchantPrivileges, determineTier } from '@/lib/privilege-engine'
+import { determineMerchantPrivileges, determineTier } from '@/lib/shared/privilege-engine'
 import { MERCHANT_PRIVILEGE_MAPPING } from '@/constants/merchant'
 import {
   estimateRenderCost,
   reserveMerchantCredits,
   chargeMerchantCredits,
   refundMerchantCredits,
-} from '@/lib/merchant-billing-service'
-import { estimateGroupCreditCost } from '@/lib/credit-service'
-import { prisma } from '@/lib/db'
-import { ApiError } from '@/lib/api-error'
+} from '@/lib/merchant/merchant-billing-service'
+import { estimateGroupCreditCost } from '@/lib/shared/credit-service'
+import { prisma } from '@/lib/shared/db'
+import { ApiError } from '@/lib/shared/api-error'
 
 // ========================
 // 共享生成器
@@ -337,7 +337,10 @@ async function createTestUser(creditBalance: number): Promise<string> {
   return user.id
 }
 
-describe('Property 2: 余额不足必拒绝且余额不变', () => {
+/** 依赖 Redis 的属性测试需实际 Redis 连接（withCreditLock） */
+const skipIfNoRedis = !process.env.REDIS_URL
+
+describe.skipIf(skipIfNoRedis)('Property 2: 余额不足必拒绝且余额不变', () => {
   it('余额 < 所需冻结额时 reserveMerchantCredits 抛 402 INSUFFICIENT_CREDITS，且余额前后不变、非负', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -406,7 +409,7 @@ describe('Property 2: 余额不足必拒绝且余额不变', () => {
 // 再重复调用 N-1 次，断言余额与流水条数均不变（= 等同单次）。numRuns 取较小值（每次迭代均落库）。
 // ========================
 
-describe('Property 5: 商家计费动作幂等', () => {
+describe.skipIf(skipIfNoRedis)('Property 5: 商家计费动作幂等', () => {
   // N 次重复调用：N ∈ [2,5]
   const repeatArb = fc.integer({ min: 2, max: 5 })
   // 冻结/扣费额度：> 0
@@ -566,7 +569,7 @@ describe('Property 5: 商家计费动作幂等', () => {
 // numRuns 取较小值（每次迭代均落库）。
 // ========================
 
-describe('Property 6: 冻结—退款往返一致', () => {
+describe.skipIf(skipIfNoRedis)('Property 6: 冻结—退款往返一致', () => {
   // 关联实体类型：取实际进入计费路径的 CONTENT_BRIEF / CONTENT_PLAN
   const bizRefTypeArb = fc.constantFrom<'CONTENT_BRIEF' | 'CONTENT_PLAN'>(
     'CONTENT_BRIEF',
@@ -640,7 +643,7 @@ describe('Property 6: 冻结—退款往返一致', () => {
 // 余额非负。numRuns 取较小值（每次迭代均落库）。
 // ========================
 
-describe('Property 7: 差额退款使净扣等于实扣', () => {
+describe.skipIf(skipIfNoRedis)('Property 7: 差额退款使净扣等于实扣', () => {
   // 关联实体类型：取实际进入计费路径的 CONTENT_BRIEF / CONTENT_PLAN
   const bizRefTypeArb = fc.constantFrom<'CONTENT_BRIEF' | 'CONTENT_PLAN'>(
     'CONTENT_BRIEF',
@@ -720,7 +723,7 @@ describe('Property 7: 差额退款使净扣等于实扣', () => {
 // numRuns 取较小值（每次迭代均落库）。
 // ========================
 
-describe('Property 4: 商家流水不含 jobId 且正确关联商家实体', () => {
+describe.skipIf(skipIfNoRedis)('Property 4: 商家流水不含 jobId 且正确关联商家实体', () => {
   // 关联实体类型：取实际进入计费路径的 CONTENT_BRIEF / CONTENT_PLAN
   const bizRefTypeArb = fc.constantFrom<'CONTENT_BRIEF' | 'CONTENT_PLAN'>(
     'CONTENT_BRIEF',

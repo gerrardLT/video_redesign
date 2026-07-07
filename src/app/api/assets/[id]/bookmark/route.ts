@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { computeExpiryStatus } from '@/lib/expiry-status'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/shared/db'
+import { computeExpiryStatus } from '@/lib/shared/expiry-status'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/workspace/upload
  * 工作台参考素材上传接口
  *
@@ -9,8 +9,8 @@
  * Response: { url, thumbUrl?, type, fileSize }
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { uploadBuffer, getPublicUrl } from '@/lib/storage'
-import { validateFile } from '@/lib/workspace-validators'
+import { uploadBuffer, getPublicUrl } from '@/lib/shared/storage'
+import { validateFile } from '@/lib/video/workspace-validators'
 import type { WorkspaceUploadResponse } from '@/types/workspace'
 
 export async function POST(request: NextRequest) {

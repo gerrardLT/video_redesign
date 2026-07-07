@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/stores/[storeId]/insights/apply — 应用复盘建议（可反哺）
  *
  * 调用 performance-learning-service.applyInsights：将商家采纳的复盘建议
@@ -22,10 +22,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { applyInsights } from '@/lib/performance-learning-service'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { applyInsights } from '@/lib/merchant/performance-learning-service'
 import { ContentGoalSchema } from '@/types/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

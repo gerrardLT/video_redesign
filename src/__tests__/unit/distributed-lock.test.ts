@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Unit Test: distributed-lock
  * Validates: Requirements 5.1, 5.4
  *
@@ -6,7 +6,7 @@
  * 以及模拟 acquireLock/releaseLock 的语义
  */
 import { describe, it, expect } from 'vitest'
-import { generateLockKey } from '@/lib/distributed-lock'
+import { generateLockKey } from '@/lib/shared/distributed-lock'
 
 describe('distributed-lock', () => {
   describe('generateLockKey', () => {

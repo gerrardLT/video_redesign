@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 通知 Worker
  * 处理 notification 队列的定时任务：
  * - 'expiry-reminder'：资产过期提醒（user 作用域 Notification）
@@ -17,11 +17,11 @@
  * 4. 通知发送成功后才置 reminded=true（与写通知同事务，保证恰一次）
  */
 import { Worker, type Job } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { getExpiringAssets, getRemainingDays } from '@/lib/asset-lifecycle-service'
-import { createAssetExpiringNotification } from '@/lib/notification-service'
-import { prisma } from '@/lib/db'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { getExpiringAssets, getRemainingDays } from '@/lib/shared/asset-lifecycle-service'
+import { createAssetExpiringNotification } from '@/lib/shared/notification-service'
+import { prisma } from '@/lib/shared/db'
+import { logger } from '@/lib/shared/logger'
 import type { ConnectionOptions } from 'bullmq'
 
 const connection = redis as unknown as ConnectionOptions

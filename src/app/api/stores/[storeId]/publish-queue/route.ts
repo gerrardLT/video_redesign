@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/publish-queue — 待发布清单视图（需求 8.2）
  *
  * 调用 publish-queue-service.listPublishQueue：返回门店作用域下所有已导出内容的
@@ -19,9 +19,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { listPublishQueue } from '@/lib/publish-queue-service'
-import { ApiError } from '@/lib/api-error'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { listPublishQueue } from '@/lib/merchant/publish-queue-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

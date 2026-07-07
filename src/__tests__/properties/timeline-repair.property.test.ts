@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { repairTimeline } from '@/lib/shot-schema'
+import { repairTimeline } from '@/lib/video/shot-schema'
 
 // 生成具有有效 endTime > startTime 的 shot 数组
 const validShotsArb = fc.array(

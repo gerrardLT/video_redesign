@@ -1,7 +1,16 @@
-import { describe, it, expect } from 'vitest'
+﻿import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
-import { groupShots, type GroupingInputShot } from '@/lib/grouping-service'
-import { estimateGroupCreditCost } from '@/lib/credit-service'
+
+// Mock db/redis 模块，避免 DATABASE_URL 缺失导致的初始化错误
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+vi.mock('@/lib/shared/redis', () => ({
+  redis: new Proxy({}, { get: () => vi.fn() })
+}))
+
+import { groupShots, type GroupingInputShot } from '@/lib/video/grouping-service'
+import { estimateGroupCreditCost } from '@/lib/shared/credit-service'
 
 /**
  * 属性测试文件：音频切片区间对齐 + 按组计费公式

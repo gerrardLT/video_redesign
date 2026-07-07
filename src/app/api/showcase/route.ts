@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { showcaseService } from '@/lib/showcase-service'
+import { showcaseService } from '@/lib/shared/showcase-service'
 
 export const dynamic = 'force-dynamic'
 

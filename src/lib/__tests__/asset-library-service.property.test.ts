@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 用户资产库 - 属性测试 (Property-Based Tests)
  *
  * 使用 fast-check v4.8.0 对核心服务层逻辑进行属性测试。
@@ -11,7 +11,7 @@ import * as fc from 'fast-check'
 // Mock setup
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     asset: {
       findFirst: vi.fn(),
@@ -28,19 +28,19 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-vi.mock('@/lib/storage', () => ({
+vi.mock('@/lib/shared/storage', () => ({
   deleteObject: vi.fn(),
   extractKeyFromUrl: vi.fn((url: string) => url),
   isOSSConfigured: vi.fn(() => true),
 }))
 
-vi.mock('@/lib/logger', () => ({
+vi.mock('@/lib/shared/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn() },
 }))
 
-import { prisma } from '@/lib/db'
-import { ingestCharacterImage } from '@/lib/asset-ingestion-service'
-import { listAssets, deleteAsset } from '@/lib/asset-library-service'
+import { prisma } from '@/lib/shared/db'
+import { ingestCharacterImage } from '@/lib/shared/asset-ingestion-service'
+import { listAssets, deleteAsset } from '@/lib/shared/asset-library-service'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -419,7 +419,7 @@ describe('Property 9: 用户数据隔离', () => {
           } as any)
 
           // userB 尝试删除 userA 的资产，应抛出 403 错误
-          const { ApiError } = await import('@/lib/api-error')
+          const { ApiError } = await import('@/lib/shared/api-error')
           try {
             await deleteAsset(assetId, userB)
             // 如果没有抛异常则失败
@@ -446,7 +446,7 @@ describe('Property 9: 用户数据隔离', () => {
 
 describe('Property 10: 分类计数准确性', () => {
   it('对任意分类计数组合，getCategoryCounts 应返回精确数值及正确的总计', async () => {
-    const { getCategoryCounts } = await import('@/lib/asset-library-service')
+    const { getCategoryCounts } = await import('@/lib/shared/asset-library-service')
 
     await fc.assert(
       fc.asyncProperty(
@@ -487,7 +487,7 @@ describe('Property 10: 分类计数准确性', () => {
 
 describe('Property 3: 分类枚举约束', () => {
   it('合法分类值（CHARACTER/MATERIAL/AUDIO）应通过 validateCategory 校验并返回自身', async () => {
-    const { validateCategory } = await import('@/lib/asset-library-service')
+    const { validateCategory } = await import('@/lib/shared/asset-library-service')
 
     await fc.assert(
       fc.property(
@@ -502,7 +502,7 @@ describe('Property 3: 分类枚举约束', () => {
   })
 
   it('非法分类值应被 validateCategory 拒绝（返回 undefined）', async () => {
-    const { validateCategory } = await import('@/lib/asset-library-service')
+    const { validateCategory } = await import('@/lib/shared/asset-library-service')
 
     const validCategories = ['CHARACTER', 'MATERIAL', 'AUDIO']
 

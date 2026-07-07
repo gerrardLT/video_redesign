@@ -41,11 +41,11 @@ afterEach(() => {
 // ========================
 
 async function importSeedanceModule() {
-  return await import('@/lib/seedance')
+  return await import('@/lib/video/seedance')
 }
 
 async function importReferenceBuilderModule() {
-  return await import('@/lib/reference-builder')
+  return await import('@/lib/video/reference-builder')
 }
 
 // ========================

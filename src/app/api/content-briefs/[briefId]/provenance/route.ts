@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/content-briefs/[briefId]/provenance — 获取 ContentBrief 的画像溯源快照（可解释）
  *
  * 直接读取 ContentBrief.provenance 列（生成时快照，需求 5.4 不回溯）并原样返回，
@@ -21,10 +21,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { ApiError } from '@/lib/api-error'
-import type { BriefProvenance } from '@/lib/playbook-engine'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { ApiError } from '@/lib/shared/api-error'
+import type { BriefProvenance } from '@/lib/merchant/playbook-engine'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>

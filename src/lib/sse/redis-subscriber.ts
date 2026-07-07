@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Redis Subscriber Manager — Redis 订阅管理器
  *
  * 管理 Redis Pub/Sub 订阅，为每个用户维护一个共享的 PSUBSCRIBE 频道模式。
@@ -14,7 +14,7 @@
 
 import Redis from 'ioredis'
 import type { ProgressEventPayload } from './types'
-import { logger } from '@/lib/logger'
+import { logger } from '@/lib/shared/logger'
 
 /** 消息回调类型 */
 type MessageCallback = (event: ProgressEventPayload) => void

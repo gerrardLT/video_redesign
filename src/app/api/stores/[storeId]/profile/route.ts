@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/profile — 获取门店画像
  *
  * 鉴权：从 x-user-id header 获取用户 ID，通过 validateMerchantAccess 验证权限
@@ -14,9 +14,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

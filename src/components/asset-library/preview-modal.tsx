@@ -28,7 +28,7 @@ import {
   MIN_SCALE,
   MAX_SCALE,
   type ViewTransform,
-} from '@/lib/preview-transform'
+} from '@/lib/video/preview-transform'
 import type { AssetLibraryItem } from '@/components/asset-library/asset-grid'
 
 // ========================

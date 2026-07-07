@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/stores/[storeId]/profile/regenerate — 重新生成门店画像
  *
  * 当画像生成失败（状态为 PROFILE_PENDING 或 INCOMPLETE）时，
@@ -17,10 +17,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { generateStoreProfileQueue } from '@/lib/queue'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { generateStoreProfileQueue } from '@/lib/shared/queue'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

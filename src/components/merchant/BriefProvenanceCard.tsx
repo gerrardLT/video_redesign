@@ -177,11 +177,13 @@ function AdjustProfileDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-1.5 text-amber-900">
             <SlidersHorizontal className="h-4 w-4 text-amber-500" />
-            调整门店画像
+            {isHookKeyword ? '移除开场话术' : '调整门店画像'}
           </DialogTitle>
           <DialogDescription>
             {reference
-              ? `这条「${FIELD_FRIENDLY_LABELS[reference.field]}」不准确？在这里改一下。`
+              ? isHookKeyword
+                ? `这句「${FIELD_FRIENDLY_LABELS[reference.field]}」不准确？确认后将不再用于新内容。`
+                : `这条「${FIELD_FRIENDLY_LABELS[reference.field]}」不准确？在这里改一下。`
               : ''}
           </DialogDescription>
         </DialogHeader>
@@ -343,30 +345,30 @@ export function BriefProvenanceCard({
         ) : (
           <>
             {/* 通俗话术展示每条画像引用（需求 5.1 / 5.5） */}
-            <p className="text-xs text-gray-500">这条内容用上了你门店的这些招牌信息：</p>
-            <ul className="space-y-2">
+            <p className="text-xs text-gray-500">本条内容使用了以下门店信息：</p>
+            <ul className="space-y-1.5">
               {references.map((ref, idx) => (
                 <li
                   key={`${ref.field}-${idx}`}
-                  className="flex items-start justify-between gap-2 rounded-xl bg-amber-50/60 border border-amber-100 p-3"
+                  className="flex items-center justify-between gap-2 rounded-lg bg-amber-50/60 border border-amber-100 px-3 py-2"
                 >
-                  <div className="flex items-start gap-1.5 min-w-0">
-                    <Quote className="h-3.5 w-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700 leading-relaxed">{ref.plainText}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[11px] text-amber-600 font-medium flex-shrink-0">{FIELD_FRIENDLY_LABELS[ref.field]}</span>
+                    <span className="text-sm text-gray-800 truncate">『{ref.value}』</span>
                   </div>
-                  {/* 可干预入口：调整这条依据（仅对后续生效） */}
+                  {/* 可干预入口：开场话术只能移除，其余字段可调整 */}
                   <button
                     onClick={() => openAdjust(ref)}
                     className="flex-shrink-0 text-xs text-amber-600 hover:text-amber-700 hover:underline whitespace-nowrap"
                   >
-                    不准确？调整
+                    {ref.field === 'hookKeyword' ? '移除' : '调整'}
                   </button>
                 </li>
               ))}
             </ul>
             {/* 调整仅对后续生效的总说明（需求 5.3 / 5.4） */}
             <p className="text-[11px] text-gray-400 leading-relaxed">
-              调整画像只影响以后新生成的内容，不会改动这条和之前已生成的内容。
+              调整仅对之后新生成的内容生效，不影响当前和已有内容。
             </p>
           </>
         )}

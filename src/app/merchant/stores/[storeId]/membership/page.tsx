@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 会员与积分页 — /merchant/stores/[storeId]/membership
@@ -29,6 +29,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/shared/utils'
 import { ArrowLeft, Crown, Coins, Check, X } from 'lucide-react'
 
 // ─── 数据获取 ───
@@ -189,24 +190,36 @@ export default function MembershipPage() {
           <ArrowLeft className="h-4 w-4 mr-1" />
           返回
         </Button>
-        <h2 className="text-xl font-bold text-amber-900">会员与积分</h2>
+        <h2 className="text-[var(--text-title)] font-semibold font-[var(--font-serif)] text-[var(--ll-text)]">会员与积分</h2>
       </div>
 
-      {/* 当前状态 —— 会员仪式 band：深绿底 + 金色皇冠/积分（金色专供会员，不做按钮） */}
-      <Card className="border-transparent rounded-2xl bg-[var(--ll-house)] text-white overflow-hidden">
-        <CardContent className="flex items-center justify-between py-4">
-          <div className="flex items-center gap-2">
-            <Crown className="h-5 w-5 text-[var(--ll-gold)]" />
-            <span className="text-sm font-medium text-white">
-              {currentTier ? MEMBER_TIER_LABELS[currentTier] ?? currentTier : '加载中...'}
-            </span>
+      {/* 当前状态 — 实体会员卡样式：深绿底 + 金色热压纹理 + 圆角 */}
+      <div className="relative overflow-hidden rounded-2xl bg-[var(--ll-house)] p-5">
+        {/* 背景纹理 — 微妙对角线条 */}
+        <div className="absolute inset-0 opacity-[0.04]" style={{
+          backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 20px, rgba(255,255,255,.3) 20px, rgba(255,255,255,.3) 21px)'
+        }} />
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[var(--ll-gold)]/20 flex items-center justify-center">
+              <Crown className="h-5 w-5 text-[var(--ll-gold)]" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">
+                {currentTier ? MEMBER_TIER_LABELS[currentTier] ?? currentTier : '加载中...'}
+              </p>
+              <p className="text-[11px] text-white/60 mt-0.5">MEMBERSHIP CARD</p>
+            </div>
           </div>
-          <div className="flex items-center gap-1 text-sm font-semibold text-[var(--ll-gold)]">
-            <Coins className="h-4 w-4" />
-            积分余额 {sub?.creditBalance ?? 0}
+          <div className="text-right">
+            <div className="flex items-center gap-1 text-sm font-bold text-[var(--ll-gold)] font-[var(--font-num)] tabular-nums">
+              <Coins className="h-4 w-4" />
+              {sub?.creditBalance ?? 0}
+            </div>
+            <p className="text-[10px] text-white/50 mt-0.5">积分余额</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* 支付方式选择 */}
       <div className="mt-4 flex items-center gap-2">
@@ -263,10 +276,19 @@ export default function MembershipPage() {
           {!plansLoading && plans.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-6">暂无可购买的会员套餐</p>
           )}
-          {plans.map((plan) => {
+          {plans.map((plan, idx) => {
             const isCurrent = currentTier === plan.type
+            const isRecommended = idx === plans.length - 1 && !isCurrent // 最高级套餐为推荐
             return (
-              <Card key={plan.id} className="border-amber-100 rounded-2xl">
+              <Card key={plan.id} className={cn(
+                'rounded-2xl relative',
+                isRecommended ? 'border-t-[3px] border-t-[var(--ll-gold)] border-[var(--ll-gold)]/30' : 'border-amber-100'
+              )}>
+                {isRecommended && (
+                  <span className="absolute -top-3 right-4 inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--ll-gold)] text-white text-[10px] font-bold rounded-full shadow-sm">
+                    推荐
+                  </span>
+                )}
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between">
                     <div>
@@ -287,7 +309,7 @@ export default function MembershipPage() {
                       )}
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-orange-600">¥{(plan.price / 100).toFixed(0)}</p>
+                      <p className="text-lg font-semibold font-[var(--font-num)] tabular-nums text-[var(--ll-green)]">¥{(plan.price / 100).toFixed(0)}</p>
                     </div>
                   </div>
                   <Button
@@ -325,7 +347,7 @@ export default function MembershipPage() {
                       <p className="text-xs text-gray-400 mt-1">{pkg.description}</p>
                     )}
                   </div>
-                  <p className="text-lg font-bold text-orange-600">¥{(pkg.price / 100).toFixed(0)}</p>
+                  <p className="text-lg font-semibold font-[var(--font-num)] tabular-nums text-[var(--ll-green)]">¥{(pkg.price / 100).toFixed(0)}</p>
                 </div>
                 <Button
                   onClick={() => handleRecharge(pkg)}

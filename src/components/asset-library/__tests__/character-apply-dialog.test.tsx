@@ -41,9 +41,11 @@ function createFetchMock(options?: {
 }) {
   const { projectsDelay = 0, charactersDelay = 0, applySuccess = true } = options ?? {}
 
-  return vi.fn(async (url: string, init?: RequestInit) => {
+  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+
     // 项目列表请求（无 projectId 参数）
-    if (typeof url === 'string' && url.includes('/api/projects/list-with-characters') && !url.includes('projectId=')) {
+    if (url.includes('/api/projects/list-with-characters') && !url.includes('projectId=')) {
       if (projectsDelay > 0) {
         await new Promise((r) => setTimeout(r, projectsDelay))
       }
@@ -54,7 +56,7 @@ function createFetchMock(options?: {
     }
 
     // 角色列表请求（含 projectId 参数）
-    if (typeof url === 'string' && url.includes('/api/projects/list-with-characters') && url.includes('projectId=')) {
+    if (url.includes('/api/projects/list-with-characters') && url.includes('projectId=')) {
       if (charactersDelay > 0) {
         await new Promise((r) => setTimeout(r, charactersDelay))
       }
@@ -65,7 +67,7 @@ function createFetchMock(options?: {
     }
 
     // 应用到角色 API
-    if (typeof url === 'string' && url.includes('/apply-to-character')) {
+    if (url.includes('/apply-to-character')) {
       if (applySuccess) {
         return new Response(
           JSON.stringify({
@@ -78,7 +80,7 @@ function createFetchMock(options?: {
     }
 
     return new Response('Not Found', { status: 404 })
-  })
+  }) as any
 }
 
 // 默认 props
@@ -95,7 +97,7 @@ describe('Character_Apply_Dialog 组件', () => {
 
   beforeEach(() => {
     fetchMock = createFetchMock()
-    global.fetch = fetchMock
+    globalThis.fetch = fetchMock
   })
 
   afterEach(() => {
@@ -267,14 +269,14 @@ describe('Character_Apply_Dialog 组件', () => {
     // 验证 API 被调用
     await waitFor(() => {
       const applyCalls = fetchMock.mock.calls.filter(
-        (call) => typeof call[0] === 'string' && call[0].includes('/apply-to-character')
+        (call: any[]) => typeof call[0] === 'string' && call[0].includes('/apply-to-character')
       )
       expect(applyCalls.length).toBe(1)
     })
 
     // 验证请求体
     const applyCall = fetchMock.mock.calls.find(
-      (call) => typeof call[0] === 'string' && call[0].includes('/apply-to-character')
+      (call: any[]) => typeof call[0] === 'string' && call[0].includes('/apply-to-character')
     )
     expect(applyCall).toBeTruthy()
     const body = JSON.parse(applyCall![1]?.body as string)

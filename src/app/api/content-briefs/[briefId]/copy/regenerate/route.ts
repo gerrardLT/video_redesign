@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/content-briefs/[briefId]/copy/regenerate — 重新生成平台文案（需求 2.2, 2.3）
  *
  * 基于 StoreProfile + brief 上下文调用真实 LLM 产出新文案，替换 platformCopies[platform]
@@ -27,11 +27,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { regenerateCopy } from '@/lib/publish-copy-service'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { regenerateCopy } from '@/lib/merchant/publish-copy-service'
 import { PublishPlatformSchema } from '@/types/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>

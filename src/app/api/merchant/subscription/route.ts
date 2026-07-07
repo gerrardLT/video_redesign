@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/merchant/subscription — 获取当前用户的会员权益与积分余额
  *
  * 收敛后：会员权益由 privilege-engine 的 getMerchantPrivileges 经 UserTier
@@ -13,24 +13,20 @@
  *
  * Requirements: 2.3, 5.1, 5.2
  */
-
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { getMerchantPrivileges } from '@/lib/privilege-engine'
-import { getBalance } from '@/lib/credit-service'
-import { ApiError } from '@/lib/api-error'
-
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { getMerchantPrivileges } from '@/lib/shared/privilege-engine'
+import { getBalance } from '@/lib/shared/credit-service'
+import { ApiError } from '@/lib/shared/api-error'
 export async function GET(request: NextRequest) {
   try {
     // 1. 鉴权
     const userId = getUserIdFromRequest(request)
-
     // 2. 并行获取会员权益与积分余额
     const [privileges, creditBalance] = await Promise.all([
       getMerchantPrivileges(userId),
       getBalance(userId),
     ])
-
     // 3. 返回聚合信息（权益 + 积分余额）
     return NextResponse.json({
       tier: privileges.tier,

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 引擎选择组件
@@ -7,7 +7,7 @@
  * - HappyHorse：标注"支持真人脸"
  */
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 interface EngineSelectorProps {
   projectId: string

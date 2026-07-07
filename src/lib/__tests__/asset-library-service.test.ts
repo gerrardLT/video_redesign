@@ -1,11 +1,11 @@
-/**
+﻿/**
  * AssetLibraryService 单元测试
  * 覆盖：复用角色图 URL 一致、删除引用保留 OSS 文件、跨用户 403、displayName 派生、
  *       下载签名 URL 生成、跨项目角色图应用、项目与角色列表查询
  */
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     asset: {
       findMany: vi.fn(),
@@ -26,19 +26,19 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-vi.mock('@/lib/storage', () => ({
+vi.mock('@/lib/shared/storage', () => ({
   deleteObject: vi.fn(),
   extractKeyFromUrl: vi.fn((url: string) => url.replace('https://oss.example.com/', '')),
   isOSSConfigured: vi.fn(() => true),
   getSignedObjectUrl: vi.fn((key: string, _expires: number) => `https://oss.example.com/${key}?Signature=abc&Expires=9999`),
 }))
 
-vi.mock('@/lib/logger', () => ({
+vi.mock('@/lib/shared/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn() },
 }))
 
-import { prisma } from '@/lib/db'
-import { deleteObject } from '@/lib/storage'
+import { prisma } from '@/lib/shared/db'
+import { deleteObject } from '@/lib/shared/storage'
 import {
   deleteAsset,
   getCharacterAssets,
@@ -46,8 +46,8 @@ import {
   generateDownloadUrl,
   applyToCharacter,
   listProjectsWithCharacterCount,
-} from '@/lib/asset-library-service'
-import { ApiError } from '@/lib/api-error'
+} from '@/lib/shared/asset-library-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 beforeEach(() => {
   vi.clearAllMocks()

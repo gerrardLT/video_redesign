@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 解析看门狗 Worker
  * 处理 'parse-watchdog' 队列的定时任务
  *
@@ -6,9 +6,9 @@
  * 将其标记为 FAILED，避免项目因入队失败/Worker 宕机而永久卡死。
  */
 import { Worker, type Job } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
+import { logger } from '@/lib/shared/logger'
 import type { ConnectionOptions } from 'bullmq'
 
 const connection = redis as unknown as ConnectionOptions

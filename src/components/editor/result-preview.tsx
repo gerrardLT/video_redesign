@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * ResultPreview — 生成结果预览与对比组件
@@ -12,7 +12,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Play, Pause, Columns2, MonitorPlay } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 interface GeneratedSegment {
   index: number

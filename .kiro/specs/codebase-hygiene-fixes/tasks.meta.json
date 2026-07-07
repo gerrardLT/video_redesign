@@ -1,0 +1,323 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 创建 src/lib 域子目录": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324323992
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324337555
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324401721
+      }
+    ],
+    "1.2 清理 Prisma Schema 过时注释": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324041
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324338434
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324402422
+      }
+    ],
+    "2.1 移动 Video_Domain 模块文件": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324073
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324410732
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324540233
+      }
+    ],
+    "3.1 移动 Merchant_Domain 模块文件": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324105
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324411364
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324540962
+      }
+    ],
+    "4.1 移动 Shared_Domain 模块文件": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324135
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324412317
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324541905
+      }
+    ],
+    "5. Checkpoint - 确认文件迁移完成": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324178
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324555198
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324614223
+      }
+    ],
+    "6.1 更新 Video_Domain 模块的 import 路径": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324230
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324620807
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783325407732
+      }
+    ],
+    "6.2 更新 Merchant_Domain 模块的 import 路径": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324260
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324621638
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783325408659
+      }
+    ],
+    "6.3 更新 Shared_Domain 模块的 import 路径": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324294
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324622556
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783325409511
+      }
+    ],
+    "7. Checkpoint - 确认 import 路径更新完整": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324328
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783325417961
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326240021
+      }
+    ],
+    "8.1 重写 `tests/unit/db-retry.test.ts`": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324372
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783325419021
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326240792
+      }
+    ],
+    "9.1 重写 `src/__tests__/properties/db-retry.property.test.ts`": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324408
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783325419843
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326241761
+      }
+    ],
+    "10.1 重写 `tests/properties/idempotent-cleanup.property.test.ts`": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324439
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783325420594
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326242722
+      }
+    ],
+    "11.1 执行 TypeScript 编译验证": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324469
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326271768
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326685973
+      }
+    ],
+    "11.2 执行全量测试验证": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324324495
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326272523
+      },
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326686719
+      }
+    ],
+    "1. 创建域目录结构与 Schema 注释清理": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324402467
+      }
+    ],
+    "2. 迁移视频域模块至 video/ 子目录": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324540281
+      }
+    ],
+    "3. 迁移商家域模块至 merchant/ 子目录": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324541008
+      }
+    ],
+    "4. 迁移共享域模块至 shared/ 子目录": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783324541959
+      }
+    ],
+    "6. 更新全部 import 路径": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783325409562
+      }
+    ],
+    "8. 重写单元测试文件为 PostgreSQL 语义": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326240840
+      }
+    ],
+    "9. 重写属性测试文件 A 为 PostgreSQL 语义": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326241809
+      }
+    ],
+    "10. 重写属性测试文件 B 为 PostgreSQL 语义": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326242776
+      }
+    ],
+    "11. Final checkpoint - 全量验证": [
+      {
+        "executionId": "082d1376-c24d-4869-b9f2-1c5dac2a7030",
+        "chatSessionId": "sess_3b6598c3-12d2-45ac-9c0c-e3486e3838a1",
+        "timestamp": 1783326686753
+      }
+    ]
+  }
+}

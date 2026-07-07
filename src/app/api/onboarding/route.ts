@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 新手引导进度 API
  *
  * GET /api/onboarding - 获取当前用户的引导进度，首次调用自动创建进度记录并创建示例项目
@@ -7,11 +7,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { getUserId } from '@/lib/auth-helpers'
-import { ApiError } from '@/lib/api-error'
-import { getProgress, updateStep, checkAndGrantReward } from '@/lib/onboarding-service'
-import type { OnboardingStepId, StepStatus } from '@/lib/onboarding-service'
-import { createSampleProject } from '@/lib/sample-project-service'
+import { getUserId } from '@/lib/shared/auth-helpers'
+import { ApiError } from '@/lib/shared/api-error'
+import { getProgress, updateStep, checkAndGrantReward } from '@/lib/shared/onboarding-service'
+import type { OnboardingStepId, StepStatus } from '@/lib/shared/onboarding-service'
+import { createSampleProject } from '@/lib/shared/sample-project-service'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 属性测试：工作台生成 (Workspace Generation)
  *
  * 覆盖设计文档中的正确性属性 1-8
@@ -9,8 +9,8 @@ import {
   validatePromptLength,
   validateFile,
   insertAssetReference,
-} from '@/lib/workspace-validators'
-import { estimateWorkspaceCost, getDurationOptions } from '@/lib/credit-calc'
+} from '@/lib/video/workspace-validators'
+import { estimateWorkspaceCost, getDurationOptions } from '@/lib/shared/credit-calc'
 import { MAX_WORKSPACE_ASSETS, FILE_LIMITS } from '@/constants/workspace'
 
 // Feature: workspace-generation, Property 1: Prompt 长度校验
@@ -235,7 +235,7 @@ describe('Property 5: 积分预估计算正确性', () => {
 // Feature: workspace-generation, Property 6: 生成请求体构建完整性
 describe('Property 6: 生成请求体构建完整性', () => {
   it('Seedance 请求体: prompt 文本项 + 图片 image_url + 音频 audio_url', async () => {
-    const { buildSeedanceWorkspaceRequest } = await import('@/lib/workspace-request-builder')
+    const { buildSeedanceWorkspaceRequest } = await import('@/lib/video/workspace-request-builder')
 
     fc.assert(
       fc.property(
@@ -255,7 +255,7 @@ describe('Property 6: 生成请求体构建完整性', () => {
           })
 
           // 必须包含 prompt 文本项
-          const textItems = body.content.filter((c: { type: string }) => c.type === 'text')
+          const textItems = body.content.filter((c: { type: string }) => c.type === 'text') as Array<{ type: 'text'; text: string }>
           expect(textItems.length).toBe(1)
           expect(textItems[0].text).toBe(prompt)
 
@@ -278,7 +278,7 @@ describe('Property 6: 生成请求体构建完整性', () => {
   })
 
   it('HappyHorse 无参考图时使用 T2V 模型', async () => {
-    const { buildT2VRequestBody } = await import('@/lib/happyhorse-workspace')
+    const { buildT2VRequestBody } = await import('@/lib/shared/happyhorse-workspace')
 
     fc.assert(
       fc.property(
@@ -299,7 +299,7 @@ describe('Property 6: 生成请求体构建完整性', () => {
   })
 
   it('HappyHorse 有参考图时使用 R2V 模型且 media 包含所有参考图', async () => {
-    const { buildR2VRequestBody } = await import('@/lib/happyhorse-workspace')
+    const { buildR2VRequestBody } = await import('@/lib/shared/happyhorse-workspace')
 
     fc.assert(
       fc.property(

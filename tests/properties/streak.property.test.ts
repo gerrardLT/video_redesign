@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 36: 连续创作计算正确
+﻿// Feature: local-life-depth-enhancements, Property 36: 连续创作计算正确
 
 import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
@@ -27,12 +27,12 @@ import fc from 'fast-check'
 // Mock Prisma（computeStreak 不使用 prisma，仅为规避模块顶层 import 副作用）
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {},
 }))
 
-const { computeStreak } = await import('@/lib/engagement-service')
-const { resolvePeriods, periodIndexOf } = await import('@/lib/period-service')
+const { computeStreak } = await import('@/lib/merchant/engagement-service')
+const { resolvePeriods, periodIndexOf } = await import('@/lib/merchant/period-service')
 
 // ========================
 // 纯日期工具（测试自带，保持与被测实现独立）

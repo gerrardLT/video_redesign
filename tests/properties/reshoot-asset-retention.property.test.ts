@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 22: 换选题保留已拍素材
+﻿// Feature: local-life-depth-enhancements, Property 22: 换选题保留已拍素材
 //
 // 属性：对任意已含 RawAsset 的 brief，更换 playbook 后原 RawAsset SHALL 全部保留
 //   （计数不减），且 SHALL 返回 assetWarning 提示，不自动丢弃；无已拍素材时不返回 assetWarning。
@@ -35,7 +35,7 @@ const h = vi.hoisted(() => {
   return { state }
 })
 
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const { state } = h
   const prisma = {
     store: {
@@ -85,8 +85,8 @@ vi.mock('@/lib/db', () => {
   return { prisma }
 })
 
-vi.mock('@/lib/playbook-engine', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/playbook-engine')>()
+vi.mock('@/lib/merchant/playbook-engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/merchant/playbook-engine')>()
   return {
     ...actual,
     instantiatePlaybookWithProvenance: vi.fn(async () => ({
@@ -111,7 +111,7 @@ vi.mock('@/lib/playbook-engine', async (importOriginal) => {
   }
 })
 
-const { editContentBrief } = await import('@/lib/content-calendar-service')
+const { editContentBrief } = await import('@/lib/merchant/content-calendar-service')
 
 const STORE_ID = 'store-1'
 const BRIEF_ID = 'brief-1'

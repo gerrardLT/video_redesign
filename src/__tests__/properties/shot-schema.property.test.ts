@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { ShotSchema } from '@/lib/shot-schema'
+import { ShotSchema } from '@/lib/video/shot-schema'
 
 // 生成符合 ShotSchema 的有效 shot 对象的 Arbitrary
 const validShotArb = fc.record({

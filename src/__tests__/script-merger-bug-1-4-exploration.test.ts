@@ -27,7 +27,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { mergeTimelineScript, type MergeInputShot } from '../lib/script-merger'
+import { mergeTimelineScript, type MergeInputShot } from '../lib/video/script-merger'
 
 /** 把一句台词包装成 Shot.dialogue 的存储格式（JSON.stringify([{speaker,text}])） */
 function dialogueJson(speaker: string, text: string): string {

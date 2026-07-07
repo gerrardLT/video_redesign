@@ -238,15 +238,15 @@ export default function PublishQueuePage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-8">
-      {/* 标题 */}
-      <div className="flex items-center gap-2 pt-1">
-        <Megaphone className="h-5 w-5 text-amber-600" />
-        <h1 className="text-lg font-bold text-gray-800">待发布清单</h1>
+      {/* 标题 — v3 Zen: serif 标题 + lucide strokeWidth 1.5 */}
+      <div className="flex items-center gap-2 pt-1 zen-reveal">
+        <Megaphone className="h-5 w-5 text-[var(--ll-green)]" strokeWidth={1.5} />
+        <h1 className="text-[var(--text-title)] font-semibold font-[var(--font-serif)] text-[var(--ll-text)]">待发布清单</h1>
       </div>
 
       {/* 能力边界说明（需求 8.6）：明确为清单 + 提醒 + 手动标记，不伪装自动分发 */}
-      <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-800">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+      <div className="flex gap-2 rounded-[3px] border border-[var(--ll-hair)] bg-[var(--ll-green-light)]/40 p-3 text-xs text-[var(--ll-text-2)] zen-reveal">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ll-green)]" strokeWidth={1.5} />
         <p className="leading-relaxed">
           导出后系统会把视频放进这里并按时提醒你发布。目前需要你手动发布到各平台：
           点「去发布」可复制文案、下载视频、打开平台发布页，发完后回来标记一下即可。
@@ -356,7 +356,7 @@ function PublishQueueCard({
     <Card className="rounded-2xl border-gray-100 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-gray-800">
+          <p className="truncate text-sm font-semibold text-[var(--ll-text)]">
             {brief?.title ?? '加载中…'}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

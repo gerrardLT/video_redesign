@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/content-briefs/[briefId]/insights — 获取优化建议
  *
  * 流程：
@@ -20,11 +20,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { getMerchantPrivileges } from '@/lib/privilege-engine'
-import { generatePerformanceInsights } from '@/lib/performance-learning-service'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { getMerchantPrivileges } from '@/lib/shared/privilege-engine'
+import { generatePerformanceInsights } from '@/lib/merchant/performance-learning-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 export async function GET(
   request: NextRequest,

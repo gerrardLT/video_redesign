@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 资产下载签名 URL API
  * GET /api/asset-library/[id]/download - 生成资产下载签名 URL
  *
@@ -13,8 +13,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { generateDownloadUrl } from '@/lib/asset-library-service'
-import { ApiError } from '@/lib/api-error'
+import { generateDownloadUrl } from '@/lib/shared/asset-library-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 export const dynamic = 'force-dynamic'
 

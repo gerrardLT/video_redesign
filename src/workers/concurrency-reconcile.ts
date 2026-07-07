@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 并发对账 Worker
  * 处理 'concurrency-reconcile' 队列的定时任务
  *
@@ -7,9 +7,9 @@
  * 修复 Worker 崩溃/Redis 重启导致的计数泄漏，确保用户并发额度不被永久占用。
  */
 import { Worker, type Job } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { reconcileAll } from '@/lib/concurrency-controller'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { reconcileAll } from '@/lib/shared/concurrency-controller'
+import { logger } from '@/lib/shared/logger'
 import type { ConnectionOptions } from 'bullmq'
 
 const connection = redis as unknown as ConnectionOptions

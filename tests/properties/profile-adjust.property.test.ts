@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 18: 画像调整仅对后续生效且不回溯
+﻿// Feature: local-life-depth-enhancements, Property 18: 画像调整仅对后续生效且不回溯
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -42,7 +42,7 @@ const dbState = vi.hoisted(() => ({
   briefTouchCount: 0,
 }))
 
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const store = {
     findUnique: vi.fn(async () => ({
       id: dbState.profile.storeId,
@@ -101,9 +101,9 @@ vi.stubGlobal(
 )
 
 // 动态导入以确保 mock 生效
-const { adjustStoreProfile } = await import('@/lib/store-profile-service')
-const { instantiatePlaybookWithProvenance } = await import('@/lib/playbook-engine')
-import type { Playbook, Store, StoreProfile, BriefProvenance } from '@/lib/playbook-engine'
+const { adjustStoreProfile } = await import('@/lib/merchant/store-profile-service')
+const { instantiatePlaybookWithProvenance } = await import('@/lib/merchant/playbook-engine')
+import type { Playbook, Store, StoreProfile, BriefProvenance } from '@/lib/merchant/playbook-engine'
 
 // ========================
 // 固定门店/剧本脚手架（与钩子词无关的字段固定，确保不与钩子词标签冲突）

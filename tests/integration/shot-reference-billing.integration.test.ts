@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 集成测试 16.2：镜头参考图生成计费（真实图像生成 + 计费链路）
  *
  * 验证真实图像生成（复用 Flux 文生图）+ 真实 credit-service 计费链路；
@@ -23,8 +23,8 @@ describe.skipIf(!enabled)('集成16.2 镜头参考图生成计费（真实图像
   }
 
   it('生成参考图：返回真实 OSS URL，且计费守恒（余额非负、只减不增）', async () => {
-    const { generateShotReferenceImage } = await import('@/lib/capture-director')
-    const { getBalance } = await import('@/lib/credit-service')
+    const { generateShotReferenceImage } = await import('@/lib/merchant/capture-director')
+    const { getBalance } = await import('@/lib/shared/credit-service')
 
     const userId = env('INTEGRATION_USER_ID')
     const shotTaskId = env('INTEGRATION_SHOT_TASK_ID')
@@ -51,7 +51,7 @@ describe.skipIf(!enabled)('集成16.2 镜头参考图生成计费（真实图像
       console.info('[integration 16.2] 跳过余额不足子用例：未提供 INTEGRATION_POOR_USER_ID')
       return
     }
-    const { generateShotReferenceImage } = await import('@/lib/capture-director')
+    const { generateShotReferenceImage } = await import('@/lib/merchant/capture-director')
     const shotTaskId = env('INTEGRATION_SHOT_TASK_ID')
 
     await expect(

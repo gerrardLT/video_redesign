@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-helpers'
-import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/api-error'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/shared/db'
+import { requireAdmin } from '@/lib/shared/auth-helpers'
+import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/shared/api-error'
 
 export const dynamic = 'force-dynamic'
 

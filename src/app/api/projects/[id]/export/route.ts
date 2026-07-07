@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 视频导出超分 API
  * POST /api/projects/[id]/export
  *
@@ -9,11 +9,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { videoMergeQueue } from '@/lib/queue'
-import { getUserPrivileges } from '@/lib/privilege-engine'
-import { buildRejectionResponse } from '@/lib/concurrency-controller'
-import { scheduleWithPriority } from '@/lib/priority-scheduler'
+import { prisma } from '@/lib/shared/db'
+import { videoMergeQueue } from '@/lib/shared/queue'
+import { getUserPrivileges } from '@/lib/shared/privilege-engine'
+import { buildRejectionResponse } from '@/lib/shared/concurrency-controller'
+import { scheduleWithPriority } from '@/lib/shared/priority-scheduler'
 
 export const dynamic = 'force-dynamic'
 

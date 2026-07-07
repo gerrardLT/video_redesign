@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 人脸检测 Worker
  * 处理 face-check 队列中的人脸检测任务
  *
@@ -8,9 +8,9 @@
  * 3. 服务内部会更新 Asset 状态并记录 ContentSafetyLog 审核日志
  */
 import { Worker, type Job } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { faceDetectionService } from '@/lib/face-detection-service'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { faceDetectionService } from '@/lib/shared/face-detection-service'
+import { logger } from '@/lib/shared/logger'
 import type { ConnectionOptions } from 'bullmq'
 
 const connection = redis as unknown as ConnectionOptions

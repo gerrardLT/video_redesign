@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
-import { resolveReferences } from '@/lib/prompt-parser'
+import { resolveReferences } from '@/lib/video/prompt-parser'
 
 /**
  * Feature: video-reshaping-pipeline-fix

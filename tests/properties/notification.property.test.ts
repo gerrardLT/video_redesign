@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 33: 通知作用域与已读切换
+﻿// Feature: local-life-depth-enhancements, Property 33: 通知作用域与已读切换
 //
 // 属性测试：对任意多门店通知集合——
 //   1) 作用域：listNotifications(storeId) 仅返回该 store 的通知，绝不混入其它门店；
@@ -30,7 +30,7 @@ const db = vi.hoisted(() => ({
 // ============================================================
 // prisma 内存桩：仅实现被测路径用到的 storeNotification 三个方法
 // ============================================================
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const storeNotification = {
     // 作用域过滤：仅返回 where.storeId 命中的通知，按 createdAt 降序（与实现一致）
     findMany: vi.fn(async (args: { where: { storeId: string }; orderBy?: unknown }) => {
@@ -59,7 +59,7 @@ vi.mock('@/lib/db', () => {
 })
 
 // 动态导入以确保 mock 生效
-const { listNotifications, markNotificationRead } = await import('@/lib/task-center-service')
+const { listNotifications, markNotificationRead } = await import('@/lib/merchant/task-center-service')
 
 // ============================================================
 // Arbitraries

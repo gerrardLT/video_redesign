@@ -1,4 +1,4 @@
-/**
+﻿/**
  * /api/stores/[storeId]/platform-accounts — 自营平台账号关联（不消耗积分）
  *
  * GET：列出本门店已关联的平台账号（仅非敏感字段，供前端展示状态/「需重新关联」入口）。
@@ -29,15 +29,15 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import {
   requestAccountLink,
   saveCredential,
   CredentialAuthError,
-} from '@/lib/platform-metrics-crawler'
+} from '@/lib/merchant/platform-metrics-crawler'
 import { PublishPlatformSchema } from '@/types/merchant'
-import { ApiError } from '@/lib/api-error'
-import { prisma } from '@/lib/db'
+import { ApiError } from '@/lib/shared/api-error'
+import { prisma } from '@/lib/shared/db'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

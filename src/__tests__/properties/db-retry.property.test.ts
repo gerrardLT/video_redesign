@@ -1,54 +1,62 @@
-/**
- * Feature: parsing-pipeline-gemini-rollback, Property 6: SQLite retry semantics
+﻿/**
+ * 属性测试：PostgreSQL 事务冲突重试语义
  *
- * For any async operation wrapped in withRetry:
- * (a) if it fails with "SQLITE_BUSY" or "database is locked", it retries up to 3 times
- *     with delays 500ms, 1000ms, 1500ms;
- * (b) if it fails with any other error, it throws immediately without retry;
- * (c) if all 4 attempts fail with lock errors, the original error is thrown;
- * (d) if operation succeeds on any attempt (1st through 4th), the result is returned.
+ * 验证 withRetry 对 PostgreSQL 可重试事务冲突错误的行为：
+ * - P2034: Prisma 事务写冲突/死锁（Transaction failed due to a write conflict or a deadlock）
+ * - deadlock detected: PostgreSQL 原生死锁检测
+ * - could not serialize access: PostgreSQL 序列化隔离级别冲突
  *
- * **Validates: Requirements 8.1, 8.2, 8.3**
+ * 属性覆盖：
+ * (a) N 次可重试失败后成功 → sleep 序列为 [200, 500, 1000] 的前 N 个元素
+ * (b) 非可重试错误 → 立即抛出，调用次数 1，sleep 次数 0
+ * (c) 连续 4 次可重试错误 → 抛出原始错误，总调用 4 次，sleep 序列 [200, 500, 1000]
+ * (d) 第 M+1 次成功时返回值严格相等
+ * (e) M 次可重试后一次非可重试 → 非可重试错误立即抛出，sleep 次数 = M
+ *
+ * **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9**
  */
-import fc from 'fast-check'
+import * as fc from 'fast-check'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { withRetry, _internals, RETRY_CONFIG } from '@/lib/db-retry'
+import { withRetry, _internals, RETRY_CONFIG } from '@/lib/shared/db-retry'
+
+// ─── 生成器定义 ────────────────────────────────────────────────────────────────
 
 /**
- * Arbitrary: generates a random SQLite lock error message
+ * 生成 PostgreSQL 可重试事务冲突错误消息
+ * 包含 P2034、deadlock detected、could not serialize access 及其随机后缀变体
  */
-const lockErrorMessageArb = fc.oneof(
-  fc.constant('SQLITE_BUSY'),
-  fc.constant('database is locked'),
-  fc.constant('SQLITE_BUSY (database is locked)'),
-  fc.constant('Error: SQLITE_BUSY - database is locked'),
-  fc.constant('SQLITE_BUSY: cannot start a transaction within a transaction')
+const retriableErrorMessageArb = fc.oneof(
+  fc.constant('P2034: Transaction failed due to a write conflict'),
+  fc.constant('P2034: Transaction failed due to a write conflict or a deadlock'),
+  fc.constant('deadlock detected'),
+  fc.constant('could not serialize access'),
+  fc.string({ minLength: 0, maxLength: 50 }).map((s) => `P2034: ${s}`),
+  fc.string({ minLength: 0, maxLength: 50 }).map((s) => `deadlock detected: ${s}`),
+  fc.string({ minLength: 0, maxLength: 50 }).map((s) => `could not serialize access due to ${s}`)
 )
 
 /**
- * Arbitrary: generates a non-lock error message (does not contain SQLITE_BUSY or database is locked)
+ * 生成非可重试错误消息（过滤排除三种 PostgreSQL 可重试特征）
  */
-const nonLockErrorMessageArb = fc.constantFrom(
-  'Connection refused',
-  'Timeout exceeded',
-  'ENOENT: no such file',
-  'Permission denied',
-  'Invalid argument',
-  'Network error',
-  'Out of memory',
-  'SQLITE_CONSTRAINT: UNIQUE constraint failed',
-  'SQLITE_ERROR: no such table',
-  'Foreign key constraint failed'
-)
+const nonRetriableErrorMessageArb = fc
+  .string({ minLength: 1, maxLength: 100 })
+  .filter(
+    (s) =>
+      !s.includes('P2034') &&
+      !s.includes('deadlock detected') &&
+      !s.includes('could not serialize access')
+  )
 
-describe('Property 6: SQLite retry semantics', () => {
+// ─── 属性测试 ──────────────────────────────────────────────────────────────────
+
+describe('PostgreSQL 事务冲突重试属性测试', () => {
   let originalSleep: typeof _internals.sleep
   let sleepCalls: number[]
 
   beforeEach(() => {
     originalSleep = _internals.sleep
     sleepCalls = []
-    // Inject zero-delay sleep that records calls
+    // 注入零延迟 sleep，仅记录调用参数
     _internals.sleep = async (ms: number) => {
       sleepCalls.push(ms)
     }
@@ -58,16 +66,15 @@ describe('Property 6: SQLite retry semantics', () => {
     _internals.sleep = originalSleep
   })
 
-  it('retries up to 3 times with delays 500ms, 1000ms, 1500ms on lock errors', async () => {
+  it('属性: N 次重试后成功 → sleep 序列为 [200, 500, 1000] 的前 N 个元素', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 1, max: 3 }),
-        lockErrorMessageArb,
+        retriableErrorMessageArb,
         async (retryCount, errorMsg) => {
           sleepCalls = []
           let callCount = 0
 
-          // Fails with lock error for `retryCount` times, then succeeds
           const operation = async () => {
             callCount++
             if (callCount <= retryCount) {
@@ -80,7 +87,7 @@ describe('Property 6: SQLite retry semantics', () => {
           expect(result).toBe('success')
           expect(callCount).toBe(retryCount + 1)
 
-          // Verify delay values match expected pattern
+          // sleep 序列应为 RETRY_CONFIG.delays 的前 N 个元素
           const expectedDelays = RETRY_CONFIG.delays.slice(0, retryCount)
           expect(sleepCalls).toEqual(expectedDelays)
         }
@@ -89,9 +96,9 @@ describe('Property 6: SQLite retry semantics', () => {
     )
   })
 
-  it('throws immediately without retry on non-lock errors', async () => {
+  it('属性: 非可重试错误 → 立即抛出，调用次数 1，sleep 次数 0', async () => {
     await fc.assert(
-      fc.asyncProperty(nonLockErrorMessageArb, async (errorMsg) => {
+      fc.asyncProperty(nonRetriableErrorMessageArb, async (errorMsg) => {
         sleepCalls = []
         let callCount = 0
 
@@ -108,32 +115,49 @@ describe('Property 6: SQLite retry semantics', () => {
     )
   })
 
-  it('throws the original error after all 4 attempts fail with lock errors', async () => {
+  it('属性: 连续 4 次可重试 → 抛出原始错误，总调用 4 次，sleep 序列 [200, 500, 1000]', async () => {
     await fc.assert(
-      fc.asyncProperty(lockErrorMessageArb, async (errorMsg) => {
+      fc.asyncProperty(retriableErrorMessageArb, async (errorMsg) => {
         sleepCalls = []
         let callCount = 0
-        const originalError = new Error(errorMsg)
+        const errors: Error[] = []
 
         const operation = async () => {
           callCount++
-          throw originalError
+          const err = new Error(errorMsg)
+          errors.push(err)
+          throw err
         }
 
-        await expect(withRetry(operation)).rejects.toThrow(originalError)
-        expect(callCount).toBe(4) // 1 initial + 3 retries
-        expect(sleepCalls).toEqual([500, 1000, 1500])
+        try {
+          await withRetry(operation)
+          // 不应走到这里
+          expect.fail('应该抛出错误')
+        } catch (thrown) {
+          // 抛出的是最后一次捕获的错误
+          expect(thrown).toBe(errors[errors.length - 1])
+        }
+
+        expect(callCount).toBe(4) // 1 初始 + 3 重试
+        expect(sleepCalls).toEqual([200, 500, 1000])
       }),
       { numRuns: 100 }
     )
   })
 
-  it('returns the result on any successful attempt (1st through 4th)', async () => {
+  it('属性: 第 M+1 次成功时返回值严格相等', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 0, max: 3 }),
-        lockErrorMessageArb,
-        fc.oneof(fc.integer(), fc.string({ minLength: 1 }), fc.constant(null), fc.constant(true)),
+        retriableErrorMessageArb,
+        fc.oneof(
+          fc.integer(),
+          fc.string({ minLength: 1 }),
+          fc.constant(null),
+          fc.constant(true),
+          fc.constant(undefined),
+          fc.double({ noNaN: true })
+        ),
         async (failuresBeforeSuccess, errorMsg, returnValue) => {
           sleepCalls = []
           let callCount = 0
@@ -147,6 +171,7 @@ describe('Property 6: SQLite retry semantics', () => {
           }
 
           const result = await withRetry(operation)
+          // 返回值严格相等（===）
           expect(result).toBe(returnValue)
           expect(callCount).toBe(failuresBeforeSuccess + 1)
         }
@@ -155,30 +180,29 @@ describe('Property 6: SQLite retry semantics', () => {
     )
   })
 
-  it('distinguishes lock errors from non-lock errors in mixed failure sequences', async () => {
+  it('属性: M 次可重试后一次非可重试 → 非可重试错误立即抛出，sleep 次数 = M', async () => {
     await fc.assert(
       fc.asyncProperty(
-        nonLockErrorMessageArb,
         fc.integer({ min: 0, max: 3 }),
-        lockErrorMessageArb,
-        async (nonLockMsg, lockFailuresBefore, lockMsg) => {
+        retriableErrorMessageArb,
+        nonRetriableErrorMessageArb,
+        async (retriableFailures, retriableMsg, nonRetriableMsg) => {
           sleepCalls = []
           let callCount = 0
 
-          // First `lockFailuresBefore` attempts fail with lock error,
-          // then one attempt fails with non-lock error — should throw immediately
           const operation = async () => {
             callCount++
-            if (callCount <= lockFailuresBefore) {
-              throw new Error(lockMsg)
+            if (callCount <= retriableFailures) {
+              throw new Error(retriableMsg)
             }
-            throw new Error(nonLockMsg)
+            // 第 M+1 次抛出非可重试错误
+            throw new Error(nonRetriableMsg)
           }
 
-          await expect(withRetry(operation)).rejects.toThrow(nonLockMsg)
-          expect(callCount).toBe(lockFailuresBefore + 1)
-          // Should have slept for each lock error retry
-          expect(sleepCalls).toHaveLength(lockFailuresBefore)
+          await expect(withRetry(operation)).rejects.toThrow(nonRetriableMsg)
+          expect(callCount).toBe(retriableFailures + 1)
+          // sleep 次数等于可重试失败次数
+          expect(sleepCalls).toHaveLength(retriableFailures)
         }
       ),
       { numRuns: 100 }

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { saveProjectStyle, StyleConfigInputSchema } from '@/lib/style-service'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/shared/db'
+import { saveProjectStyle, StyleConfigInputSchema } from '@/lib/shared/style-service'
 import { parseStructuredStyle, renderStructuredStyleToText, type StructuredStyle } from '@/types/style'
 import { z } from 'zod/v4'
 

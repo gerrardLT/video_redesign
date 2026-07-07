@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * WelcomeWizard - 4 步欢迎向导 Modal
@@ -17,7 +17,7 @@
 import { useState, useCallback } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { Sparkles, Layers, Coins, Rocket } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import { Button } from '@/components/ui/button'
 import { useOnboardingContext } from './onboarding-provider'
 

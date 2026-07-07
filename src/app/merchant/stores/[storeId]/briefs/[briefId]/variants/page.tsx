@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 版本导出页 — /merchant/stores/[storeId]/briefs/[briefId]/variants
@@ -41,12 +41,33 @@ import {
   BarChart3,
   ChevronRight,
   Megaphone,
+  Sparkles,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { CopyCompliancePanel } from '@/components/merchant/CopyCompliancePanel'
 import { GenerationControlPanel } from '@/components/merchant/GenerationControlPanel'
+
+// ─── 平台预设（内联避免引入过多依赖）───
+
+type PlatformId = 'douyin_local' | 'xiaohongshu' | 'wechat_video' | 'universal'
+
+interface PlatformPreset {
+  id: PlatformId
+  label: string
+  ratio: string
+  resolution: string
+  maxDurationLabel: string | null
+  tips: string
+}
+
+const PLATFORM_PRESETS: PlatformPreset[] = [
+  { id: 'douyin_local', label: '抖音本地生活', ratio: '9:16', resolution: '1080x1920', maxDurationLabel: '45秒', tips: 'POI 标签加权，完播率 > 30%' },
+  { id: 'xiaohongshu', label: '小红书', ratio: '3:4', resolution: '1080x1440', maxDurationLabel: '60秒', tips: '真实感 > 精修感' },
+  { id: 'wechat_video', label: '视频号', ratio: '9:16', resolution: '1080x1920', maxDurationLabel: '90秒', tips: '社交裂变加权' },
+  { id: 'universal', label: '通用', ratio: '9:16', resolution: '1080x1920', maxDurationLabel: null, tips: '适配多平台' },
+]
 
 // ─── 类型定义 ───
 
@@ -144,6 +165,7 @@ export default function VariantsExportPage() {
   const [exportResults, setExportResults] = useState<Record<string, ExportResult>>({})
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showHighRiskConfirm, setShowHighRiskConfirm] = useState<string | null>(null)
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformId | null>(null)
 
   // 获取 VideoVariants 列表
   const {
@@ -175,6 +197,8 @@ export default function VariantsExportPage() {
     try {
       const res = await fetch(`/api/video-variants/${variantId}/export`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(selectedPlatform ? { platform: selectedPlatform } : {}),
       })
 
       const data = await res.json()
@@ -255,11 +279,12 @@ export default function VariantsExportPage() {
 
   return (
     <div className="max-w-lg mx-auto px-4 pb-8">
-      {/* 页面标题 */}
-      <div className="py-4 border-b border-amber-100">
-        <h1 className="text-lg font-bold text-gray-800">选择版本导出</h1>
-        <p className="text-sm text-gray-500 mt-1">共生成 {variants.length} 个版本，选择合适的下载</p>
-      </div>
+      {/* 编辑式标题 */}
+      <section className="zen-reveal py-5 border-b border-[var(--ll-hair)]">
+        <p className="text-[11px] tracking-[.08em] text-[var(--ll-text-3)] font-medium uppercase">VARIANTS</p>
+        <h1 className="mt-1 text-xl font-semibold font-[var(--font-serif)] text-[var(--ll-text)]">选择版本导出</h1>
+        <p className="text-sm text-[var(--ll-text-2)] mt-1">共生成 {variants.length} 个版本，选择合适的下载</p>
+      </section>
 
       {/* 错误提示 */}
       {errorMessage && (
@@ -268,22 +293,60 @@ export default function VariantsExportPage() {
         </div>
       )}
 
-      {/* 版本卡片列表 */}
+      {/* 版本卡片列表 — 依次揭幕动画 + AI 推荐金色标记 */}
       <div className="mt-4 space-y-3">
-        {variants.map((variant) => (
-          <VariantCard
+        {variants.map((variant, idx) => (
+          <div
             key={variant.id}
-            variant={variant}
-            isSelected={selectedVariantId === variant.id}
-            isExporting={exportingId === variant.id}
-            exportResult={exportResults[variant.id]}
-            onSelect={() => setSelectedVariantId(
-              selectedVariantId === variant.id ? null : variant.id
-            )}
-            onExport={() => handleExport(variant.id)}
-          />
+            style={{
+              animation: `zenRevealBlur 0.7s ease-out ${idx * 400}ms both`,
+            }}
+          >
+            <VariantCard
+              variant={variant}
+              isSelected={selectedVariantId === variant.id}
+              isExporting={exportingId === variant.id}
+              exportResult={exportResults[variant.id]}
+              isRecommended={idx === 0}
+              onSelect={() => setSelectedVariantId(
+                selectedVariantId === variant.id ? null : variant.id
+              )}
+              onExport={() => handleExport(variant.id)}
+            />
+          </div>
         ))}
       </div>
+
+      {/* 选中版本时：平台适配选择器 */}
+      {selectedVariant && (
+        <div className="mt-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm font-bold text-gray-800">导出平台</span>
+            <span className="text-xs text-gray-400">选择目标平台，自动适配分辨率</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {PLATFORM_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                className={cn(
+                  'p-3 rounded-xl border-2 text-left transition-all',
+                  selectedPlatform === p.id
+                    ? 'border-amber-300 bg-amber-50/50'
+                    : 'border-gray-100 hover:border-amber-200',
+                )}
+                onClick={() => setSelectedPlatform(selectedPlatform === p.id ? null : p.id)}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-gray-800">{p.label}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 rounded-full text-gray-500">{p.ratio}</span>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">{p.resolution}{p.maxDurationLabel ? ` · ≤${p.maxDurationLabel}` : ''}</p>
+                <p className="text-[10px] text-amber-600 mt-0.5">{p.tips}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 选中版本时：文案就地编辑 + 合规可操作面板（任务 3.7） */}
       {selectedVariant && (
@@ -365,6 +428,7 @@ interface VariantCardProps {
   isSelected: boolean
   isExporting: boolean
   exportResult?: ExportResult
+  isRecommended?: boolean
   onSelect: () => void
   onExport: () => void
 }
@@ -374,6 +438,7 @@ function VariantCard({
   isSelected,
   isExporting,
   exportResult,
+  isRecommended,
   onSelect,
   onExport,
 }: VariantCardProps) {
@@ -391,12 +456,20 @@ function VariantCard({
   return (
     <Card
       className={cn(
-        'p-4 rounded-2xl border-2 transition-all cursor-pointer',
+        'p-4 rounded-2xl border-2 transition-all cursor-pointer relative',
+        isRecommended && 'border-t-[var(--ll-gold)] border-t-[3px]',
         isSelected && 'border-amber-300 bg-amber-50/30 shadow-md shadow-amber-100',
-        !isSelected && 'border-gray-100 hover:border-amber-200',
+        !isSelected && !isRecommended && 'border-gray-100 hover:border-amber-200',
+        !isSelected && isRecommended && 'border-[var(--ll-gold)]/30 hover:border-[var(--ll-gold)]/60',
       )}
       onClick={onSelect}
     >
+      {/* AI 推荐金色标记 */}
+      {isRecommended && (
+        <span className="absolute -top-3 left-4 inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--ll-gold)] text-white text-[10px] font-bold rounded-full shadow-sm">
+          <Sparkles className="h-3 w-3" /> AI 推荐
+        </span>
+      )}
       <div className="flex items-start gap-3">
         {/* 缩略图区域 */}
         <div className="flex-shrink-0 w-16 h-24 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden">

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * OnboardingProvider - 新手引导状态 Context Provider
@@ -12,7 +12,7 @@
 
 import { createContext, useContext, type ReactNode } from 'react'
 import { useOnboarding, type UseOnboardingReturn } from '@/hooks/use-onboarding'
-import type { OnboardingStepId, OnboardingProgress } from '@/lib/onboarding-service'
+import type { OnboardingStepId, OnboardingProgress } from '@/lib/shared/onboarding-service'
 
 // ========================
 // Context 类型定义

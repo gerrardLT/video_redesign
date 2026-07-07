@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { validateAndImport } from '@/lib/video-import-service'
-import { checkRateLimit } from '@/lib/rate-limiter'
+import { validateAndImport } from '@/lib/shared/video-import-service'
+import { checkRateLimit } from '@/lib/shared/rate-limiter'
 
 export const dynamic = 'force-dynamic'
 

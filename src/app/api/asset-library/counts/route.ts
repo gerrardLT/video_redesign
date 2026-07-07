@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 资产库分类计数 API
  * GET /api/asset-library/counts - 获取用户各分类资产数量和总计
  *
@@ -7,7 +7,7 @@
  * 鉴权：从 request.headers.get('x-user-id') 获取 userId
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { getCategoryCounts } from '@/lib/asset-library-service'
+import { getCategoryCounts } from '@/lib/shared/asset-library-service'
 
 export const dynamic = 'force-dynamic'
 

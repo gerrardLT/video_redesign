@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 合规检查 Worker
  * 处理 `compliance-review` BullMQ 队列任务
  *
@@ -16,10 +16,12 @@
  */
 
 import { Worker, type Job, type ConnectionOptions } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
-import { runComplianceCheck } from '@/lib/compliance-service'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
+import { runComplianceCheck } from '@/lib/merchant/compliance-service'
+import { logger } from '@/lib/shared/logger'
+import { assertBriefTransition } from '@/lib/merchant/content-brief-state-machine'
+import type { ContentBriefStatus } from '@/generated/prisma'
 
 // ============ 类型定义 ============
 
@@ -37,7 +39,7 @@ export interface ComplianceReviewJobData {
  * - LOW/MEDIUM: 允许导出 → READY_TO_EXPORT
  * - HIGH/BLOCKED: 需用户确认 → COMPLIANCE_REVIEW
  */
-function resolveContentBriefStatus(riskLevel: string): string {
+function resolveContentBriefStatus(riskLevel: string): ContentBriefStatus {
   switch (riskLevel) {
     case 'LOW':
     case 'MEDIUM':
@@ -66,13 +68,33 @@ async function processComplianceReview(job: Job<ComplianceReviewJobData>): Promi
   // 执行合规检查（内部会保存 ComplianceCheck 记录到数据库）
   const complianceCheck = await runComplianceCheck({ contentBriefId, videoVariantId })
 
-  // 根据检查结果更新 ContentBrief 状态
+  // 根据检查结果更新 ContentBrief 状态（带状态机守卫）
   const targetStatus = resolveContentBriefStatus(complianceCheck.riskLevel)
 
-  await prisma.contentBrief.update({
+  // 读取当前状态，校验转换合法性；仅 GENERATED 状态可被合规 Worker 转换，
+  // 避免覆盖用户手动设置的状态（如 ARCHIVED）
+  const currentBrief = await prisma.contentBrief.findUnique({
     where: { id: contentBriefId },
-    data: { status: targetStatus },
+    select: { status: true },
   })
+
+  if (!currentBrief) {
+    throw new Error(`[compliance-review] ContentBrief 不存在: ${contentBriefId}`)
+  }
+
+  if (currentBrief.status !== 'GENERATED') {
+    logger.warn('[compliance-review] ContentBrief 状态非 GENERATED，跳过状态更新', {
+      contentBriefId,
+      currentStatus: currentBrief.status,
+      targetStatus,
+    })
+  } else {
+    assertBriefTransition(currentBrief.status as ContentBriefStatus, targetStatus)
+    await prisma.contentBrief.update({
+      where: { id: contentBriefId },
+      data: { status: targetStatus },
+    })
+  }
 
   logger.info('[compliance-review] 合规检查完成', {
     jobId: job.id,

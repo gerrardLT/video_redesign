@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Property 10: 用户数据隔离
  * 
  * **Validates: Requirements 22.5, 17.5**
@@ -9,8 +9,8 @@
 
 import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
-import { getUserId, requireAdmin } from '@/lib/auth-helpers'
-import { ApiError } from '@/lib/api-error'
+import { getUserId, requireAdmin } from '@/lib/shared/auth-helpers'
+import { ApiError } from '@/lib/shared/api-error'
 
 // Mock NextRequest for testing
 function createMockRequest(headers: Record<string, string>) {

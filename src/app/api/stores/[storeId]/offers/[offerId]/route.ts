@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PUT /api/stores/[storeId]/offers/[offerId] — 更新优惠信息
  *
  * 鉴权：从 x-user-id header 获取用户 ID，通过 validateMerchantAccess 验证权限
@@ -16,11 +16,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 import { Prisma } from '@/generated/prisma'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import { ProductOfferSchema } from '@/lib/validations/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string; offerId: string }>

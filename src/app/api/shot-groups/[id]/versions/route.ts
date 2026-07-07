@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { listVersions, getVersionStats, getPromptExcerpt } from '@/lib/version-history-service'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/shared/db'
+import { listVersions, getVersionStats, getPromptExcerpt } from '@/lib/video/version-history-service'
 
 export const dynamic = 'force-dynamic'
 

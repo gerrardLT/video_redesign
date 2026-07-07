@@ -11,8 +11,8 @@
  * 用法: npx tsx scripts/test-happyhorse-e2e.ts
  */
 import 'dotenv/config'
-import { uploadFile, getPublicUrl } from '../src/lib/storage'
-import { createHappyHorseTask, getHappyHorseTaskStatus } from '../src/lib/happyhorse'
+import { uploadFile, getPublicUrl } from '../src/lib/shared/storage'
+import { createHappyHorseTask, getHappyHorseTaskStatus } from '../src/lib/shared/happyhorse'
 import path from 'path'
 
 // 配置
@@ -44,7 +44,7 @@ async function main() {
 
   // Step 2: 获取测试视频 URL（使用项目 t11 的原视频）
   // 从数据库查项目的 videoUrl，或直接用一个已知的 OSS 视频
-  const { prisma } = await import('../src/lib/db')
+  const { prisma } = await import('../src/lib/shared/db')
   const project = await prisma.project.findFirst({
     where: { name: 't11' },
     select: { id: true, videoUrl: true, duration: true },

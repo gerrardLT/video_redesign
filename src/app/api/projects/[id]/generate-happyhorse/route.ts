@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/projects/:id/generate-happyhorse
  * HappyHorse V-Edit 模式生成入口
  *
@@ -20,9 +20,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { orchestrateHappyHorseGeneration } from '@/lib/generation-orchestrator'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { orchestrateHappyHorseGeneration } from '@/lib/video/generation-orchestrator'
+import { ApiError } from '@/lib/shared/api-error'
 import type { UserTier } from '@/constants/concurrency'
 
 const generateSchema = z.object({

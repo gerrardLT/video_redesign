@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 17: 溯源引用来自画像
+﻿// Feature: local-life-depth-enhancements, Property 17: 溯源引用来自画像
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -26,10 +26,10 @@ import fc from 'fast-check'
 // ========================
 // Mock Prisma（仅为打断模块加载期的 db 初始化副作用，被测函数不使用数据库）
 // ========================
-vi.mock('@/lib/db', () => ({ prisma: {} }))
+vi.mock('@/lib/shared/db', () => ({ prisma: {} }))
 
 // 动态导入以确保 mock 生效
-const { instantiatePlaybookWithProvenance } = await import('@/lib/playbook-engine')
+const { instantiatePlaybookWithProvenance } = await import('@/lib/merchant/playbook-engine')
 type Inst = typeof instantiatePlaybookWithProvenance
 type Store = Parameters<Inst>[0]['store']
 type StoreProfile = Parameters<Inst>[0]['profile']

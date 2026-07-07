@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 导出状态查询 API
  * GET /api/projects/[id]/export-status
  *
@@ -7,7 +7,7 @@
  * 前端轮询（3s 间隔）调用，用于实时展示导出进度。
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

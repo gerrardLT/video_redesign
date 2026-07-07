@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 30: 超时提醒恰一次
+﻿// Feature: local-life-depth-enhancements, Property 30: 超时提醒恰一次
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -37,7 +37,7 @@ const db = vi.hoisted(() => ({
 
 // Mock Prisma：findMany 仅实现 where.reminded 过滤（与被测查询一致），
 // $transaction 执行回调并提供 storeNotification.create + publishQueueItem.update 内存桩。
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const txStoreNotificationCreate = vi.fn(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async ({ data }: any) => {
@@ -89,19 +89,19 @@ vi.mock('bullmq', () => {
 })
 
 // redis 空桩：被测仅作为 connection 透传，不实际连接
-vi.mock('@/lib/redis', () => ({ redis: {} }))
+vi.mock('@/lib/shared/redis', () => ({ redis: {} }))
 
 // logger 空桩：抑制日志噪声
-vi.mock('@/lib/logger', () => ({
+vi.mock('@/lib/shared/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
 // 资产过期提醒相关依赖空桩：worker 模块顶层会导入，但本测试不触发该分支
-vi.mock('@/lib/asset-lifecycle-service', () => ({
+vi.mock('@/lib/shared/asset-lifecycle-service', () => ({
   getExpiringAssets: vi.fn(async () => []),
   getRemainingDays: vi.fn(() => 0),
 }))
-vi.mock('@/lib/notification-service', () => ({
+vi.mock('@/lib/shared/notification-service', () => ({
   createAssetExpiringNotification: vi.fn(async () => ({})),
 }))
 

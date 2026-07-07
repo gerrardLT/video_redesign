@@ -21,7 +21,7 @@ import {
   MAX_GROUP_DURATION,
   MIN_GROUP_DURATION,
   type GroupingInputShot,
-} from '@/lib/grouping-service'
+} from '@/lib/video/grouping-service'
 
 // 每组最大 shot 数（grouping-service 内部常量，未导出，此处镜像用于断言）
 const MAX_SHOTS_PER_GROUP = 3

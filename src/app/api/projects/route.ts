@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { generateUploadUrl, toMediaProxyUrl } from '@/lib/storage'
+import { prisma } from '@/lib/shared/db'
+import { generateUploadUrl, toMediaProxyUrl } from '@/lib/shared/storage'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * ReferenceImageUploader — 参考图拖拽上传组件
@@ -14,8 +14,8 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { Upload, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { validateReferenceImage } from '@/lib/placeholder-utils'
+import { cn } from '@/lib/shared/utils'
+import { validateReferenceImage } from '@/lib/shared/placeholder-utils'
 import { toast } from 'sonner'
 import type { ReferenceImage } from '@/stores/happyhorse-store'
 

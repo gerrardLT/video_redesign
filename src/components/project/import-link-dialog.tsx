@@ -1,11 +1,11 @@
-'use client'
+﻿'use client'
 
 import { useState, useCallback, useEffect } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { validateShareLink, type ExtendedPlatform } from '@/lib/validate-share-link'
+import { validateShareLink, type ExtendedPlatform } from '@/lib/shared/validate-share-link'
 import { PLATFORM_PATTERNS, type VideoPlatform } from '@/constants/platform-patterns'
 
 interface ImportLinkDialogProps {

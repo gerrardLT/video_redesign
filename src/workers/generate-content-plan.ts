@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 内容计划生成 Worker
  *
  * 处理两个 BullMQ 队列任务：
@@ -17,12 +17,12 @@
  */
 
 import { Worker, Job, type ConnectionOptions } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
-import { createStoreProfile } from '@/lib/store-profile-service'
-import { generateContentPlan } from '@/lib/content-calendar-service'
-import { generateContentPlanQueue } from '@/lib/queue'
-import { chargeMerchantCredits, refundMerchantCredits } from '@/lib/merchant-billing-service'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
+import { createStoreProfile } from '@/lib/merchant/store-profile-service'
+import { generateContentPlan } from '@/lib/merchant/content-calendar-service'
+import { generateContentPlanQueue } from '@/lib/shared/queue'
+import { chargeMerchantCredits, refundMerchantCredits } from '@/lib/merchant/merchant-billing-service'
 import { CREDIT_COST_CONTENT_PLAN } from '@/constants/merchant'
 
 // ========================

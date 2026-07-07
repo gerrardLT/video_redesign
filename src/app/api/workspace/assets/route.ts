@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/workspace/assets
  * 工作台素材选择列表（用于 @ 引用弹窗）
  *
@@ -6,8 +6,8 @@
  * Query: keyword（可选搜索）
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { listAssets } from '@/lib/asset-library-service'
-import { toMediaProxyUrl } from '@/lib/storage'
+import { listAssets } from '@/lib/shared/asset-library-service'
+import { toMediaProxyUrl } from '@/lib/shared/storage'
 
 export async function GET(request: NextRequest) {
   const userId = request.headers.get('x-user-id')

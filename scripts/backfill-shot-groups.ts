@@ -20,8 +20,8 @@
  */
 
 import 'dotenv/config'
-import { prisma } from '@/lib/db'
-import { groupShots, type GroupingInputShot, type ShotGroupPlan } from '@/lib/grouping-service'
+import { prisma } from '@/lib/shared/db'
+import { groupShots, type GroupingInputShot, type ShotGroupPlan } from '@/lib/video/grouping-service'
 
 /** 单个项目的回填统计 */
 interface ProjectBackfillResult {

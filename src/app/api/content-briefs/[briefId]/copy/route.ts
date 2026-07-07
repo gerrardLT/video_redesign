@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PUT /api/content-briefs/[briefId]/copy — 就地保存人工编辑的平台文案（需求 2.1, 2.8）
  *
  * 将商家手工编辑的标题/正文/标签/CTA 原样写回 ContentBrief.platformCopies[platform]，
@@ -21,11 +21,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { saveManualCopy } from '@/lib/publish-copy-service'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { saveManualCopy } from '@/lib/merchant/publish-copy-service'
 import { PublishPlatformSchema } from '@/types/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 平台数据自动抓取 Worker（crawl-platform-metrics）—— 需求 7.5 / 7.6
  *
  * 职责：
@@ -16,24 +16,24 @@
  * 真实抓取实现注入（遵循 AGENTS.md：真实接口、无 fallback、无伪造数据）：
  *  - 服务层不内置任何抓取实现，需由本 Worker 启动时通过 registerPlatformWorksFetcher 注入
  *    针对各平台（抖音/小红书/视频号等）真实接口的 PlatformWorksFetcher。
- *  - 各平台真实抓取属外部依赖，本仓库当前未提供可用的真实平台抓取实现，故此处不注册任何
- *    fetcher（严禁注入返回假数据的伪实现）。在真实 fetcher 缺失且存在待抓取账号时，
- *    crawlAccountMetrics 会抛出 CrawlConfigError，本 Worker 以 UnrecoverableError 显式中止本次
- *    调度（不标记 NEEDS_RELINK、不写 CRAWL_FAILED、不重试伪造），把「缺少真实抓取实现」这一
- *    系统级配置约束如实暴露给运维，待接入真实实现后即可正常抓取。
+ *  - 当前已注册：DouyinWorksFetcher（抖音开放平台创作者服务 API）。
+ *    其它平台（小红书/快手/视频号）待接入时追加 fetcher 注册。
  *
  * Requirements: 7.5, 7.6
  */
 import { Worker, UnrecoverableError, type Job, type ConnectionOptions } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
+import { logger } from '@/lib/shared/logger'
 import {
   crawlAccountMetrics,
   CrawlConfigError,
-  // 说明：如需注入真实平台抓取实现，在此 import registerPlatformWorksFetcher 并于 Worker
-  // 启动时调用；当前仓库无可用真实平台接口，故不注册（详见文件头说明）。
-} from '@/lib/platform-metrics-crawler'
+  registerPlatformWorksFetcher,
+} from '@/lib/merchant/platform-metrics-crawler'
+import { DouyinWorksFetcher } from '@/lib/platform-fetchers/douyin'
+
+// 注册真实平台作品抓取器（抖音先行，后续可扩展其它平台）
+registerPlatformWorksFetcher(new DouyinWorksFetcher())
 
 const connection = redis as unknown as ConnectionOptions
 

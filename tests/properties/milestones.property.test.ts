@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 37: 里程碑触发等价
+﻿// Feature: local-life-depth-enhancements, Property 37: 里程碑触发等价
 //
 // 属性：For any 周期完成度数据，checkMilestones 返回某里程碑 当且仅当 其达成条件成立。
 //
@@ -43,7 +43,7 @@ const h = vi.hoisted(() => {
 // ============================================================
 // prisma 内存桩：返回构造数据；副作用方法为不影响返回值的空桩
 // ============================================================
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const { state } = h
   const prisma = {
     storeProfile: {
@@ -71,8 +71,8 @@ vi.mock('@/lib/db', () => {
 })
 
 // 动态导入以确保 mock 生效
-const { checkMilestones, computeStreak } = await import('@/lib/engagement-service')
-const { resolvePeriods } = await import('@/lib/period-service')
+const { checkMilestones, computeStreak } = await import('@/lib/merchant/engagement-service')
+const { resolvePeriods } = await import('@/lib/merchant/period-service')
 
 // ============================================================
 // 常量（与 engagement-service 内部常量一致）

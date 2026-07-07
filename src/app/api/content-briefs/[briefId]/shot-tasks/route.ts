@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/content-briefs/[briefId]/shot-tasks — 获取拍摄任务列表
  *
  * 返回指定 ContentBrief 的所有 ShotTasks，按 order 升序排列。
@@ -15,9 +15,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>

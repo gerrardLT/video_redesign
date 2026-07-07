@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolvePeriods, periodIndexOf } from '@/lib/period-service'
+import { resolvePeriods, periodIndexOf } from '@/lib/merchant/period-service'
 
 /**
  * Feature: local-life-depth-enhancements

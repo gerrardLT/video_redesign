@@ -10,7 +10,7 @@ import {
   zoomAtPoint,
   MIN_SCALE,
   MAX_SCALE,
-} from '@/lib/preview-transform'
+} from '@/lib/video/preview-transform'
 
 describe('clampScale', () => {
   it('应将小于 0.5 的值限制为 0.5', () => {

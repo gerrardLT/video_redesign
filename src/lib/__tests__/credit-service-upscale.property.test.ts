@@ -1,12 +1,21 @@
-/**
+﻿/**
  * 超分积分估算属性测试
  *
  * Tag: Feature: video-quality-enhancements, Property 1: 超分积分计算公式
  * Tag: Feature: video-quality-enhancements, Property 2: 积分不足阻断导出
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import * as fc from 'fast-check'
-import { estimateUpscaleCreditCost } from '@/lib/credit-service'
+
+// Mock db/redis 模块，避免 DATABASE_URL 缺失导致的初始化错误
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+vi.mock('@/lib/shared/redis', () => ({
+  redis: new Proxy({}, { get: () => vi.fn() })
+}))
+
+import { estimateUpscaleCreditCost } from '@/lib/shared/credit-service'
 
 describe('estimateUpscaleCreditCost 属性测试', () => {
   /**

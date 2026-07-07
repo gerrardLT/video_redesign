@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="200" viewBox="0 0 240 200" fill="none">
+  <!-- 单色线稿风格：视频空态插画 - 播放按钮 + 胶片卷 -->
+  <!-- MIT License -->
+  <g stroke="#00754A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 主屏幕/画面框 -->
+    <rect x="50" y="45" width="140" height="95" rx="3" fill="none"/>
+    <!-- 播放按钮三角形 -->
+    <path d="M108 78 L108 108 L132 93 Z" fill="none"/>
+    <!-- 底部胶片条 -->
+    <line x1="60" y1="155" x2="180" y2="155"/>
+    <!-- 胶片孔洞 -->
+    <rect x="65" y="150" width="6" height="10" rx="1" fill="none"/>
+    <rect x="80" y="150" width="6" height="10" rx="1" fill="none"/>
+    <rect x="95" y="150" width="6" height="10" rx="1" fill="none"/>
+    <rect x="110" y="150" width="6" height="10" rx="1" fill="none"/>
+    <rect x="125" y="150" width="6" height="10" rx="1" fill="none"/>
+    <rect x="140" y="150" width="6" height="10" rx="1" fill="none"/>
+    <rect x="155" y="150" width="6" height="10" rx="1" fill="none"/>
+    <rect x="170" y="150" width="6" height="10" rx="1" fill="none"/>
+    <!-- 装饰：左上角小星点 -->
+    <circle cx="38" cy="38" r="2" fill="#00754A" opacity="0.3"/>
+    <circle cx="202" cy="42" r="1.5" fill="#00754A" opacity="0.2"/>
+    <!-- 装饰：底部曲线 -->
+    <path d="M70 175 Q120 185 170 175" fill="none" opacity="0.3"/>
+  </g>
+</svg>

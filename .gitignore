@@ -63,3 +63,42 @@ design-demos/
 
 # Kiro 本地 skill（非项目源码，不入库）
 .kiro/skills/
+
+# ============================================================
+# 以下为项目改造/维护期间补充的 gitignore 条目
+# ============================================================
+
+# 调试/诊断输出文件（tsc/test 快照，不入库）
+tsc-output.txt
+tsc-errors-full.txt
+tsc-errors-utf8.txt
+test-output.txt
+test-failures-full.txt
+build-output.txt
+
+# Docker volumes（生产环境产生的持久化数据）
+postgres-data/
+redis-data/
+
+# 部署备份（deploy.sh 产生）
+/backups/
+
+# 开发日志（.devlogs/ 下的运行时日志）
+.devlogs/
+
+# Vitest 缓存
+.vitest/
+
+# Redis 本地转储
+dump.rdb
+
+# 工具锁文件
+skills-lock.json
+
+# 根目录截图/设计稿（非源码）
+/*.png
+/*.jpg
+/*.jpeg
+/merchant-deck.html
+
+# SQLite 残留条目说明（项目已完全迁移到 PostgreSQL，以上 dev.db* 条目保留兼容旧 clone）

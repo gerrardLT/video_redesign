@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/projects/:id/background-image
  * 上传分镜组背景图（Seedance 模式）
  *
@@ -9,8 +9,8 @@
  * 上传至 OSS 并将 URL 写入 ShotGroup.backgroundImageUrl
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { uploadBuffer, getPublicUrl } from '@/lib/storage'
+import { prisma } from '@/lib/shared/db'
+import { uploadBuffer, getPublicUrl } from '@/lib/shared/storage'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']

@@ -277,7 +277,7 @@ export default function ExportPage() {
             resolution={exportStatus.resolution ?? undefined}
             videoUrl={exportStatus.videoUrl ?? undefined}
             errorMessage={exportStatus.errorMessage ?? undefined}
-            refundedCredits={exportStatus.refundedCredits}
+            refundedCredits={exportStatus.refundedCredits ?? undefined}
             onRetry={handleRetry}
           />
         )}

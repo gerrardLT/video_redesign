@@ -19,7 +19,7 @@ import type {
   WorkspaceGenerateStatus,
 } from '@/types/workspace'
 import { MAX_WORKSPACE_ASSETS, MODEL_DEFAULT_DURATION, MODEL_DURATION_OPTIONS } from '@/constants/workspace'
-import { insertAssetReference } from '@/lib/workspace-validators'
+import { insertAssetReference } from '@/lib/video/workspace-validators'
 
 /** 工作台状态接口 */
 export interface WorkspaceState {

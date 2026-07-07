@@ -1,7 +1,15 @@
-import { describe, it, expect } from 'vitest'
+﻿import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
 import { readFileSync } from 'fs'
 import path from 'path'
+
+// Mock db/redis 模块，避免 DATABASE_URL 缺失导致的初始化错误（credit-service 间接 import db）
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+vi.mock('@/lib/shared/redis', () => ({
+  redis: new Proxy({}, { get: () => vi.fn() })
+}))
 
 /**
  * Feature: video-pipeline-fixes（Bug 修复）
@@ -64,7 +72,7 @@ function makeInMemoryTx(userId: string, initialBalance: number) {
 describe('缺陷 1：解析阶段余额预检 / 禁止兜底扣至 0（Property 1）', () => {
   it('余额不足时 chargeParseCreditsTx 必须拒绝，绝不兜底扣至 0、绝不产生欠费', async () => {
     // 动态 import 真实 credit-service（真实接口、真实流程）
-    const { chargeParseCreditsTx } = await import('@/lib/credit-service')
+    const { chargeParseCreditsTx } = await import('@/lib/shared/credit-service')
 
     await fc.assert(
       fc.asyncProperty(
@@ -105,12 +113,12 @@ describe('缺陷 1：解析阶段余额预检 / 禁止兜底扣至 0（Property 
 
 describe('缺陷 2：解析计费仅含真实消费、移除废弃首帧 +10（Property 2）', () => {
   it('estimateParseCreditCost(60) 必须等于 30（修复后；未修复返回 40）', async () => {
-    const { estimateParseCreditCost } = await import('@/lib/credit-service')
+    const { estimateParseCreditCost } = await import('@/lib/shared/credit-service')
     expect(estimateParseCreditCost(60)).toBe(30)
   })
 
   it('对任意时长 estimateParseCreditCost(d) 必须等于 ceil(d*0.5)', async () => {
-    const { estimateParseCreditCost } = await import('@/lib/credit-service')
+    const { estimateParseCreditCost } = await import('@/lib/shared/credit-service')
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 600 }), (duration) => {
         expect(estimateParseCreditCost(duration)).toBe(Math.ceil(duration * 0.5))
@@ -178,7 +186,7 @@ function makeChargeTx(userId: string, initialBalance: number) {
 
 describe('缺陷 4：项目级分段扣费幂等（Property 3）', () => {
   it('同一 jobId 再次进入扣费事务（重试）时不得新增 CHARGE，仅保留一条', async () => {
-    const { chargeCreditsTx } = await import('@/lib/credit-service')
+    const { chargeCreditsTx } = await import('@/lib/shared/credit-service')
 
     await fc.assert(
       fc.asyncProperty(

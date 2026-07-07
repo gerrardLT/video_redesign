@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 27: 抓取失败不伪造
+﻿// Feature: local-life-depth-enhancements, Property 27: 抓取失败不伪造
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -30,7 +30,7 @@ process.env.PLATFORM_CRED_ENC_KEY = 'test-platform-cred-enc-key-for-property-27'
 // Mock Prisma（内存桩）
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     platformAccount: {
       findUnique: vi.fn(),
@@ -46,14 +46,14 @@ vi.mock('@/lib/db', () => ({
 }))
 
 // 抑制 logger 噪音（抓取失败会 logger.warn）
-vi.mock('@/lib/logger', () => ({
+vi.mock('@/lib/shared/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
 // 动态导入以确保 mock 生效
-const { prisma } = await import('@/lib/db')
-const { crawlAccountMetrics, encryptCredential } = await import('@/lib/platform-metrics-crawler')
-import type { PlatformWorksFetcher } from '@/lib/platform-metrics-crawler'
+const { prisma } = await import('@/lib/shared/db')
+const { crawlAccountMetrics, encryptCredential } = await import('@/lib/merchant/platform-metrics-crawler')
+import type { PlatformWorksFetcher } from '@/lib/merchant/platform-metrics-crawler'
 
 // 类型收窄：mock 后的 prisma 方法
 const accountFindUnique = prisma.platformAccount.findUnique as unknown as ReturnType<typeof vi.fn>

@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 8: 反哺标注可见性（一次性消费）
+﻿// Feature: local-life-depth-enhancements, Property 8: 反哺标注可见性（一次性消费）
 //
 // 属性测试：对任意被某次 content-plan 生成消费的 PlanGenerationInput——
 //   1) 生成的计划必须携带包含其 acceptedSummaries 的「已采纳上轮复盘建议」标注；
@@ -81,7 +81,7 @@ const h = vi.hoisted(() => {
 // ============================================================
 // prisma 内存桩
 // ============================================================
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const { state } = h
 
   const prisma = {
@@ -187,8 +187,8 @@ vi.mock('@/lib/db', () => {
 // playbook-engine 部分桩：保留真实 selectPlaybooks（查询 prisma.playbook 内存桩），
 // 仅替换 instantiatePlaybookWithProvenance 以隔离 LLM 外部调用，返回确定性 draft + provenance。
 // ============================================================
-vi.mock('@/lib/playbook-engine', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/playbook-engine')>()
+vi.mock('@/lib/merchant/playbook-engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/merchant/playbook-engine')>()
   return {
     ...actual,
     instantiatePlaybookWithProvenance: vi.fn(
@@ -223,8 +223,8 @@ vi.mock('@/lib/playbook-engine', async (importOriginal) => {
 })
 
 // 动态导入以确保上述 mock 生效
-const { prisma } = await import('@/lib/db')
-const { generateContentPlan } = await import('@/lib/content-calendar-service')
+const { prisma } = await import('@/lib/shared/db')
+const { generateContentPlan } = await import('@/lib/merchant/content-calendar-service')
 
 // ============================================================
 // 测试夹具

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 版本切换 API
  *
  * POST /api/shot-groups/[id]/versions/[versionId]/switch
@@ -10,10 +10,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserId } from '@/lib/auth-helpers'
-import { switchVersion, getPromptExcerpt } from '@/lib/version-history-service'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserId } from '@/lib/shared/auth-helpers'
+import { switchVersion, getPromptExcerpt } from '@/lib/video/version-history-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 export const dynamic = 'force-dynamic'
 

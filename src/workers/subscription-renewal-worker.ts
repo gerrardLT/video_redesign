@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 订阅续费 Worker
  * 处理 subscription-renewal 队列任务：
  *
@@ -6,10 +6,10 @@
  * 2. 重试续费：isRetry=true 时调用 retryRenewal 执行重试逻辑
  */
 import { Worker, type Job } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { triggerAutoRenewal, retryRenewal } from '@/lib/subscription-service'
-import { prisma } from '@/lib/db'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { triggerAutoRenewal, retryRenewal } from '@/lib/shared/subscription-service'
+import { prisma } from '@/lib/shared/db'
+import { logger } from '@/lib/shared/logger'
 import type { ConnectionOptions } from 'bullmq'
 
 const connection = redis as unknown as ConnectionOptions

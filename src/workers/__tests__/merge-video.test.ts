@@ -4,7 +4,13 @@
  * 测试含转场的视频合并流程（mock FFmpeg 命令执行）和超分触发逻辑（mock BullMQ 入队）。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { computeTransitionPlan, buildTransitionFilters, type SegmentInfo } from '@/lib/transition-engine'
+
+// Mock db 模块，避免 DATABASE_URL 缺失导致的初始化错误（frame-continuity 间接 import db）
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+
+import { computeTransitionPlan, buildTransitionFilters, type SegmentInfo } from '@/lib/video/transition-engine'
 
 // 直接测试转场引擎与合并逻辑的集成（不需要真正启动 Worker）
 
@@ -77,26 +83,26 @@ describe('Merge Worker 集成测试 - 转场合并流程', () => {
 
 describe('Merge Worker 集成测试 - 超分触发逻辑', () => {
   it('480p 不触发超分', () => {
-    const targetResolution = '480p'
+    const targetResolution: string = '480p'
     const shouldTriggerUpscale = targetResolution === '720p' || targetResolution === '1080p'
     expect(shouldTriggerUpscale).toBe(false)
   })
 
   it('720p 触发超分入队', () => {
-    const targetResolution = '720p'
+    const targetResolution: string = '720p'
     const shouldTriggerUpscale = targetResolution === '720p' || targetResolution === '1080p'
     expect(shouldTriggerUpscale).toBe(true)
   })
 
   it('1080p 触发超分入队', () => {
-    const targetResolution = '1080p'
+    const targetResolution: string = '1080p'
     const shouldTriggerUpscale = targetResolution === '720p' || targetResolution === '1080p'
     expect(shouldTriggerUpscale).toBe(true)
   })
 
   it('超分积分冻结与退还逻辑', () => {
-    const reservedCredits = 20
-    const targetResolution = '1080p'
+    const reservedCredits: number = 20
+    const targetResolution: string = '1080p'
 
     // 模拟合并失败后退还积分的判定
     const shouldRefund = (targetResolution === '720p' || targetResolution === '1080p') &&

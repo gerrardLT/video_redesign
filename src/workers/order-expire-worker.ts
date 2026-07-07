@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 订单过期 Worker
  * 处理 order-expire 队列的两种任务：
  *
@@ -6,9 +6,9 @@
  * 2. 延迟任务（从 createOrder 添加的单个订单过期），调用 expireOrder(orderId) 过期单个订单
  */
 import { Worker, type Job } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { expireTimedOutOrders, expireOrder } from '@/lib/order-service'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { expireTimedOutOrders, expireOrder } from '@/lib/shared/order-service'
+import { logger } from '@/lib/shared/logger'
 import type { ConnectionOptions } from 'bullmq'
 
 const connection = redis as unknown as ConnectionOptions

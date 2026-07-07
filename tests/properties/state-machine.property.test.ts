@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+﻿import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
-import { canTransition, canCancel, canRetry, isTerminalState, getNextStates } from '@/lib/state-machine'
+import { canTransition, canCancel, canRetry, isTerminalState, getNextStates } from '@/lib/shared/state-machine'
 
 /**
  * Feature: video-reshaping-mvp

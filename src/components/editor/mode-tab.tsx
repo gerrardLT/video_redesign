@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * ModeTab — Tab 切换控制器
@@ -13,7 +13,7 @@
  */
 
 import { useState, type ReactNode } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 

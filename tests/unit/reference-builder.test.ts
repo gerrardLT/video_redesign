@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { buildReferenceData } from '@/lib/reference-builder'
+import { buildReferenceData } from '@/lib/video/reference-builder'
 
 /**
  * 单元测试: reference-builder

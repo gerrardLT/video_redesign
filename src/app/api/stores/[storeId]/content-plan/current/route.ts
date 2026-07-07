@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/content-plan/current — 获取当前活跃的内容计划
  *
  * 返回最新的 ACTIVE 状态 ContentPlan，关联其下所有 ContentBriefs（含 ShotTasks + 成片版本 VideoVariants）。
@@ -17,10 +17,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { ApiError } from '@/lib/api-error'
-import { getMediaProxyUrl } from '@/lib/storage'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { ApiError } from '@/lib/shared/api-error'
+import { getMediaProxyUrl } from '@/lib/shared/storage'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

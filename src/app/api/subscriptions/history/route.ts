@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getSubscriptionHistory } from '@/lib/subscription-service'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getSubscriptionHistory } from '@/lib/shared/subscription-service'
 
 export const dynamic = 'force-dynamic'
 

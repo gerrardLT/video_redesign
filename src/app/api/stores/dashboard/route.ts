@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/dashboard — 跨店看板聚合（需求 10.3, 10.5）
  *
  * 鉴权：从 x-user-id header 获取用户 ID。
@@ -17,20 +17,16 @@
  *
  * Requirements: 10.3, 10.5
  */
-
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { getCrossStoreDashboard } from '@/lib/cross-store-service'
-import { ApiError } from '@/lib/api-error'
-
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { getCrossStoreDashboard } from '@/lib/merchant/cross-store-service'
+import { ApiError } from '@/lib/shared/api-error'
 export async function GET(request: NextRequest) {
   try {
     // 1. 鉴权
     const userId = getUserIdFromRequest(request)
-
     // 2. 跨店看板真实聚合（逐店本周完成度/最佳视频/待办数）
     const stores = await getCrossStoreDashboard({ userId })
-
     return NextResponse.json({ stores })
   } catch (error) {
     if (error instanceof ApiError) {

@@ -22,14 +22,12 @@
  *
  * Requirements: 6.1, 6.2
  */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { addContentBrief } from '@/lib/content-calendar-service'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { addContentBrief } from '@/lib/merchant/content-calendar-service'
 import { ContentGoalSchema } from '@/types/merchant'
-import { mapContentBriefError } from '@/lib/content-brief-api-error'
-
+import { mapContentBriefError } from '@/lib/merchant/content-brief-api-error'
 /**
  * 新增 brief 请求体校验：
  * - storeId / goal 必填
@@ -42,11 +40,9 @@ const AddBriefSchema = z.object({
   goal: ContentGoalSchema,
   playbookId: z.string().min(1).optional(),
 })
-
 export async function POST(request: NextRequest) {
   try {
     const userId = getUserIdFromRequest(request)
-
     // 解析请求体
     let body: unknown
     try {
@@ -57,7 +53,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
     const parseResult = AddBriefSchema.safeParse(body)
     if (!parseResult.success) {
       const fieldErrors = parseResult.error.issues.map((issue) => ({
@@ -69,12 +64,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
     const { storeId, date, goal, playbookId } = parseResult.data
-
     // 校验商家对该门店的访问权限（门店归属）
     await validateMerchantAccess(userId, storeId)
-
     // 调用服务新增 brief（纯写库，不消耗积分）
     const brief = await addContentBrief({
       storeId,
@@ -82,7 +74,6 @@ export async function POST(request: NextRequest) {
       goal,
       playbookId,
     })
-
     return NextResponse.json({ brief, message: '已新增内容任务' }, { status: 201 })
   } catch (error) {
     return mapContentBriefError(error, 'POST /api/content-briefs')

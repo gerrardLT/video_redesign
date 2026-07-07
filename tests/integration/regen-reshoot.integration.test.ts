@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 集成测试 16.3：单版本重生成 / 局部重拍（真实 Seedance + FFmpeg）
  *
  * 验证受影响范围重渲染与承接不断裂（需求 4.2, 4.3, 4.5）。
@@ -31,7 +31,7 @@ describe.skipIf(!enabled)('集成16.3 单版本重生成 / 局部重拍（真实
   }
 
   it('受影响范围闭包：computeReshootScope 含被重拍镜头本身（承接链纯计算，不消耗积分）', async () => {
-    const { computeReshootScope } = await import('@/lib/impact-scope-service')
+    const { computeReshootScope } = await import('@/lib/merchant/impact-scope-service')
     const contentBriefId = env('INTEGRATION_BRIEF_ID')
     const shotTaskId = env('INTEGRATION_SHOT_TASK_ID')
 
@@ -45,8 +45,8 @@ describe.skipIf(!enabled)('集成16.3 单版本重生成 / 局部重拍（真实
   }, 60_000)
 
   it('单版本重生成：仅替换目标版本，其它版本保留（隔离性，Property 14）', async () => {
-    const { regenerateSingleVariant } = await import('@/lib/local-render-service')
-    const { prisma } = await import('@/lib/db')
+    const { regenerateSingleVariant } = await import('@/lib/merchant/local-render-service')
+    const { prisma } = await import('@/lib/shared/db')
 
     const userId = env('INTEGRATION_USER_ID')
     const contentBriefId = env('INTEGRATION_BRIEF_ID')
@@ -69,7 +69,7 @@ describe.skipIf(!enabled)('集成16.3 单版本重生成 / 局部重拍（真实
   }, 600_000)
 
   it('局部重拍：仅重渲染受影响范围并返回受影响版本（regenScope 标注）', async () => {
-    const { rerenderAffectedScope } = await import('@/lib/local-render-service')
+    const { rerenderAffectedScope } = await import('@/lib/merchant/local-render-service')
     const userId = env('INTEGRATION_USER_ID')
     const contentBriefId = env('INTEGRATION_BRIEF_ID')
     const shotTaskId = env('INTEGRATION_SHOT_TASK_ID')

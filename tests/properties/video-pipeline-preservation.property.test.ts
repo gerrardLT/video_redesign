@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest'
+﻿import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
+
+// Mock db/redis 模块，避免 DATABASE_URL 缺失导致的初始化错误（credit-service/state-machine 间接 import db）
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+vi.mock('@/lib/shared/redis', () => ({
+  redis: new Proxy({}, { get: () => vi.fn() })
+}))
 
 /**
  * Feature: video-pipeline-fixes（Bug 修复）
@@ -75,7 +83,7 @@ class ParseStatusSimulator {
 
 describe('3.1 余额充足解析保持：按真实消费扣全额并置 EDITABLE（Property 2）', () => {
   it('足额余额时 chargeParseCreditsTx 恰扣应扣全额、余额减少该额度、无欠费备注', async () => {
-    const { chargeParseCreditsTx } = await import('@/lib/credit-service')
+    const { chargeParseCreditsTx } = await import('@/lib/shared/credit-service')
 
     await fc.assert(
       fc.asyncProperty(
@@ -435,7 +443,7 @@ describe('3.4/3.8 合并成功置 EXPORTED 与 EXPORTED 幂等跳过保持（Pro
 
 describe('3.5 路由状态校验保持：真实 assertTransition / canRetry / canCancel（Property 2）', () => {
   it('jobs/retry：仅 FAILED 可重试，且 FAILED→QUEUED 合法转换通过 assertTransition', async () => {
-    const { canRetry, assertTransition } = await import('@/lib/state-machine')
+    const { canRetry, assertTransition } = await import('@/lib/shared/state-machine')
 
     fc.assert(
       fc.property(
@@ -455,7 +463,7 @@ describe('3.5 路由状态校验保持：真实 assertTransition / canRetry / ca
   })
 
   it('jobs/cancel：仅 QUEUED / CREDIT_RESERVED 可取消，QUEUED→CANCELED 合法转换通过', async () => {
-    const { canCancel, assertTransition } = await import('@/lib/state-machine')
+    const { canCancel, assertTransition } = await import('@/lib/shared/state-machine')
 
     fc.assert(
       fc.property(
@@ -474,7 +482,7 @@ describe('3.5 路由状态校验保持：真实 assertTransition / canRetry / ca
   })
 
   it('assertTransition 对非法转换抛错（如 SUCCEEDED→任意、GENERATING→QUEUED）', async () => {
-    const { assertTransition, canTransition } = await import('@/lib/state-machine')
+    const { assertTransition, canTransition } = await import('@/lib/shared/state-machine')
 
     fc.assert(
       fc.property(
@@ -494,7 +502,7 @@ describe('3.5 路由状态校验保持：真实 assertTransition / canRetry / ca
   })
 
   it('终态（SUCCEEDED / CANCELED / REFUNDED）无任何合法后继转换', async () => {
-    const { getNextStates, isTerminalState } = await import('@/lib/state-machine')
+    const { getNextStates, isTerminalState } = await import('@/lib/shared/state-machine')
     for (const terminal of ['SUCCEEDED', 'CANCELED', 'REFUNDED']) {
       expect(isTerminalState(terminal)).toBe(true)
       expect(getNextStates(terminal)).toHaveLength(0)
@@ -565,7 +573,7 @@ describe('3.7 OSS 读写路径保持：产物 key 命名空间不变（Property 
   })
 
   it('getPublicUrl 对同一 key 确定性返回（真实 storage 纯函数），可用于前端访问', async () => {
-    const { getPublicUrl } = await import('@/lib/storage')
+    const { getPublicUrl } = await import('@/lib/shared/storage')
     fc.assert(
       fc.property(idArb, idArb, (projectId, jobId) => {
         const key = buildSegmentGenOSSKey(projectId, jobId)

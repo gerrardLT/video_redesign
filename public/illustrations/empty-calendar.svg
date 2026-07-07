@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="200" viewBox="0 0 240 200" fill="none">
+  <!-- 单色线稿风格：日历空态插画 - 空日历 + 时钟 -->
+  <!-- MIT License -->
+  <g stroke="#00754A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 日历主体 -->
+    <rect x="55" y="50" width="130" height="110" rx="3" fill="none"/>
+    <!-- 日历顶部横条 -->
+    <line x1="55" y1="75" x2="185" y2="75"/>
+    <!-- 日历挂扣 -->
+    <line x1="85" y1="42" x2="85" y2="58"/>
+    <line x1="155" y1="42" x2="155" y2="58"/>
+    <!-- 网格虚线（日期格子） -->
+    <line x1="55" y1="100" x2="185" y2="100" opacity="0.3" stroke-dasharray="4 3"/>
+    <line x1="55" y1="125" x2="185" y2="125" opacity="0.3" stroke-dasharray="4 3"/>
+    <line x1="98" y1="75" x2="98" y2="160" opacity="0.3" stroke-dasharray="4 3"/>
+    <line x1="141" y1="75" x2="141" y2="160" opacity="0.3" stroke-dasharray="4 3"/>
+    <!-- 右下小时钟装饰 -->
+    <circle cx="185" cy="170" r="14" fill="none"/>
+    <line x1="185" y1="170" x2="185" y2="161"/>
+    <line x1="185" y1="170" x2="192" y2="173"/>
+    <!-- 左上装饰圆点 -->
+    <circle cx="42" cy="55" r="2" fill="#00754A" opacity="0.25"/>
+    <circle cx="35" cy="68" r="1.2" fill="#00754A" opacity="0.15"/>
+    <!-- 底部提示弧线 -->
+    <path d="M80 175 Q120 182 160 175" fill="none" opacity="0.3"/>
+  </g>
+</svg>

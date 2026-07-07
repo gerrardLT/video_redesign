@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PATCH /api/stores/[storeId]/profile/adjust — 调整门店画像依据（可干预 + 可反哺）
  *
  * 调用 store-profile-service.adjustStoreProfile：剔除钩子词 / 替换卖点 / 修改人设 / 修改 CTA。
@@ -21,9 +21,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { adjustStoreProfile } from '@/lib/store-profile-service'
-import { ApiError } from '@/lib/api-error'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { adjustStoreProfile } from '@/lib/merchant/store-profile-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

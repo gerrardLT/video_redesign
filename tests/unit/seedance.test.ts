@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  *   referenceImages 最多 9 张（role=reference_image）
  */
 
-type SeedanceModule = typeof import('@/lib/seedance')
+type SeedanceModule = typeof import('@/lib/video/seedance')
 
 // 读取 fetch 请求体中的 content 数组
 function getContentFromFetch(
@@ -33,7 +33,7 @@ describe('seedance 无 API Key 时抛错（不返回 mock/占位结果）', () =
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('不应调用 fetch')))
 
     vi.resetModules()
-    mod = await import('@/lib/seedance')
+    mod = await import('@/lib/video/seedance')
   })
 
   afterEach(() => {
@@ -94,7 +94,7 @@ describe('createSeedanceTask content 约束（有 Key）', () => {
     vi.stubGlobal('fetch', mockFetch)
 
     vi.resetModules()
-    const mod = await import('@/lib/seedance')
+    const mod = await import('@/lib/video/seedance')
     createSeedanceTask = mod.createSeedanceTask
   })
 

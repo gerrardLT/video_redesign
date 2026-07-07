@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 跨项目角色图应用 API
  * POST /api/asset-library/[id]/apply-to-character
  *
@@ -19,8 +19,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { applyToCharacter } from '@/lib/asset-library-service'
-import { ApiError } from '@/lib/api-error'
+import { applyToCharacter } from '@/lib/shared/asset-library-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 export const dynamic = 'force-dynamic'
 

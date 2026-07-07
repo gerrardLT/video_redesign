@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { withCreditLock } from '@/lib/distributed-lock'
-import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/api-error'
-import { requireAdmin } from '@/lib/auth-helpers'
+import { prisma } from '@/lib/shared/db'
+import { withCreditLock } from '@/lib/shared/distributed-lock'
+import { ApiError, apiErrorToResponse, toErrorResponse } from '@/lib/shared/api-error'
+import { requireAdmin } from '@/lib/shared/auth-helpers'
 
 export const dynamic = 'force-dynamic'
 

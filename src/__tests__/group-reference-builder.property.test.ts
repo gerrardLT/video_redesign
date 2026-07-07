@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { buildGroupReferenceData, type GroupReferenceParams } from '@/lib/reference-builder'
+import { buildGroupReferenceData, type GroupReferenceParams } from '@/lib/video/reference-builder'
 
 const publicUrlArb = fc
   .integer({ min: 0, max: 100000 })

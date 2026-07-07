@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 日历视图 — /merchant/stores/[storeId]/calendar
@@ -35,11 +35,11 @@ import {
   LockOpen,
   SkipForward,
 } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/shared/utils'
 import {
   Select,
   SelectContent,
@@ -96,6 +96,7 @@ const GOAL_LABELS: Record<string, string> = {
   REPEAT_PURCHASE: '家庭聚餐',
 }
 
+/** emoji 仅在选题选择器的下拉数据展示中使用（非功能装饰） */
 const GOAL_ICONS: Record<string, string> = {
   TRAFFIC: '🚗',
   PROMOTION: '🔥',
@@ -282,11 +283,11 @@ function ShotProgress({ shotTasks }: { shotTasks: ShotTask[] }) {
         {required.map((task) => (
           <div
             key={task.id}
-            className={`w-4 h-1.5 rounded-full ${task.status === 'CAPTURED' ? 'bg-green-400' : 'bg-gray-200'}`}
+            className={`w-4 h-[2px] rounded-[1px] ${task.status === 'CAPTURED' ? 'bg-[var(--ll-green)]' : 'bg-[var(--ll-hair)]'}`}
           />
         ))}
       </div>
-      <span className="text-[10px] text-gray-400">
+      <span className="text-[10px] text-[var(--ll-text-3)] font-[var(--font-num)] tabular-nums">
         {captured.length}/{required.length}
       </span>
     </div>
@@ -692,15 +693,14 @@ function BriefRow({
   const router = useRouter()
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3">
+    <div className="flex items-center gap-3 rounded-[var(--radius)] border border-[var(--ll-hair)] bg-[var(--ll-surface)] p-3">
       <button
         type="button"
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
         onClick={() => router.push(`/merchant/stores/${storeId}/briefs/${brief.id}`)}
       >
-        <span className="text-xl">{GOAL_ICONS[brief.goal] ?? '📋'}</span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-gray-800">{brief.title}</p>
+          <p className="truncate text-sm font-medium">{brief.title}</p>
           <div className="mt-1 flex items-center gap-2">
             <Badge variant="secondary" className="text-[10px]">
               {GOAL_LABELS[brief.goal] ?? brief.goal}
@@ -717,22 +717,22 @@ function BriefRow({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-gray-400 hover:text-gray-700"
+          className="h-8 w-8 text-[var(--ll-text-3)] hover:text-[var(--ll-text)]"
           disabled={disabled}
           onClick={() => onEdit(brief)}
           aria-label="编辑"
         >
-          <Pencil className="h-4 w-4" />
+          <Pencil className="h-4 w-4" strokeWidth={1.5} />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-gray-400 hover:text-red-600"
+          className="h-8 w-8 text-[var(--ll-text-3)] hover:text-[var(--ll-danger)]"
           disabled={disabled}
           onClick={() => onDelete(brief)}
           aria-label="删除"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-4 w-4" strokeWidth={1.5} />
         </Button>
       </div>
     </div>
@@ -777,26 +777,26 @@ function DayCard({
   const addDisabled = isSkipped || atLimit
 
   return (
-    <Card className={isToday ? 'border-orange-300' : ''}>
-      <CardContent className="p-4">
+    <section className={`py-4 border-t border-[var(--ll-hair)] zen-reveal ${isToday ? 'bg-[var(--ll-green-light)]/20' : ''}`}>
+      <div className="px-1">
         {/* 日期标题行 + 状态控制 */}
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className={`text-sm font-semibold ${isToday ? 'text-orange-600' : 'text-gray-800'}`}>
+            <span className={`text-sm font-semibold ${isToday ? 'text-[var(--ll-green)]' : ''}`}>
               {bucket.date.getMonth() + 1}月{bucket.date.getDate()}日
             </span>
-            <span className="text-xs text-gray-400">{weekday}</span>
+            <span className="text-[var(--text-aux)] text-[var(--ll-text-3)]">{weekday}</span>
             {isToday && (
-              <Badge className="bg-orange-100 text-orange-700 text-[10px]">今天</Badge>
+              <Badge className="bg-[var(--ll-green-light)] text-[var(--ll-green)] text-[10px]">今天</Badge>
             )}
             {isLocked && (
-              <Badge variant="outline" className="border-amber-300 text-amber-600 text-[10px]">
-                <Lock className="mr-0.5 h-3 w-3" /> 已锁定
+              <Badge variant="outline" className="border-[var(--ll-gold)] text-[var(--ll-gold-ink)] text-[10px]">
+                <Lock className="mr-0.5 h-3 w-3" strokeWidth={1.5} /> 已锁定
               </Badge>
             )}
             {isSkipped && (
-              <Badge variant="outline" className="border-gray-300 text-gray-500 text-[10px]">
-                <SkipForward className="mr-0.5 h-3 w-3" /> 已跳过
+              <Badge variant="outline" className="border-[var(--ll-border-strong)] text-[var(--ll-text-3)] text-[10px]">
+                <SkipForward className="mr-0.5 h-3 w-3" strokeWidth={1.5} /> 已跳过
               </Badge>
             )}
           </div>
@@ -806,22 +806,22 @@ function DayCard({
             <Button
               variant="ghost"
               size="icon"
-              className={`h-7 w-7 ${isLocked ? 'text-amber-600' : 'text-gray-400'}`}
+              className={`h-7 w-7 ${isLocked ? 'text-[var(--ll-gold-ink)]' : 'text-[var(--ll-text-3)]'}`}
               onClick={() => onSetDayState(bucket.date, isLocked ? 'NORMAL' : 'LOCKED')}
               aria-label={isLocked ? '解除锁定' : '锁定该天'}
               title={isLocked ? '解除锁定' : '锁定该天（下一轮自动生成不改动）'}
             >
-              {isLocked ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+              {isLocked ? <LockOpen className="h-4 w-4" strokeWidth={1.5} /> : <Lock className="h-4 w-4" strokeWidth={1.5} />}
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className={`h-7 w-7 ${isSkipped ? 'text-gray-700' : 'text-gray-400'}`}
+              className={`h-7 w-7 ${isSkipped ? 'text-[var(--ll-text)]' : 'text-[var(--ll-text-3)]'}`}
               onClick={() => onSetDayState(bucket.date, isSkipped ? 'NORMAL' : 'SKIPPED')}
               aria-label={isSkipped ? '取消跳过' : '跳过该天'}
               title={isSkipped ? '取消跳过' : '跳过该天（下一轮自动生成不安排内容）'}
             >
-              <SkipForward className="h-4 w-4" />
+              <SkipForward className="h-4 w-4" strokeWidth={1.5} />
             </Button>
           </div>
         </div>
@@ -842,7 +842,7 @@ function DayCard({
           </div>
         ) : (
           // 空缺如实展示，不自动填充伪内容（需求 6.7）
-          <div className="rounded-xl border border-dashed border-gray-200 py-4 text-center text-xs text-gray-400">
+          <div className="rounded-[var(--radius)] border border-dashed border-[var(--ll-hair)] py-4 text-center text-[var(--text-aux)] text-[var(--ll-text-3)]">
             {isSkipped ? '本日已跳过，不安排内容' : '未安排内容'}
           </div>
         )}
@@ -851,15 +851,15 @@ function DayCard({
         <Button
           variant="outline"
           size="sm"
-          className="mt-3 w-full border-dashed text-gray-500"
+          className="mt-3 w-full border-dashed text-[var(--ll-text-2)]"
           disabled={addDisabled}
           onClick={() => onAdd(bucket.date)}
         >
-          <Plus className="mr-1 h-4 w-4" />
+          <Plus className="mr-1 h-4 w-4" strokeWidth={1.5} />
           {atLimit ? `当日已达上限（${dayLimit}条）` : isSkipped ? '本日已跳过' : '新增内容'}
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
@@ -929,10 +929,10 @@ export default function CalendarPage() {
   if (isNotFound || (!data?.contentPlan && !error)) {
     return (
       <div className="mx-auto max-w-lg space-y-4 py-10 text-center">
-        <p className="text-gray-500">还没有内容计划</p>
-        <p className="text-sm text-gray-400">生成一份 7 天内容计划后即可在此查看与编辑</p>
+        <p className="text-[var(--ll-text-2)]">还没有内容计划</p>
+        <p className="text-sm text-[var(--ll-text-3)]">生成一份 7 天内容计划后即可在此查看与编辑</p>
         <Button
-          className="rounded-xl"
+          className="rounded-[var(--radius)]"
           onClick={() => router.push(`/merchant/stores/${storeId}`)}
         >
           去生成内容计划
@@ -945,8 +945,8 @@ export default function CalendarPage() {
   if (error || !data?.contentPlan) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center space-y-3">
-        <p className="text-gray-500">{error?.message || '加载失败'}</p>
-        <Button variant="outline" className="rounded-xl" onClick={() => router.back()}>
+        <p className="text-[var(--ll-text-2)]">{error?.message || '加载失败'}</p>
+        <Button variant="outline" className="rounded-[var(--radius)]" onClick={() => router.back()}>
           返回
         </Button>
       </div>
@@ -1053,26 +1053,54 @@ export default function CalendarPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 pb-10">
-      {/* 计划头部 */}
-      <div className="flex items-start justify-between gap-3">
+      {/* 计划头部 — v3 Zen: serif 标题 + hairline 分隔 */}
+      <div className="flex items-start justify-between gap-3 zen-reveal">
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold text-gray-900">{plan.title || '内容计划'}</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
+          <h1 className="truncate text-[var(--text-title)] font-semibold font-[var(--font-serif)]">{plan.title || '内容计划'}</h1>
+          <p className="mt-0.5 text-[var(--text-aux)] text-[var(--ll-text-3)]">
             {formatDate(plan.startDate)} - {formatDate(plan.endDate)}
           </p>
         </div>
         <Button
           variant="ghost"
           size="sm"
-          className="shrink-0 text-gray-500"
+          className="shrink-0 text-[var(--ll-text-2)]"
           onClick={() => router.push(`/merchant/stores/${storeId}`)}
         >
           返回门店
         </Button>
       </div>
 
+      {/* 周进度色带 — 7天简洁一行展示，已有内容的天为绿，空缺为灰 */}
+      <div className="zen-reveal flex items-center gap-1">
+        {buckets.map((bucket) => {
+          const hasContent = bucket.briefs.length > 0
+          const dayS = dayStates[bucket.key] ?? 'NORMAL'
+          const isLk = dayS === 'LOCKED'
+          const isSk = dayS === 'SKIPPED'
+          return (
+            <div key={bucket.key} className="flex-1 flex flex-col items-center gap-1">
+              <span className="text-[9px] text-[var(--ll-text-3)] font-[var(--font-num)] tabular-nums">
+                {WEEKDAYS[bucket.date.getDay()].slice(1)}
+              </span>
+              <div
+                className={cn(
+                  'h-[6px] w-full rounded-full transition-colors',
+                  isSk ? 'bg-[var(--ll-hair)] opacity-40' :
+                  isLk ? 'bg-[var(--ll-gold)]/40' :
+                  hasContent ? 'bg-[var(--ll-green)]' : 'bg-[var(--ll-hair)]'
+                )}
+              />
+            </div>
+          )
+        })}
+        <span className="ml-2 text-[11px] text-[var(--ll-text-3)] font-[var(--font-num)] tabular-nums whitespace-nowrap">
+          {buckets.filter(b => b.briefs.length > 0).length}/{buckets.length}
+        </span>
+      </div>
+
       {/* 说明：空缺天如实展示，不自动填充（需求 6.7） */}
-      <p className="text-xs text-gray-400">
+      <p className="text-[var(--text-aux)] text-[var(--ll-text-3)] zen-reveal">
         可改期 / 换选题 / 换剧本 / 删除 / 新增内容；锁定或跳过某天后，下一轮自动生成将尊重你的设置。
       </p>
 

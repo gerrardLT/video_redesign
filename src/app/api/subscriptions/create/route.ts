@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { createSubscription } from '@/lib/subscription-service'
-import { ApiError } from '@/lib/api-error'
+import { createSubscription } from '@/lib/shared/subscription-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 export const dynamic = 'force-dynamic'
 

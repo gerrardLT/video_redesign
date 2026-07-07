@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/engagement — 激励与留存聚合（当前门店作用域）
  *
  * 并行调用 engagement-service 的四项能力并聚合为单一响应：
@@ -24,14 +24,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import {
   getStreak,
   checkMilestones,
   getGrowthComparison,
   getOnboardingProgress,
-} from '@/lib/engagement-service'
-import { ApiError } from '@/lib/api-error'
+} from '@/lib/merchant/engagement-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

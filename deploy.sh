@@ -6,8 +6,8 @@
 # 流程：环境检查 → 备份数据库 → 拉取代码 → 重建镜像 → 启动 → 数据库迁移 → 重启 Worker → 健康检查
 #
 # 用法：
-#   bash deploy.sh                  # 默认从 origin/deploy/docker 拉取并部署
-#   BRANCH=main bash deploy.sh      # 指定分支
+#   bash deploy.sh                  # 默认从 origin/main 拉取并部署
+#   BRANCH=feat/xxx bash deploy.sh  # 指定分支
 #   SKIP_BACKUP=1 bash deploy.sh    # 跳过数据库备份（不推荐）
 #   NO_CACHE=0 bash deploy.sh       # 构建时使用缓存（更快但可能不彻底）
 
@@ -17,7 +17,7 @@ set -euo pipefail
 # 配置（可通过环境变量覆盖）
 # ========================
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
-BRANCH="${BRANCH:-deploy/docker}"
+BRANCH="${BRANCH:-main}"
 SKIP_BACKUP="${SKIP_BACKUP:-0}"
 NO_CACHE="${NO_CACHE:-1}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/playbooks — 列出门店可用剧本（需求 6.1 换 playbook）
  *
  * 供 calendar 计划可编辑前端的「换剧本」选择器使用：按门店所属行业返回激活中的 Playbook，
@@ -23,10 +23,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import { ContentGoalSchema } from '@/types/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

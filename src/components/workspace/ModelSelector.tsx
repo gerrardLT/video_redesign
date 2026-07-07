@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 模型选择组件（参数行内紧凑版）
@@ -11,7 +11,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Flame, Wand2 } from 'lucide-react'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { MODEL_INFO } from '@/constants/workspace'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import type { WorkspaceModel } from '@/types/workspace'
 
 /** 模型图标映射 */

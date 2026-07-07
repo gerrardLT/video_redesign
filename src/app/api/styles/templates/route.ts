@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getTemplates } from '@/lib/style-service'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getTemplates } from '@/lib/shared/style-service'
 
 export const dynamic = 'force-dynamic'
 

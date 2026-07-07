@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import path from 'path'
-import { AppearanceDescriptorSchema, CharacterWithAppearanceSchema } from '@/lib/shot-schema'
+import { AppearanceDescriptorSchema, CharacterWithAppearanceSchema } from '@/lib/video/shot-schema'
 import type { CharacterAppearanceRecord, AppearanceDescriptor } from '@/types/appearance'
 
 // ========================
@@ -20,7 +20,7 @@ import type { CharacterAppearanceRecord, AppearanceDescriptor } from '@/types/ap
 // （SYSTEM_PROMPT 未导出，通过读取源文件进行静态验证）
 // ========================
 const videoAnalyzerSource = readFileSync(
-  path.resolve(__dirname, '../lib/video-analyzer.ts'),
+  path.resolve(__dirname, '../lib/video/video-analyzer.ts'),
   'utf-8'
 )
 
@@ -85,7 +85,8 @@ describe('SYSTEM_PROMPT 外观描述结构说明', () => {
 
   it('SYSTEM_PROMPT 中明确指导模型输出四维度结构', () => {
     // 验证提示词中包含对 appearanceDetail 四维度的结构化示例或说明
-    expect(videoAnalyzerSource).toMatch(/appearanceDetail.*hair.*clothing.*accessories.*makeup/s)
+    // 使用 [\s\S] 替代 dotAll 标志 s，兼容 ES2017 目标
+    expect(videoAnalyzerSource).toMatch(/appearanceDetail[\s\S]*hair[\s\S]*clothing[\s\S]*accessories[\s\S]*makeup/)
   })
 })
 

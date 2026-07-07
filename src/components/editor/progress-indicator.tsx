@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * ProgressIndicator — 生成进度动画组件
@@ -14,8 +14,8 @@ import { useMemo } from 'react'
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { useSSEProgressStore } from '@/stores/sse-progress-store'
 import { Progress } from '@/components/ui/progress'
-import { formatRemainingTime } from '@/lib/placeholder-utils'
-import { cn } from '@/lib/utils'
+import { formatRemainingTime } from '@/lib/shared/placeholder-utils'
+import { cn } from '@/lib/shared/utils'
 
 interface ProgressIndicatorProps {
   /** 任务 ID，从 SSE store 读取进度 */

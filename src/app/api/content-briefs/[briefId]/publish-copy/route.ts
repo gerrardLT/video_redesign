@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/content-briefs/[briefId]/publish-copy — 为指定 ContentBrief 生成各平台发布文案
  *
  * 流程：
@@ -23,11 +23,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { generatePublishCopy } from '@/lib/publish-copy-service'
+import { prisma } from '@/lib/shared/db'
+import type { Prisma } from '@/generated/prisma'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { generatePublishCopy } from '@/lib/merchant/publish-copy-service'
 import { VideoVariantTypeSchema, PublishPlatformSchema } from '@/types/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     await prisma.contentBrief.update({
       where: { id: briefId },
-      data: { platformCopies: mergedCopies as unknown as Record<string, unknown> },
+      data: { platformCopies: mergedCopies as unknown as Prisma.InputJsonValue },
     })
 
     return NextResponse.json({

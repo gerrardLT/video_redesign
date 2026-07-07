@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/merchant/onboarding — 商家问诊 API
  *
  * 接收商家问诊表单，在单个数据库事务中创建 Merchant、Store、ProductOffer 记录，
@@ -17,9 +17,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 import { MerchantOnboardingSchema } from '@/lib/validations/merchant'
-import { generateStoreProfileQueue } from '@/lib/queue'
+import { generateStoreProfileQueue } from '@/lib/shared/queue'
 
 export async function POST(request: NextRequest) {
   // 1. 鉴权：从 middleware 注入的 x-user-id header 获取 userId

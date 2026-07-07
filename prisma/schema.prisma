@@ -89,7 +89,7 @@ model Shot {
   scene                String?
   shotType             String?  @map("shot_type")
   cameraMove           String?  @map("camera_move")
-  dialogue             String? // JSON 字符串，SQLite 无 JSON 类型
+  dialogue             String? // JSON 字符串，存储对话/台词信息
   audioDesc            String?  @map("audio_desc")
   prompt               String?
   genStatus            String   @default("PENDING") @map("gen_status") // PENDING|QUEUED|GENERATING|SUCCEEDED|FAILED|CANCELED
@@ -899,6 +899,8 @@ model ContentBrief {
   provenance          Json? // BriefProvenance - 生成时的画像引用快照（需求 5.1,5.2,5.4）
   copyEdited          Boolean            @default(false) // 人工修改文案标记，自动流程不得静默覆盖（需求 2.3,2.8）
   planInputId         String? // 关联采纳的复盘建议输入 PlanGenerationInput.id（需求 1.7 反哺标注）
+  renderMode          String             @default("MANUAL") @map("render_mode") // MANUAL | AUTO — 渲染模式（一键出片）
+  autoGenStartedAt    DateTime?          @map("auto_gen_started_at") // 一键出片触发时间
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -1021,10 +1023,13 @@ model PublishJob {
   status         PublishJobStatus @default(DRAFT)
   title          String?
   caption        String?
-  tags           Json? // string[] - 发布标签
-  locationText   String? // 位置文本
-  exportedOssKey String? // 导出文件 OSS 路径
+  tags           Json?            // string[] - 发布标签
+  locationText   String?          // 位置文本
+  exportedOssKey String?          // 导出文件 OSS 路径
   errorMessage   String?
+  accountId      String?          // 矩阵号发布目标账号（SocialAccount.id），null 表示主账号
+  scheduledAt    DateTime?        // 定时发布时间，null 表示立即发布
+  matrixBatchId  String?          // 矩阵分发批次 ID，同批次多个账号共享，便于追踪
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   publishedAt    DateTime?
@@ -1035,6 +1040,8 @@ model PublishJob {
   @@index([contentBriefId])
   @@index([platform])
   @@index([status])
+  @@index([matrixBatchId])
+  @@index([scheduledAt])
   @@map("publish_jobs")
 }
 
@@ -1190,6 +1197,7 @@ model PublishQueueItem {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
+  @@unique([videoVariantId]) // 幂等保证：每个已导出 variant 恰对应一个 PublishQueueItem（防并发创建重复）
   @@index([storeId])
   @@index([contentBriefId])
   @@index([reminded, exportedAt])

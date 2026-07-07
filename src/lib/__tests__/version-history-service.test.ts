@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest'
-import { getPromptExcerpt } from '@/lib/version-history-service'
+import { describe, it, expect, vi } from 'vitest'
+
+// Mock db 模块，避免 DATABASE_URL 缺失导致的初始化错误
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+
+import { getPromptExcerpt } from '@/lib/video/version-history-service'
 
 /**
  * getPromptExcerpt 单元测试

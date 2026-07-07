@@ -12,7 +12,7 @@
 import { useCallback, useRef, useState, useEffect } from 'react'
 import { X, Music } from 'lucide-react'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { validateFile } from '@/lib/workspace-validators'
+import { validateFile } from '@/lib/video/workspace-validators'
 import { MAX_WORKSPACE_ASSETS, MODEL_DURATION_OPTIONS } from '@/constants/workspace'
 import { toast } from 'sonner'
 import type { WorkspaceAsset } from '@/types/workspace'

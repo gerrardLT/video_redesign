@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 保持（Preservation）属性测试 — 非承接输入行为保持不变
  * Spec: shot-group-frame-continuity（bugfix，requirements-first）
  *
@@ -28,8 +28,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 import { NextRequest } from 'next/server'
 // 真实实现：不 mock，确保 scriptHash 与 durationNum 与生产逐位一致
-import { computeScriptHash } from '@/lib/script-hash'
-import { MAX_GROUP_DURATION } from '@/lib/grouping-service'
+import { computeScriptHash } from '@/lib/shared/script-hash'
+import { MAX_GROUP_DURATION } from '@/lib/video/grouping-service'
 
 // ========================
 // 测试夹具常量
@@ -95,18 +95,18 @@ const {
   return { mockPrisma, mockQueue, mockEstimateGroupCreditCost, mockBuildGroupGenReference }
 })
 
-vi.mock('@/lib/db', () => ({ prisma: mockPrisma }))
-vi.mock('@/lib/queue', () => ({ videoGenerateQueue: mockQueue }))
-vi.mock('@/lib/credit-service', () => ({
+vi.mock('@/lib/shared/db', () => ({ prisma: mockPrisma }))
+vi.mock('@/lib/shared/queue', () => ({ videoGenerateQueue: mockQueue }))
+vi.mock('@/lib/shared/credit-service', () => ({
   estimateGroupCreditCost: (duration: number, resolution: string) =>
     mockEstimateGroupCreditCost(duration, resolution),
 }))
-vi.mock('@/lib/rate-limiter', () => ({ isRateLimited: () => false }))
+vi.mock('@/lib/shared/rate-limiter', () => ({ isRateLimited: () => false }))
 // 分布式锁在单测中直接放行：withCreditLock(fn) → fn()
-vi.mock('@/lib/distributed-lock', () => ({
+vi.mock('@/lib/shared/distributed-lock', () => ({
   withCreditLock: (fn: () => unknown) => fn(),
 }))
-vi.mock('@/lib/group-gen-context', () => ({
+vi.mock('@/lib/video/group-gen-context', () => ({
   buildGroupGenReference: (...args: unknown[]) => mockBuildGroupGenReference(...args),
 }))
 

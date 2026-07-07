@@ -41,8 +41,8 @@ import {
   Circle,
   ChevronRight,
   Award,
+  Eye,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 
@@ -131,57 +131,85 @@ function nextThreshold(current: number, thresholds: number[]): number | null {
 // 子组件
 // ========================
 
-/** 连续创作展示（需求 11.1, 11.5）：天数 / 周数双指标，真实数据，无记录显示 0 */
+/** 连续创作展示（需求 11.1, 11.5）—— 创新升级：Hero 大数字 + 去 Card 化
+ *
+ * 设计签名：连续天数为 64px hero 数字，数字本身就是设计。
+ * 去 Card 化：hairline separator + section padding，与首页统一设计语言。
+ */
 function StreakSection({ streak }: { streak: StreakResult }) {
   const nextDay = nextThreshold(streak.days, STREAK_DAY_THRESHOLDS)
   const nextWeek = nextThreshold(streak.weeks, STREAK_WEEK_THRESHOLDS)
 
+  if (streak.days === 0 && streak.weeks === 0) {
+    return (
+      <section className="zen-reveal py-6 border-t border-[var(--ll-hair)]">
+        <div className="flex items-center gap-2 mb-3">
+          <Flame className="h-5 w-5 text-[var(--ll-green)]" strokeWidth={1.5} />
+          <h3 className="font-[var(--font-serif)] text-[17px] font-semibold text-[var(--ll-text)]">连续创作</h3>
+        </div>
+        <p className="text-sm text-[var(--ll-text-2)]">
+          还没有连续发布记录，发布你的第一条内容就能点亮连续创作
+        </p>
+      </section>
+    )
+  }
+
   return (
-    <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-orange-800">
-          <Flame className="h-5 w-5 text-orange-500" />
-          连续创作
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {streak.days === 0 && streak.weeks === 0 ? (
-          // 无任何连续发布记录 —— 显式提示，不伪造
-          <p className="text-sm text-gray-600">
-            还没有连续发布记录，发布你的第一条内容就能点亮连续创作 🔥
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-white/70 p-4 text-center">
-              <div className="flex items-center justify-center gap-1 text-orange-600">
-                <Flame className="h-5 w-5" />
-                <span className="text-3xl font-bold">{streak.days}</span>
-                <span className="text-sm text-gray-500 self-end mb-1">天</span>
-              </div>
-              <p className="mt-1 text-xs text-gray-500">连续发布天数</p>
-              {nextDay !== null && (
-                <p className="mt-1 text-[11px] text-orange-500">
-                  距「{nextDay} 天」徽章还差 {nextDay - streak.days} 天
-                </p>
-              )}
-            </div>
-            <div className="rounded-2xl bg-white/70 p-4 text-center">
-              <div className="flex items-center justify-center gap-1 text-amber-600">
-                <CalendarDays className="h-5 w-5" />
-                <span className="text-3xl font-bold">{streak.weeks}</span>
-                <span className="text-sm text-gray-500 self-end mb-1">周</span>
-              </div>
-              <p className="mt-1 text-xs text-gray-500">连续创作周数</p>
-              {nextWeek !== null && (
-                <p className="mt-1 text-[11px] text-amber-500">
-                  距「{nextWeek} 周」徽章还差 {nextWeek - streak.weeks} 周
-                </p>
-              )}
-            </div>
+    <section className="zen-reveal py-6 border-t border-[var(--ll-hair)]">
+      {/* Hero 区域：连续天数大数字 + SVG 火焰 */}
+      <div className="flex items-end gap-3 mb-4">
+        <Flame className="h-5 w-5 text-[var(--ll-green)]" strokeWidth={1.5} />
+        <h3 className="font-[var(--font-serif)] text-[17px] font-semibold text-[var(--ll-text)]">连续创作</h3>
+      </div>
+
+      {/* Hero 数字 — 64px Space Grotesk，数字本身就是设计 */}
+      <div className="flex items-baseline gap-2 mb-1">
+        <span
+          className="font-[var(--font-num)] text-[64px] leading-none font-bold tabular-nums text-[var(--ll-green)]"
+          style={{ letterSpacing: '-0.02em' }}
+        >
+          {streak.days}
+        </span>
+        <span className="text-base text-[var(--ll-text-2)] mb-1">天</span>
+      </div>
+
+      {nextDay !== null && (
+        <div className="flex items-center gap-2 mb-5">
+          <div className="flex-1 h-[2px] bg-[var(--ll-hair)] rounded-[1px] relative overflow-hidden">
+            <div
+              className="absolute inset-y-0 left-0 bg-[var(--ll-green)] rounded-[1px]"
+              style={{
+                width: `${(streak.days / nextDay) * 100}%`,
+                transition: 'width 600ms var(--ease-out)',
+              }}
+            />
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <span className="text-xs text-[var(--ll-text-3)] whitespace-nowrap tabular-nums">
+            距 {nextDay} 天徽章还差 {nextDay - streak.days}
+          </span>
+        </div>
+      )}
+
+      {/* 天/周双指标 — 并排紧凑布局 */}
+      <div className="flex gap-6">
+        <div className="flex items-center gap-2">
+          <Flame className="h-4 w-4 text-[var(--ll-green)]" strokeWidth={1.5} />
+          <span className="font-[var(--font-num)] text-xl font-semibold tabular-nums text-[var(--ll-text)]">{streak.days}</span>
+          <span className="text-xs text-[var(--ll-text-3)]">天</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-[var(--ll-green)]" strokeWidth={1.5} />
+          <span className="font-[var(--font-num)] text-xl font-semibold tabular-nums text-[var(--ll-text)]">{streak.weeks}</span>
+          <span className="text-xs text-[var(--ll-text-3)]">周</span>
+        </div>
+      </div>
+
+      {nextWeek !== null && (
+        <p className="mt-2 text-xs text-[var(--ll-gold)]">
+          距「{nextWeek} 周」徽章还差 {nextWeek - streak.weeks} 周
+        </p>
+      )}
+    </section>
   )
 }
 
@@ -192,54 +220,49 @@ const MILESTONE_ICON: Record<MilestoneKind, typeof Trophy> = {
   WEEK_COMPLETED: Award,
 }
 
-/** 里程碑徽章 + 鼓励文案（需求 11.2） */
+/** 里程碑徽章 + 鼓励文案（需求 11.2）—— 去 Card 化 */
 function MilestoneSection({ milestones }: { milestones: Milestone[] }) {
   return (
-    <Card className="border-yellow-200">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-gray-800">
-          <Trophy className="h-5 w-5 text-yellow-500" />
-          我的里程碑
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {milestones.length === 0 ? (
-          // 尚未达成任何里程碑 —— 显式提示，不伪造徽章
-          <p className="text-sm text-gray-600">
-            坚持发布内容，达成连续创作或完成整周任务就能点亮第一枚徽章 🏆
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {milestones.map((m) => {
-              const Icon = MILESTONE_ICON[m.kind] ?? Trophy
-              return (
-                <div
-                  key={m.id}
-                  className="flex items-start gap-3 rounded-2xl bg-gradient-to-r from-yellow-50 to-amber-50 p-3"
-                >
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-yellow-100">
-                    <Icon className="h-5 w-5 text-yellow-600" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-800">{m.title}</p>
-                      <Badge className="border-yellow-300 bg-yellow-100 text-[10px] text-yellow-700">
-                        已达成
-                      </Badge>
-                    </div>
-                    <p className="mt-0.5 text-xs leading-relaxed text-gray-600">{m.description}</p>
-                  </div>
+    <section className="zen-reveal py-6 border-t border-[var(--ll-hair)]">
+      <div className="flex items-center gap-2 mb-4">
+        <Trophy className="h-5 w-5 text-[var(--ll-gold)]" strokeWidth={1.5} />
+        <h3 className="font-[var(--font-serif)] text-[17px] font-semibold text-[var(--ll-text)]">我的里程碑</h3>
+      </div>
+      {milestones.length === 0 ? (
+        <p className="text-sm text-[var(--ll-text-2)]">
+          坚持发布内容，达成连续创作或完成整周任务就能点亮第一枚徽章
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {milestones.map((m) => {
+            const Icon = MILESTONE_ICON[m.kind] ?? Trophy
+            return (
+              <div
+                key={m.id}
+                className="flex items-start gap-3 rounded-[3px] bg-[var(--ll-gold-lightest,#FAF6EE)] p-3 border border-[var(--ll-gold)]/20"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--ll-gold)]/10">
+                  <Icon className="h-5 w-5 text-[var(--ll-gold-ink,#8A6D2F)]" />
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[var(--ll-text)]">{m.title}</p>
+                    <Badge className="border-[var(--ll-gold)]/30 bg-[var(--ll-gold-lightest,#FAF6EE)] text-[10px] text-[var(--ll-gold-ink,#8A6D2F)]">
+                      已达成
+                    </Badge>
+                  </div>
+                  <p className="mt-0.5 text-xs leading-relaxed text-[var(--ll-text-2)]">{m.description}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 
-/** 真实效果对比（需求 11.3, 11.5）：本月最佳 vs 上月最佳，含 evidence；不足显式提示 */
+/** 真实效果对比（需求 11.3, 11.5）—— 去 Card 化 */
 function GrowthComparisonSection({
   comparison,
   storeId,
@@ -250,27 +273,22 @@ function GrowthComparisonSection({
   onOpen: (href: string) => void
 }) {
   return (
-    <Card className="border-green-200">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-gray-800">
-          <Sparkles className="h-5 w-5 text-green-500" />
-          效果对比
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {!comparison.available ? (
-          // 历史不足 —— 显式提示「数据还不够」，绝不制造虚假成长（需求 11.5）
-          <div className="rounded-2xl bg-gray-50 p-4 text-center">
-            <p className="text-sm text-gray-600">数据还不够，暂时无法对比</p>
-            <p className="mt-1 text-xs text-gray-400">
-              连续两个月都有带数据的内容后，这里会展示「本月最佳 vs 上月最佳」
-            </p>
-          </div>
-        ) : (
-          <ComparisonDetail comparison={comparison} storeId={storeId} onOpen={onOpen} />
-        )}
-      </CardContent>
-    </Card>
+    <section className="zen-reveal py-6 border-t border-[var(--ll-hair)]">
+      <div className="flex items-center gap-2 mb-4">
+        <Sparkles className="h-5 w-5 text-[var(--ll-green)]" strokeWidth={1.5} />
+        <h3 className="font-[var(--font-serif)] text-[17px] font-semibold text-[var(--ll-text)]">效果对比</h3>
+      </div>
+      {!comparison.available ? (
+        <div className="rounded-[3px] bg-[var(--ll-muted)] p-4 text-center">
+          <p className="text-sm text-[var(--ll-text-2)]">数据还不够，暂时无法对比</p>
+          <p className="mt-1 text-xs text-[var(--ll-text-3)]">
+            连续两个月都有带数据的内容后，这里会展示「本月最佳 vs 上月最佳」
+          </p>
+        </div>
+      ) : (
+        <ComparisonDetail comparison={comparison} storeId={storeId} onOpen={onOpen} />
+      )}
+    </section>
   )
 }
 
@@ -296,21 +314,22 @@ function ComparisonDetail({
         <BestContentCard best={thisBest} storeId={storeId} onOpen={onOpen} />
       </div>
 
-      {/* 趋势 */}
-      <div className={`flex items-center justify-center gap-1 text-sm font-medium ${trendColor}`}>
-        <TrendIcon className="h-4 w-4" />
-        {delta > 0 ? `播放提升 ${delta}` : delta < 0 ? `播放下降 ${-delta}` : '播放持平'}
+      <div className="flex items-center gap-2 mb-3">
+        <TrendIcon className={`h-4 w-4 ${trendColor}`} />
+        <span className={`text-sm font-medium ${trendColor}`}>
+          {delta > 0 ? `播放提升 ${delta}` : delta < 0 ? `播放下降 ${-delta}` : '播放持平'}
+        </span>
       </div>
 
       {/* evidence 通俗话术（可解释，需求 11.3） */}
-      <p className="rounded-xl bg-green-50 p-3 text-xs leading-relaxed text-green-800">
+      <p className="rounded-[3px] bg-[var(--ll-green)]/5 border border-[var(--ll-green)]/10 p-3 text-xs leading-relaxed text-[var(--ll-text-2)]">
         {evidence}
       </p>
     </div>
   )
 }
 
-/** 单条最佳内容卡片 */
+/** 单条最佳内容卡片 —— 去 Card 化，hairline + hover 效果 */
 function BestContentCard({
   best,
   storeId,
@@ -326,20 +345,21 @@ function BestContentCard({
     <button
       type="button"
       onClick={() => onOpen(`/merchant/stores/${storeId}/briefs/${best.briefId}/metrics`)}
-      className={`rounded-2xl p-3 text-left transition-colors ${
-        muted ? 'bg-gray-50 hover:bg-gray-100' : 'bg-green-50 hover:bg-green-100'
+      className={`rounded-[3px] p-3 text-left transition-colors cursor-pointer active:bg-[var(--ll-ceramic)] ${
+        muted ? 'bg-[var(--ll-muted)] hover:bg-[var(--ll-ceramic)]' : 'bg-[var(--ll-green)]/5 hover:bg-[var(--ll-green)]/10'
       }`}
     >
-      <p className="text-[11px] text-gray-400">{best.periodLabel}最佳</p>
-      <p className="mt-1 line-clamp-2 text-sm font-medium text-gray-800">{best.title}</p>
-      <p className={`mt-2 text-xs ${muted ? 'text-gray-500' : 'text-green-600'}`}>
-        👁️ {best.value} 播放
-      </p>
+      <p className="text-[11px] text-[var(--ll-text-3)]">{best.periodLabel}最佳</p>
+      <p className="mt-1 line-clamp-2 text-sm font-medium text-[var(--ll-text)]">{best.title}</p>
+      <div className={`mt-2 flex items-center gap-1 text-xs ${muted ? 'text-[var(--ll-text-2)]' : 'text-[var(--ll-green)]'}`}>
+        <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />
+        <span>{best.value} 播放</span>
+      </div>
     </button>
   )
 }
 
-/** 新手进阶引导（需求 11.4）：渐进式任务清单 */
+/** 新手进阶引导（需求 11.4）—— 去 Card 化，hairline separator 模式 */
 function OnboardingSection({
   tasks,
   onOpen,
@@ -352,19 +372,17 @@ function OnboardingSection({
   const completedCount = tasks.filter((t) => t.completed).length
 
   return (
-    <Card className="border-amber-100">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-gray-800">
-            <Sparkles className="h-5 w-5 text-amber-500" />
-            进阶引导
-          </CardTitle>
-          <span className="text-xs text-gray-400">
-            {completedCount}/{tasks.length} 已完成
-          </span>
+    <section className="zen-reveal py-6 border-t border-[var(--ll-hair)]">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-[var(--ll-green)]" strokeWidth={1.5} />
+          <h3 className="font-[var(--font-serif)] text-[17px] font-semibold text-[var(--ll-text)]">进阶引导</h3>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-2">
+        <span className="text-xs text-[var(--ll-text-3)]">
+          {completedCount}/{tasks.length} 已完成
+        </span>
+      </div>
+      <div className="space-y-2">
         {tasks.map((task) => {
           const clickable = !task.locked
           return (
@@ -373,41 +391,41 @@ function OnboardingSection({
               type="button"
               disabled={!clickable}
               onClick={() => clickable && onOpen(task.actionHref)}
-              className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${
+              className={`flex w-full items-center gap-3 rounded-[3px] border p-3 text-left transition-colors ${
                 task.locked
-                  ? 'cursor-not-allowed border-gray-100 bg-gray-50 opacity-70'
-                  : 'border-amber-100 bg-white hover:border-amber-200 hover:bg-amber-50/50'
+                  ? 'cursor-not-allowed border-[var(--ll-hair)] bg-[var(--ll-muted)] opacity-70'
+                  : 'border-[var(--ll-hair)] bg-transparent hover:bg-[var(--ll-ceramic)] cursor-pointer active:bg-[var(--ll-ceramic)]'
               }`}
             >
               <div className="shrink-0">
                 {task.completed ? (
-                  <CheckCircle2 className="h-6 w-6 text-green-500" />
+                  <CheckCircle2 className="h-6 w-6 text-[var(--ll-green)]" />
                 ) : task.locked ? (
-                  <Lock className="h-6 w-6 text-gray-300" />
+                  <Lock className="h-6 w-6 text-[var(--ll-text-3)]" />
                 ) : (
-                  <Circle className="h-6 w-6 text-amber-400" />
+                  <Circle className="h-6 w-6 text-[var(--ll-gold)]" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
                 <p
                   className={`text-sm font-medium ${
-                    task.completed ? 'text-gray-400 line-through' : 'text-gray-800'
+                    task.completed ? 'text-[var(--ll-text-3)] line-through' : 'text-[var(--ll-text)]'
                   }`}
                 >
                   {task.title}
                 </p>
-                <p className="mt-0.5 text-xs text-gray-500">
+                <p className="mt-0.5 text-xs text-[var(--ll-text-2)]">
                   {task.locked ? '完成上一步后解锁' : task.description}
                 </p>
               </div>
               {clickable && !task.completed && (
-                <ChevronRight className="h-5 w-5 shrink-0 text-gray-300" />
+                <ChevronRight className="h-5 w-5 shrink-0 text-[var(--ll-text-3)]" />
               )}
             </button>
           )
         })}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
@@ -454,9 +472,9 @@ export default function GrowthPage() {
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-8">
       {/* 标题 */}
-      <div className="flex items-center gap-2 pt-1">
-        <Trophy className="h-5 w-5 text-amber-600" />
-        <h1 className="text-lg font-bold text-gray-800">我的成长</h1>
+      <div className="flex items-center gap-2 pt-1 zen-reveal">
+        <Trophy className="h-5 w-5 text-[var(--ll-green)]" strokeWidth={1.5} />
+        <h1 className="text-[var(--text-title)] font-semibold font-[var(--font-serif)] text-[var(--ll-text)]">我的成长</h1>
       </div>
 
       {/* 连续创作（需求 11.1） */}

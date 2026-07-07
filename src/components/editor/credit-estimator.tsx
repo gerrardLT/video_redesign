@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * CreditEstimator — 积分预估模块
@@ -10,8 +10,8 @@
 import { useEffect } from 'react'
 import useSWR from 'swr'
 import { AlertTriangle } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { estimateHappyHorseCreditCost } from '@/lib/credit-calc'
+import { cn } from '@/lib/shared/utils'
+import { estimateHappyHorseCreditCost } from '@/lib/shared/credit-calc'
 
 interface CreditEstimatorProps {
   /** 项目 ID */

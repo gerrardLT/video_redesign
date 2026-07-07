@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 视频超分 Worker
  * 处理 video-upscale 队列任务
  *
@@ -16,19 +16,19 @@
  * - 退款幂等：通过 projectId 作为 jobId，refundCredits 内置幂等检查
  */
 import { Worker, type Job } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
-import { chargeCreditsTx } from '@/lib/credit-service'
-import { uploadFile } from '@/lib/storage'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
+import { chargeCreditsTx } from '@/lib/shared/credit-service'
+import { uploadFile } from '@/lib/shared/storage'
 import {
   submitUpscaleTask,
   getUpscaleResult,
   WaveSpeedApiError,
-} from '@/lib/wavespeed'
+} from '@/lib/video/wavespeed'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 import type { ConnectionOptions } from 'bullmq'
-import { withCreditLock } from '@/lib/distributed-lock'
+import { withCreditLock } from '@/lib/shared/distributed-lock'
 
 const connection = redis as unknown as ConnectionOptions
 
@@ -330,7 +330,7 @@ async function processUpscaleVideo(job: Job<VideoUpscaleJobData>) {
     // 返还冻结积分（REFUND，按 projectId 幂等：导出阶段冻结走 projectId 字段）
     if (reservedCredits > 0) {
       try {
-        const { refundParseCredits } = await import('@/lib/credit-service')
+        const { refundParseCredits } = await import('@/lib/shared/credit-service')
         await refundParseCredits(userId, projectId, reservedCredits)
         console.log(`[upscale-video] 已退还冻结积分 ${reservedCredits}`)
       } catch (refundError) {

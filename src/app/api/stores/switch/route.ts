@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/stores/switch — 切换当前所选门店（需求 10.2）
  *
  * 鉴权：从 x-user-id header 获取用户 ID。
@@ -21,19 +21,15 @@
  *
  * Requirements: 10.1, 10.2, 10.3
  */
-
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { ApiError } from '@/lib/api-error'
-
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { ApiError } from '@/lib/shared/api-error'
 /** 统一作用域键 cookie 名称：任务中心/通知中心/跨店看板共享 */
 const CURRENT_STORE_COOKIE = 'currentStoreId'
-
 export async function POST(request: NextRequest) {
   try {
     // 1. 鉴权
     const userId = getUserIdFromRequest(request)
-
     // 2. 解析请求体
     let body: unknown
     try {
@@ -44,7 +40,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
     // 3. 校验 storeId 存在且为非空字符串
     const storeId =
       typeof body === 'object' && body !== null && 'storeId' in body
@@ -56,10 +51,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
     // 4. 数据隔离校验：目标门店必须归属当前用户的商家（失败抛 403）
     await validateMerchantAccess(userId, storeId)
-
     // 5. 写入统一作用域键 cookie 并回传，供前端持有
     const response = NextResponse.json({ currentStoreId: storeId })
     response.cookies.set(CURRENT_STORE_COOKIE, storeId, {
@@ -70,7 +63,6 @@ export async function POST(request: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 30, // 30 天
     })
-
     return response
   } catch (error) {
     if (error instanceof ApiError) {

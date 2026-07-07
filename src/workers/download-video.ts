@@ -1,15 +1,15 @@
-/**
+﻿/**
  * 视频下载 Worker
  * 处理 'video-download' 队列任务
  * 流程：解析短链接 → 跟随重定向获取真实视频地址 → 代理下载 → 上传 OSS → 更新状态 → 触发解析
  */
 
 import { Worker, Job, type ConnectionOptions } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
-import { videoParseQueue } from '@/lib/queue'
-import { buildProjectUpdateOnDownloadComplete } from '@/lib/video-import-service'
-import { estimateParseCreditCost, getBalance } from '@/lib/credit-service'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
+import { videoParseQueue } from '@/lib/shared/queue'
+import { buildProjectUpdateOnDownloadComplete } from '@/lib/shared/video-import-service'
+import { estimateParseCreditCost, getBalance } from '@/lib/shared/credit-service'
 import path from 'path'
 import { mkdir } from 'fs/promises'
 import { execFile } from 'child_process'
@@ -108,7 +108,7 @@ async function downloadWithYtDlp(sourceUrl: string, projectId: string): Promise<
  * @returns OSS 公开访问 URL
  */
 async function uploadToOSS(localPath: string, projectId: string): Promise<string> {
-  const { uploadFile } = await import('@/lib/storage')
+  const { uploadFile } = await import('@/lib/shared/storage')
   const { unlink } = await import('fs/promises')
   const ossKey = `downloads/${projectId}/${path.basename(localPath)}`
   const ossUrl = await uploadFile(ossKey, localPath)

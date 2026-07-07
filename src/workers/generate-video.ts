@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 视频生成 Worker
  * 处理 video-generate 队列任务
  *
@@ -10,21 +10,21 @@
  * 5. 创建版本历史记录（best-effort，失败仅记录日志不回滚生成结果）
  */
 import { Worker, type Job, UnrecoverableError } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
-import { createSeedanceTask, getSeedanceTaskStatus } from '@/lib/seedance'
-import { createHappyHorseWorkspaceTask, getHappyHorseTaskStatus as getHHWorkspaceStatus } from '@/lib/happyhorse-workspace'
-import { refundCredits, chargeCreditsTx } from '@/lib/credit-service'
-import { setExpiry } from '@/lib/asset-lifecycle-service'
-import { uploadFile } from '@/lib/storage'
-import { acquireLock, releaseLock, generateLockKey, withCreditLock } from '@/lib/distributed-lock'
-import { checkAndConcatProjectSegments } from '@/lib/segment-concat'
-import { videoGenerateQueue } from '@/lib/queue'
-import { buildGroupGenReference } from '@/lib/group-gen-context'
-import { applySameSceneContinuation } from '@/lib/frame-continuity'
-import { logger } from '@/lib/logger'
-import { publishStateChange, publishCompleted, publishFailed, publishChainProgress } from '@/lib/progress-publisher'
-import { createVersion } from '@/lib/version-history-service'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
+import { createSeedanceTask, getSeedanceTaskStatus } from '@/lib/video/seedance'
+import { createHappyHorseWorkspaceTask, getHappyHorseTaskStatus as getHHWorkspaceStatus } from '@/lib/shared/happyhorse-workspace'
+import { refundCredits, chargeCreditsTx } from '@/lib/shared/credit-service'
+import { setExpiry } from '@/lib/shared/asset-lifecycle-service'
+import { uploadFile } from '@/lib/shared/storage'
+import { acquireLock, releaseLock, generateLockKey, withCreditLock } from '@/lib/shared/distributed-lock'
+import { checkAndConcatProjectSegments } from '@/lib/video/segment-concat'
+import { videoGenerateQueue } from '@/lib/shared/queue'
+import { buildGroupGenReference } from '@/lib/video/group-gen-context'
+import { applySameSceneContinuation } from '@/lib/video/frame-continuity'
+import { logger } from '@/lib/shared/logger'
+import { publishStateChange, publishCompleted, publishFailed, publishChainProgress } from '@/lib/shared/progress-publisher'
+import { createVersion } from '@/lib/video/version-history-service'
 import { writeFile, unlink, mkdir } from 'fs/promises'
 import path from 'path'
 import { execFile } from 'child_process'
@@ -876,18 +876,20 @@ async function triggerNextChainGroup(params: {
   const nextRef = await buildGroupGenReference(nextGroup.id)
   let referenceImages = nextRef.referenceImages
 
-  // 构建下一组的完整 prompt：characterPrefix + 组内所有分镜 prompt 合并
+  // 构建下一组的完整 prompt：merchantPrefix + characterPrefix + 组内所有分镜 prompt 合并
   const nextGroupShots = await prisma.shot.findMany({
     where: { shotGroupId: nextGroup.id },
     orderBy: { orderIndex: 'asc' },
     select: { prompt: true },
   })
   const nextShotsPromptText = nextGroupShots.map(s => s.prompt || '').filter(p => p.trim()).join('\n')
-  let nextPrompt = nextRef.characterPrefix + (nextJob.promptSnapshot || nextShotsPromptText)
+  // 商家画像前缀（仅 merchant 用户有门店时非空，拼到 prompt 最前）
+  const merchantPrefixText = nextRef.merchantPrefix || ''
+  let nextPrompt = merchantPrefixText + nextRef.characterPrefix + (nextJob.promptSnapshot || nextShotsPromptText)
 
   // 链式镜头衔接（reference_video 方案）：无条件将当前组生成视频传给下一组作 reference_video，
   // 由 Seedance 模型分析前段视频的运动轨迹、光线、构图来自然续接，不再做场景判定。
-  const { VIDEO_CONTINUATION_PROMPT_SUFFIX } = await import('@/lib/frame-continuity')
+  const { VIDEO_CONTINUATION_PROMPT_SUFFIX } = await import('@/lib/video/frame-continuity')
   if (prevGroupVideoUrl) {
     nextPrompt = `${nextPrompt}${VIDEO_CONTINUATION_PROMPT_SUFFIX}`
     logger.info('链式续接：传入上一组视频作 reference_video 衔接', {
@@ -1185,7 +1187,7 @@ async function processWorkspaceGenerate(job: Job<VideoGenerateJobData>) {
     await downloadAndValidateVideo(finalVideoUrl, tmpFile)
     const ossKey = `workspace/${userId}/generated/${Date.now()}_${jobId}.mp4`
     await uploadFile(ossKey, tmpFile)
-    const { getPublicUrl } = await import('@/lib/storage')
+    const { getPublicUrl } = await import('@/lib/shared/storage')
     const ossVideoUrl = getPublicUrl(ossKey)
 
     let coverUrl: string | undefined

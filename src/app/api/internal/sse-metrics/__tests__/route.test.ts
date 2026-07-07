@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SSE 连接监控端点单元测试
  *
  * 测试 GET /api/internal/sse-metrics 的核心行为：
@@ -20,7 +20,7 @@ vi.mock('@/lib/sse/connection-registry', () => ({
 }))
 
 // Mock logger
-vi.mock('@/lib/logger', () => ({
+vi.mock('@/lib/shared/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 

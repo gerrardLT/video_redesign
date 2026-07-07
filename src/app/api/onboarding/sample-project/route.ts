@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createSampleProject, hasSampleProject } from '@/lib/sample-project-service'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { createSampleProject, hasSampleProject } from '@/lib/shared/sample-project-service'
 
 export const dynamic = 'force-dynamic'
 

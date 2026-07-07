@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * TemplatePicker — Prompt 模板快捷选择器
@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import { PROMPT_TEMPLATES, type PromptTemplate } from '@/constants/prompt-templates'
 import {
   AlertDialog,

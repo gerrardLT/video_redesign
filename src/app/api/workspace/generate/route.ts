@@ -15,7 +15,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { executeWorkspaceGeneration } from '@/lib/workspace-generation-service'
+import { executeWorkspaceGeneration } from '@/lib/video/workspace-generation-service'
 import { MODEL_DURATION_OPTIONS } from '@/constants/workspace'
 
 /** 请求体 Schema */

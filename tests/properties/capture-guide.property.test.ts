@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 12: 拍摄指导阈值映射一致
+﻿// Feature: local-life-depth-enhancements, Property 12: 拍摄指导阈值映射一致
 import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
 
@@ -22,10 +22,10 @@ import fc from 'fast-check'
 // ========================
 // Mock Prisma（仅为打断模块加载期的 db 初始化副作用，被测纯函数不使用）
 // ========================
-vi.mock('@/lib/db', () => ({ prisma: {} }))
+vi.mock('@/lib/shared/db', () => ({ prisma: {} }))
 
 // 动态导入以确保 mock 生效
-const { buildCaptureGuide } = await import('@/lib/capture-director')
+const { buildCaptureGuide } = await import('@/lib/merchant/capture-director')
 type ShotTaskWithGuide = Parameters<typeof buildCaptureGuide>[0]['shotTask']
 
 // ShotTaskType 全集（与 src/types/merchant.ts ShotTaskTypeSchema 保持一致）

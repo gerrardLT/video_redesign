@@ -9,7 +9,7 @@ import {
   hasGroupAppearanceChanged,
   formatAppearancePrompt,
   aggregateGroupAppearances,
-} from '@/lib/appearance-comparator'
+} from '@/lib/video/appearance-comparator'
 import type { AppearanceDescriptor } from '@/types/appearance'
 
 describe('normalizeAppearanceText', () => {

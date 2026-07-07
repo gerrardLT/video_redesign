@@ -10,7 +10,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Upload, X, Search } from 'lucide-react'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { validateFile } from '@/lib/workspace-validators'
+import { validateFile } from '@/lib/video/workspace-validators'
 import { toast } from 'sonner'
 
 interface LibraryAsset {

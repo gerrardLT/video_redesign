@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/metrics/period-comparison — 跨周对比视图
  *
  * 调用 performance-learning-service.getPeriodComparison：按 period-service 周期口径
@@ -20,9 +20,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { getPeriodComparison } from '@/lib/performance-learning-service'
-import { ApiError } from '@/lib/api-error'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { getPeriodComparison } from '@/lib/merchant/performance-learning-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

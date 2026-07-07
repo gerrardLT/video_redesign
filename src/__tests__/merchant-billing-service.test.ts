@@ -1,4 +1,4 @@
-/**
+﻿/**
  * merchant-billing-service 单元测试
  *
  * 覆盖商家计费体系收敛（merchant-billing-unification）中两个代表性的确定性用例，
@@ -15,8 +15,8 @@
  */
 import 'dotenv/config'
 import { describe, it, expect } from 'vitest'
-import { estimateRenderCost } from '@/lib/merchant-billing-service'
-import { estimateGroupCreditCost } from '@/lib/credit-service'
+import { estimateRenderCost } from '@/lib/merchant/merchant-billing-service'
+import { estimateGroupCreditCost } from '@/lib/shared/credit-service'
 import { CREDIT_COST_CONTENT_PLAN } from '@/constants/merchant'
 
 /**

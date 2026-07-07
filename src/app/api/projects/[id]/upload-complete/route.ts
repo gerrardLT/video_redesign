@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { estimateParseCreditCost, getBalance } from '@/lib/credit-service'
-import { getUserPrivileges } from '@/lib/privilege-engine'
-import { buildRejectionResponse } from '@/lib/concurrency-controller'
-import { scheduleWithPriority } from '@/lib/priority-scheduler'
+import { prisma } from '@/lib/shared/db'
+import { estimateParseCreditCost, getBalance } from '@/lib/shared/credit-service'
+import { getUserPrivileges } from '@/lib/shared/privilege-engine'
+import { buildRejectionResponse } from '@/lib/shared/concurrency-controller'
+import { scheduleWithPriority } from '@/lib/shared/priority-scheduler'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,7 +75,7 @@ export async function POST(
 
     // 带优先级的解析任务入队；入队失败时不静默吞掉，标记项目 FAILED 并返回错误
     try {
-      const { videoParseQueue } = await import('@/lib/queue')
+      const { videoParseQueue } = await import('@/lib/shared/queue')
       await scheduleWithPriority(
         videoParseQueue,
         'parse-video',

@@ -609,15 +609,45 @@ main {
   --ll-shadow-frap: 0 0 6px rgba(0,0,0,.24), 0 8px 12px rgba(0,0,0,.14);
 }
 
-/* 商家端根容器：暖奶油底 + Manrope/Noto Sans SC 字体 + 主文字色 + 紧字距 */
+/* 商家端根容器：暖奶油底 + v3 Zen 字体体系 + 主文字色 + 紧字距 */
 .ll-root {
   background: var(--ll-canvas);
   color: var(--ll-text);
-  font-family: 'Manrope', 'Noto Sans SC', -apple-system, system-ui, sans-serif;
+  font-family: var(--font-sans), -apple-system, system-ui, sans-serif;
   letter-spacing: -0.01em;
+
+  /* ── v3 Zen 字体变量 ── */
+  --font-serif: var(--font-noto-serif-sc), 'Noto Serif SC', serif;
+  --font-sans: var(--font-noto-sans-sc), 'Noto Sans SC', -apple-system, sans-serif;
+  --font-num: var(--font-space-grotesk), 'Space Grotesk', sans-serif;
+
+  /* ── v3 Zen 字阶 ── */
+  --text-hero: 29px;
+  --text-title: 17px;
+  --text-body: 14px;
+  --text-aux: 11px;
+
+  /* ── v3 Zen 动效曲线与时长 ── */
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-spring: cubic-bezier(.23, 1.4, .32, 1);
+  --dur-fast: 150ms;
+  --dur-base: 300ms;
+  --dur-slow: 600ms;
+
+  /* ── v3 Zen 画布升级 ── */
+  --ll-canvas: #F4F2ED;
+  --ll-green-deep: #0E3A2A;
+
+  /* ── v3 Zen 圆角降级（从 14px 降至极克制 3px） ── */
+  --radius: 0.1875rem;
 }
 /* 商家端按压微交互（Starbucks 签名 scale .95），按需加 .ll-press */
 .ll-press:active { transform: scale(0.95); }
+
+/* 会员/成就/里程碑区域极淡金色氛围底色（克制不喧宾夺主） */
+.ll-gold-ambient {
+  background: radial-gradient(ellipse, rgba(168,133,63,.04), transparent);
+}
 
 /* ------------------------------------------------------------------
  * 作用域调色板重映射（仅 .ll-root 内生效）
@@ -658,31 +688,49 @@ main {
 
 /* ========================================================================
  * shadcn token 绑定（仅 .ll-root 商家端作用域）
- * 把 shadcn 的语义变量指向 --ll-* Starbucks 调色板，让「无 className 的默认」
- * shadcn 组件（Button/Card/Input/Badge/Dialog/Select/Tabs…）自动继承奶油+大地绿，
- * 不再是 shadcn 出厂的中性近黑主色。
+ * v3 Zen 品牌语义映射：暖奶油画布 + 大地绿主色 + 极克制圆角
  * 严格限定在 /merchant 子树（.ll-root），视频重塑端（--cine-*）零影响。
  * ======================================================================== */
 .ll-root {
-  --background: var(--ll-canvas);
-  --foreground: var(--ll-text);
-  --card: var(--ll-surface);
-  --card-foreground: var(--ll-text);
+  --background: #F4F2ED;                 /* 暖奶油画布 */
+  --foreground: #1A1714;                 /* 主文字·温暖近黑 */
+  --card: #FBFAF7;                       /* 卡片底色·比画布略亮 */
+  --card-foreground: #1A1714;
   --popover: var(--ll-surface);
   --popover-foreground: var(--ll-text);
-  --primary: var(--ll-green);            /* 默认主按钮 = 大地绿 */
+  --primary: #00754A;                    /* 大地绿主色 */
   --primary-foreground: #FFFFFF;         /* 绿底白字（AA ≈ 4.8:1） */
   --secondary: var(--ll-ceramic);        /* 次级按钮 = 陶瓷奶油 */
   --secondary-foreground: var(--ll-text);
-  --muted: var(--ll-ceramic);
+  --muted: #EDEBE9;                      /* 静默底色 */
   --muted-foreground: var(--ll-text-2);
   --accent: var(--ll-green-light);       /* hover/选中 = 浅绿 */
   --accent-foreground: var(--ll-green-sb);
   --destructive: var(--ll-danger);
-  --border: var(--ll-hair);
-  --input: var(--ll-hair);
+  --border: rgba(26, 23, 20, .09);       /* 发丝线 */
+  --input: rgba(26, 23, 20, .09);
   --ring: var(--ll-green);               /* focus 环 = 大地绿 */
-  --radius: 0.875rem;                    /* 14px：Starbucks 友好大圆角基准 */
+}
+
+/* ── 纸质噪点纹理（v3 Zen 质感层）──
+ * SVG feTurbulence 生成 fractalNoise，叠加在 .ll-root 之上
+ * 营造暖奶油纸张手感。pointer-events:none 不拦截交互。
+ * Validates: Requirements 4.2, 4.3 */
+.ll-root::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* 尊重用户减少动效偏好：关闭噪点纹理 */
+@media (prefers-reduced-motion: reduce) {
+  .ll-root::after {
+    display: none;
+  }
 }
 
 
@@ -711,4 +759,75 @@ main {
   --border: var(--cine-line-2);
   --input: var(--cine-line-2);
   --ring: var(--cine-gold);
+}
+
+
+
+/* ========================================================================
+ * Stagger 入场动效（v3 Zen · .ll-root 商家端）
+ * 通用入场动画类：opacity 0→1, translateY(14px)→0
+ * duration: var(--dur-slow) = 600ms, timing: var(--ease-out)
+ * 子元素 nth-child(1)~(7) 依次延迟 60ms，覆盖一屏内容
+ * ======================================================================== */
+.zen-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: zen-revealIn var(--dur-slow) var(--ease-out) forwards;
+}
+
+@keyframes zen-revealIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 子元素延迟（60ms 间隔，7 档） */
+.zen-reveal:nth-child(1) { animation-delay: 0ms; }
+.zen-reveal:nth-child(2) { animation-delay: 60ms; }
+.zen-reveal:nth-child(3) { animation-delay: 120ms; }
+.zen-reveal:nth-child(4) { animation-delay: 180ms; }
+.zen-reveal:nth-child(5) { animation-delay: 240ms; }
+.zen-reveal:nth-child(6) { animation-delay: 300ms; }
+.zen-reveal:nth-child(7) { animation-delay: 360ms; }
+
+
+/* ========================================================================
+ * zenGlow — 完成任务时的庆祝光晕
+ * ======================================================================== */
+@keyframes zenGlow {
+  0% { box-shadow: 0 0 0 0 rgba(0, 117, 74, 0.35); }
+  50% { box-shadow: 0 0 12px 4px rgba(0, 117, 74, 0.15); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* ========================================================================
+ * zenPulse — CTA 按钮就绪时的脉冲呼吸
+ * ======================================================================== */
+@keyframes zenPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 117, 74, 0.4); }
+  50% { box-shadow: 0 0 16px 6px rgba(0, 117, 74, 0.12); }
+}
+
+/* ========================================================================
+ * zenRevealBlur — 版本揭幕动画（从模糊到清晰）
+ * ======================================================================== */
+@keyframes zenRevealBlur {
+  0% { filter: blur(8px); opacity: 0.3; transform: scale(0.97); }
+  100% { filter: blur(0); opacity: 1; transform: scale(1); }
+}
+
+/* ========================================================================
+ * 无障碍：prefers-reduced-motion 降级
+ * 关闭所有非必要动画和纹理，确保动效敏感用户不受干扰
+ * ======================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .zen-reveal {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .ll-root::after {
+    display: none;
+  }
 }

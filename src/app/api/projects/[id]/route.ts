@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { toMediaProxyUrl } from '@/lib/storage'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/shared/db'
+import { toMediaProxyUrl } from '@/lib/shared/storage'
 
 export const dynamic = 'force-dynamic'
 

@@ -32,12 +32,12 @@ const mockAsset: AssetLibraryItem = {
 }
 
 describe('PreviewModal', () => {
-  let onClose: ReturnType<typeof vi.fn>
-  let onDownload: ReturnType<typeof vi.fn>
+  let onClose: ReturnType<typeof vi.fn<() => void>>
+  let onDownload: ReturnType<typeof vi.fn<(assetId: string) => void>>
 
   beforeEach(() => {
-    onClose = vi.fn()
-    onDownload = vi.fn()
+    onClose = vi.fn<() => void>()
+    onDownload = vi.fn<(assetId: string) => void>()
   })
 
   describe('打开/关闭行为', () => {

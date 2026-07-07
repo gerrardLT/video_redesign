@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 34: 切换器可见性等价
+﻿// Feature: local-life-depth-enhancements, Property 34: 切换器可见性等价
 //
 // Property 34（Validates: Requirements 10.1, 10.4）：
 //   门店切换器（及跨店看板）可见 当且仅当 maxStores > 1 AND storeCount > 1；否则隐藏，不展示空壳。
@@ -17,7 +17,7 @@ import fc from 'fast-check'
 // 内存桩：privilege-engine（提供随机 maxStores）
 // ========================
 const mockGetMerchantPrivileges = vi.fn()
-vi.mock('@/lib/privilege-engine', () => ({
+vi.mock('@/lib/shared/privilege-engine', () => ({
   getMerchantPrivileges: (userId: string) => mockGetMerchantPrivileges(userId),
 }))
 
@@ -25,7 +25,7 @@ vi.mock('@/lib/privilege-engine', () => ({
 // 内存桩：prisma.store.findMany（返回随机数量门店）
 // ========================
 const mockStoreFindMany = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     store: {
       findMany: (...args: unknown[]) => mockStoreFindMany(...args),
@@ -34,7 +34,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 // 桩就位后再导入被测模块，确保其内部引用的是上面的内存桩
-import { getStoreSwitcher } from '@/lib/cross-store-service'
+import { getStoreSwitcher } from '@/lib/merchant/cross-store-service'
 
 describe('Property 34: 切换器可见性等价', () => {
   beforeEach(() => {

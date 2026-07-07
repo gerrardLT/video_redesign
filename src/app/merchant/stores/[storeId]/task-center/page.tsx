@@ -99,10 +99,10 @@ const TASK_META: Record<
   TaskCenterItem['type'],
   { icon: typeof Camera; color: string; bg: string }
 > = {
-  SHOOT: { icon: Camera, color: 'text-orange-600', bg: 'bg-orange-100' },
-  RENDER: { icon: Clapperboard, color: 'text-blue-600', bg: 'bg-blue-100' },
+  SHOOT: { icon: Camera, color: 'text-[var(--ll-green)]', bg: 'bg-[var(--ll-green-light)]' },
+  RENDER: { icon: Clapperboard, color: 'text-[var(--ll-info)]', bg: 'bg-[var(--ll-info-dim)]' },
   EXPORT: { icon: Download, color: 'text-purple-600', bg: 'bg-purple-100' },
-  PUBLISH: { icon: Send, color: 'text-amber-600', bg: 'bg-amber-100' },
+  PUBLISH: { icon: Send, color: 'text-[var(--ll-gold-ink)]', bg: 'bg-[var(--ll-gold-lightest)]' },
 }
 
 /** 任务类型 → 主操作按钮文案 */
@@ -115,10 +115,10 @@ const TASK_ACTION_LABEL: Record<TaskCenterItem['type'], string> = {
 
 /** 通知类型 → 图标 + 主题色 */
 const NOTIFICATION_META: Record<string, { icon: typeof Bell; color: string; bg: string }> = {
-  EXPIRY: { icon: CalendarClock, color: 'text-red-600', bg: 'bg-red-100' },
-  PUBLISH_REMINDER: { icon: Megaphone, color: 'text-amber-600', bg: 'bg-amber-100' },
-  CRAWL_FAILED: { icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-100' },
-  MILESTONE: { icon: Trophy, color: 'text-yellow-600', bg: 'bg-yellow-100' },
+  EXPIRY: { icon: CalendarClock, color: 'text-[var(--ll-danger)]', bg: 'bg-[var(--ll-danger-dim)]' },
+  PUBLISH_REMINDER: { icon: Megaphone, color: 'text-[var(--ll-warning)]', bg: 'bg-[var(--ll-warning-dim)]' },
+  CRAWL_FAILED: { icon: AlertTriangle, color: 'text-[var(--ll-warning)]', bg: 'bg-[var(--ll-warning-dim)]' },
+  MILESTONE: { icon: Trophy, color: 'text-[var(--ll-gold-ink)]', bg: 'bg-[var(--ll-gold-lightest)]' },
 }
 
 /** 标签页 */
@@ -197,31 +197,30 @@ export default function TaskCenterPage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-8">
-      {/* 标题 + SSE 连接状态 */}
-      <div className="flex items-center justify-between pt-1">
+      {/* 标题 + SSE 连接状态 — v3 Zen: serif 标题 */}
+      <div className="flex items-center justify-between pt-1 zen-reveal">
         <div className="flex items-center gap-2">
-          <Inbox className="h-5 w-5 text-amber-600" />
-          <h1 className="text-lg font-bold text-gray-800">任务与通知</h1>
+          <Inbox className="h-5 w-5 text-[var(--ll-green)]" strokeWidth={1.5} />
+          <h1 className="text-[var(--text-title)] font-semibold font-[var(--font-serif)]">任务与通知</h1>
         </div>
         {/* 近实时连接状态指示（需求 9.2）：连接时显示实时，断连回退轮询刷新 */}
         <span
           className={`flex items-center gap-1 text-[11px] ${
-            isConnected ? 'text-green-600' : 'text-gray-400'
+            isConnected ? 'text-[var(--ll-green)]' : 'text-[var(--ll-text-3)]'
           }`}
           title={isConnected ? '已连接，状态实时刷新' : '未连接，定时刷新中'}
         >
-          {isConnected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+          {isConnected ? <Wifi className="h-3.5 w-3.5" strokeWidth={1.5} /> : <WifiOff className="h-3.5 w-3.5" strokeWidth={1.5} />}
           {isConnected ? '实时' : '定时刷新'}
         </span>
       </div>
 
-      {/* 标签切换 */}
-      <div className="flex gap-2">
+      {/* 标签切换 — v3 Zen: 绿色选中态 */}
+      <div className="flex gap-2 zen-reveal">
         <Button
           type="button"
           variant={tab === 'TASKS' ? 'default' : 'outline'}
           size="sm"
-          className={tab === 'TASKS' ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}
           onClick={() => setTab('TASKS')}
         >
           进行中任务 {tasks.length > 0 ? tasks.length : ''}
@@ -230,7 +229,6 @@ export default function TaskCenterPage() {
           type="button"
           variant={tab === 'NOTIFICATIONS' ? 'default' : 'outline'}
           size="sm"
-          className={tab === 'NOTIFICATIONS' ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}
           onClick={() => setTab('NOTIFICATIONS')}
         >
           通知 {unreadCount > 0 ? `· ${unreadCount} 未读` : ''}

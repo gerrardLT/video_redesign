@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/video-variants/[variantId]/regenerate — 单版本重生成（需求 4.2, 4.6, 4.7, 4.8, 4.9）
  *
  * 仅重生成指定的 VideoVariant，保留同一 brief 下的其它版本（隔离性）。
@@ -29,10 +29,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { regenerateSingleVariant } from '@/lib/local-render-service'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { regenerateSingleVariant } from '@/lib/merchant/local-render-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ variantId: string }>

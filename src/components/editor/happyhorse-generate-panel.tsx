@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * HappyHorse V-Edit 生成面板（增强版）
@@ -22,7 +22,7 @@ import { ProgressIndicator } from '@/components/editor/progress-indicator'
 import { ResultPreview } from '@/components/editor/result-preview'
 import { HistoryList, type HistoryRecord } from '@/components/editor/history-list'
 import { useHappyHorseStore } from '@/stores/happyhorse-store'
-import { insertPlaceholder } from '@/lib/placeholder-utils'
+import { insertPlaceholder } from '@/lib/shared/placeholder-utils'
 import type { PromptTemplate } from '@/constants/prompt-templates'
 
 interface HappyHorseGeneratePanelProps {

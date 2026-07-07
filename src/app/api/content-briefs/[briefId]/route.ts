@@ -1,4 +1,4 @@
-/**
+﻿/**
  * /api/content-briefs/[briefId] — ContentBrief 详情与编辑
  *
  * - GET：获取 ContentBrief 详情（含 ShotTasks / VideoVariants / 合规检测 / 溯源）
@@ -13,12 +13,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { editContentBrief } from '@/lib/content-calendar-service'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { editContentBrief } from '@/lib/merchant/content-calendar-service'
 import { ContentGoalSchema } from '@/types/merchant'
-import { ApiError } from '@/lib/api-error'
-import { mapContentBriefError } from '@/lib/content-brief-api-error'
+import { ApiError } from '@/lib/shared/api-error'
+import { mapContentBriefError } from '@/lib/merchant/content-brief-api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>

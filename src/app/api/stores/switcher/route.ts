@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/switcher — 门店切换器数据（需求 10.1, 10.4）
  *
  * 鉴权：从 x-user-id header 获取用户 ID。
@@ -14,20 +14,16 @@
  *
  * Requirements: 10.1, 10.4
  */
-
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { getStoreSwitcher } from '@/lib/cross-store-service'
-import { ApiError } from '@/lib/api-error'
-
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { getStoreSwitcher } from '@/lib/merchant/cross-store-service'
+import { ApiError } from '@/lib/shared/api-error'
 export async function GET(request: NextRequest) {
   try {
     // 1. 鉴权
     const userId = getUserIdFromRequest(request)
-
     // 2. 获取门店切换器数据（单店/无多店权益时返回 multiStore:false）
     const switcher = await getStoreSwitcher({ userId })
-
     return NextResponse.json(switcher)
   } catch (error) {
     if (error instanceof ApiError) {

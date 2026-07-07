@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getBySlug } from '@/lib/help-center-service'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getBySlug } from '@/lib/shared/help-center-service'
 
 export const dynamic = 'force-dynamic'
 

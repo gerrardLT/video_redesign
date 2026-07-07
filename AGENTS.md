@@ -1,8 +1,13 @@
-# Video Redesign — AI 视频重绘平台
+# Video Redesign — AI 视频重绘 + 本地生活营销平台
 
 ## 项目概述
 
-AI 视频重绘 SaaS 平台：用户上传短视频 → AI 多模态解析为分镜脚本 → 用户编辑/调整分镜内容 → Seedance 2.0 逐组生成新视频 → 合并导出。
+项目包含两条并存的产品线，共享同一套底层能力（视频解析、Seedance 生成、FFmpeg、OSS、队列、积分、订阅、并发控制）：
+
+1. **AI 视频重绘（原始产品线）**：用户上传短视频 → AI 多模态解析为分镜脚本 → 用户编辑/调整分镜内容 → Seedance 2.0 逐组生成新视频 → 合并导出。入口为 `/dashboard`、`/dashboard/workspace`。
+2. **本地生活商家 AI 营销（在建产品线）**：面向本地实体门店（第一阶段餐饮）的内容经营系统——商家问诊 → 门店画像 → 7 天内容日历 → 每日拍摄任务 → 商家上传门店素材 → AI 自动剪辑生成多版本视频 → 生成文案/标题/封面 → 合规检查 → 导出/发布 → 数据复盘 → 反哺下一轮计划。入口为 `/merchant`。
+
+本地生活产品线复用视频重绘的全部底层能力，仅把上层业务对象从「项目/分镜/生成」改为「门店/内容计划/拍摄任务/视频版本」。改造实施方案见 `docs/AI本地生活营销平台改造实施方案.md`。
 
 ## 技术栈
 
@@ -17,10 +22,11 @@ AI 视频重绘 SaaS 平台：用户上传短视频 → AI 多模态解析为分
 - **对象存储**: 阿里云 OSS (ali-oss)
 - **视频处理**: FFmpeg (场景检测/Normalize/音频切片/缩略图), yt-dlp (链接下载)
 - **AI 服务**:
-  - 火山引擎方舟 Seedance 2.0 (视频生成)
-  - 多模态视频直传分析 (OpenAI 兼容接口, qwen-vl-max 等)
-  - Flux (人物形象生成)
+  - 火山引擎方舟 Seedance 2.0 (`doubao-seedance-2-0-260128`, 视频生成)
+  - 多模态视频直传分析 (OpenAI 兼容接口, 推荐 `doubao-seed-2-0-pro-260215`, 备选 `qwen-vl-max`; 配置 `VISION_API_URL` / `VISION_API_KEY` / `VISION_MODEL`)
+  - 火山方舟 Seedream 5.0 lite 文生图/图生图 (人物锚定图/首帧, 实现于 `src/lib/flux.ts`, 沿用旧文件名)
   - WaveSpeed (视频超分)
+  - 商家营销文案/画像 LLM (DashScope 兼容, 配置 `MERCHANT_LLM_API_URL` / `MERCHANT_LLM_API_KEY`, 回退 `VISION_*`)
 - **认证**: JWT (jose) + Cookie, bcryptjs 密码哈希
 - **校验**: Zod v4
 - **测试**: Vitest 4 + fast-check (属性测试), @testing-library/react
@@ -33,15 +39,24 @@ src/
 ├── app/                    # Next.js App Router 页面和 API 路由
 │   ├── (auth)/             # 登录/注册页面（公开）
 │   ├── admin/              # 管理后台页面
-│   ├── api/                # 所有 REST API 路由（Next.js Route Handlers）
-│   ├── dashboard/          # 用户仪表盘（项目列表）
+│   ├── api/                # 所有 REST API 路由（Next.js Route Handlers，含视频重绘 + 商家平台）
+│   ├── dashboard/          # 视频重绘用户仪表盘（项目列表 + workspace 编辑）
+│   ├── merchant/           # 本地生活商家平台（onboarding/stores/[storeId]/today/calendar/briefs/...）
 │   ├── help/               # 帮助中心页面
 │   └── showcase/           # 案例展示页面
 ├── components/             # React 组件
 │   ├── ui/                 # shadcn/ui 基础组件
 │   ├── editor/             # 视频编辑器组件（分镜编辑、版本历史）
+│   ├── workspace/          # 工作台生成组件
 │   ├── project/            # 项目管理组件
 │   ├── shot/               # 分镜相关组件
+│   ├── asset/              # 资产库组件
+│   ├── asset-library/      # 资产库页面组件
+│   ├── export/             # 导出/超分组件
+│   ├── video/              # 视频播放/预览组件
+│   ├── merchant/           # 商家平台组件（今日任务、内容日历、视频版本、合规、复盘）
+│   ├── layout/             # 布局组件
+│   ├── help/               # 帮助中心组件
 │   ├── subscription/       # 订阅/会员组件
 │   └── onboarding/         # 新手引导组件
 ├── lib/                    # 核心业务逻辑（后端服务层）
@@ -66,11 +81,29 @@ src/
 │   ├── wavespeed.ts        # WaveSpeed 超分 API 客户端
 │   ├── auth.ts             # 认证逻辑
 │   ├── db.ts               # Prisma 客户端实例
-│   ├── db-retry.ts         # SQLite 写锁重试（SQLITE_BUSY 兜底）
+│   ├── db-retry.ts         # PostgreSQL 事务冲突重试（P2034/死锁兜底，触发概率极低）
 │   ├── redis.ts            # Redis 连接
 │   ├── queue.ts            # BullMQ 队列定义（延迟加载，含定时任务注册）
 │   ├── progress-publisher.ts # Redis Pub/Sub 进度事件发布
-│   └── logger.ts           # 结构化日志
+│   ├── logger.ts           # 结构化日志
+│   │  # ↓↓↓ 本地生活商家平台服务层（复用上述底层能力）
+│   ├── merchant-auth.ts    # 商家身份鉴权
+│   ├── store-profile-service.ts # 门店画像生成（规则+LLM）
+│   ├── playbook-engine.ts  # 行业剧本选择/实例化
+│   ├── content-calendar-service.ts # 7 天内容计划生成
+│   ├── capture-director.ts # 拍摄任务生成 + 素材质量检测
+│   ├── local-render-service.ts # 本地素材合成多版本视频（FFmpeg+Seedance 补镜）
+│   ├── ai-auto-render-service.ts # 一键全 AI 出片
+│   ├── compliance-service.ts # 合规检查（违禁词/AIGC/授权）
+│   ├── content-entropy-service.ts # 内容同质化熵检测
+│   ├── copy-generator.ts   # 多平台发布文案生成
+│   ├── publish-copy-service.ts # 发布文案服务
+│   ├── publish-queue-service.ts # 待发布清单
+│   ├── metrics-ingestor.ts # 视频表现数据录入
+│   ├── platform-metrics-crawler.ts # 平台数据抓取
+│   ├── performance-learning-service.ts # 数据复盘→下一轮建议
+│   ├── merchant-billing-service.ts # 商家计费（复用积分/订阅）
+│   └── ...                 # 其余 merchant-*/content-*/store-*/matrix 等服务
 ├── workers/                # BullMQ Worker 进程（独立于 Next.js）
 │   ├── parse-video.ts      # 视频解析（下载→Normalize→AI分析→分组→音频切片）
 │   ├── generate-video.ts   # 视频生成（链式串行，调用 Seedance 2.0）
@@ -87,6 +120,14 @@ src/
 │   ├── concurrency-reconcile.ts # 并发计数器对账（每5分钟修复Redis漂移）
 │   ├── subscription-renewal-worker.ts # 订阅自动续费
 │   ├── subscription-expire-worker.ts  # 订阅到期处理
+│   │  # ↓↓↓ 本地生活商家平台 Worker
+│   ├── generate-content-plan.ts # 门店画像 + 7 天内容计划生成
+│   ├── render-local-video.ts    # 本地视频渲染（整体/单版本重生成/局部重拍/一键出片）
+│   ├── compliance-review.ts     # 视频版本合规审查
+│   ├── crawl-platform-metrics.ts # 平台数据抓取
+│   ├── matrix-publish.ts        # 矩阵号多账号发布
+│   ├── sync-metrics.ts          # 数据同步（第一阶段占位）
+│   ├── weekly-merchant-report.ts # 周报（第一阶段占位）
 │   └── index.ts            # Worker 启动入口
 ├── stores/                 # Zustand 状态仓库
 ├── hooks/                  # 自定义 React Hooks
@@ -256,9 +297,10 @@ Seedance 2.0 单次调用支持 4-15s 视频，分镜组将相邻镜头合并为
 2. **Redis 连接**: Workers 必须在 Redis 启动后运行，否则 BullMQ 会崩溃
 3. **FFmpeg 路径**: Windows 开发需确保 ffmpeg/ffprobe 在 PATH 中（或使用 WSL）
 4. **环境变量**: 所有关键 API Key 缺失会直接抛错，不会静默跳过
-5. **SQLite 并发写**: 积分等高并发写场景通过 Redis 全局锁（withCreditLock）跨进程串行化，防止 read-modify-write 丢失更新
+5. **积分并发写**: 积分等高并发写场景通过 Redis 全局锁（withCreditLock）跨进程串行化，防止 read-modify-write 丢失更新（PostgreSQL 行级锁仅保证单行原子性，不足以覆盖读改写）
 6. **Turbopack 端口**: 开发端口固定 3011（`pnpm dev` 已配置），前端 NEXT_PUBLIC_APP_URL 要匹配
 7. **生成目录**: `src/generated/prisma/` 在 `.gitignore` 中，首次 clone 需执行 `npx prisma generate`
 8. **全局积分写锁不可重入**: `withCreditLock` 内部不得再调用 `withCreditLock`（会自锁死至超时抛错）
 9. **并发计数器漂移**: Worker 崩溃/Redis 重启可能导致 Redis 并发计数器与 DB 真实状态不一致，由 concurrency-reconcile 看门狗每 5 分钟修复
 10. **资产 14 天过期**: 生成视频/合并导出的 Asset 设有 14 天过期，过期后 OSS 文件会被清理；合并任务应在此期限内执行
+11.本地不要使用docker

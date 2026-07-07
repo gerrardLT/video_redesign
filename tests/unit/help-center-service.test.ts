@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 /**
  * Feature: product-competitiveness
@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Mock Prisma
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     helpArticle: {
       findMany: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-const { prisma } = await import('@/lib/db')
+const { prisma } = await import('@/lib/shared/db')
 const {
   listBySection,
   search,
@@ -33,7 +33,7 @@ const {
   update,
   deleteArticle,
   updateSortOrder,
-} = await import('@/lib/help-center-service')
+} = await import('@/lib/shared/help-center-service')
 
 // ========================
 // 测试数据

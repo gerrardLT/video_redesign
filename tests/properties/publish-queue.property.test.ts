@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 29: 导出与清单一一对应
+﻿// Feature: local-life-depth-enhancements, Property 29: 导出与清单一一对应
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -35,7 +35,7 @@ const db = vi.hoisted(() => ({
   seq: 0,
 }))
 
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const videoVariant = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findUnique: vi.fn(async ({ where }: any) => {
@@ -58,7 +58,25 @@ vi.mock('@/lib/db', () => {
       const found = db.queue.find((q) => q.videoVariantId === where.videoVariantId)
       return found ? { ...found } : null
     }),
-    // create：追加一条新清单项
+    // upsert：原子幂等入列（源码实际使用 upsert 而非 findFirst + create）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    upsert: vi.fn(async ({ where, create }: any) => {
+      const existing = db.queue.find((q) => q.videoVariantId === where.videoVariantId)
+      if (existing) return { ...existing }
+      const row = {
+        id: `pq_${db.seq++}`,
+        exportedAt: new Date(),
+        remindAfterH: 24,
+        reminded: false,
+        publishedPlatforms: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...create,
+      }
+      db.queue.push(row)
+      return { ...row }
+    }),
+    // create：追加一条新清单项（兼容旧测试引用）
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     create: vi.fn(async ({ data }: any) => {
       const row = {
@@ -79,7 +97,7 @@ vi.mock('@/lib/db', () => {
 })
 
 // 动态导入以确保 mock 生效
-const { enqueueForPublish } = await import('@/lib/publish-queue-service')
+const { enqueueForPublish } = await import('@/lib/merchant/publish-queue-service')
 
 // ========================
 // Arbitraries

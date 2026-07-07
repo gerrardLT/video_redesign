@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PATCH /api/projects/:id/engine
  * 切换项目默认生成引擎
  *
@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 
 const engineSchema = z.object({
   engine: z.enum(['seedance', 'happyhorse']),

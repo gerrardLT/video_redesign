@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 3: 每条建议必带 evidence
+﻿// Feature: local-life-depth-enhancements, Property 3: 每条建议必带 evidence
 /**
  * 属性测试：表现学习服务「每条建议必带 evidence」（Property 3）
  *
@@ -22,14 +22,14 @@ import * as fc from 'fast-check'
 // Mock Prisma：仅替换 DB 读取，隔离纯规则逻辑
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     contentBrief: { findMany: vi.fn() },
   },
 }))
 
-import { prisma } from '@/lib/db'
-import { generatePerformanceInsights } from '@/lib/performance-learning-service'
+import { prisma } from '@/lib/shared/db'
+import { generatePerformanceInsights } from '@/lib/merchant/performance-learning-service'
 import type { ContentGoal } from '@/types/merchant'
 
 // ========================

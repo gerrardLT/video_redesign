@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/content-briefs/[briefId]/reshoot — 局部重拍重合成（需求 4.3, 4.4, 4.5, 4.8, 4.9）
  *
  * 替换某 ShotTask 的素材后，仅基于「受影响范围」重新合成，而非要求全部镜头重传。
@@ -35,10 +35,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { rerenderAffectedScope } from '@/lib/local-render-service'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { rerenderAffectedScope } from '@/lib/merchant/local-render-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ briefId: string }>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/metrics/trend?metric=views — 指标趋势查询
  *
  * 调用 performance-learning-service.getMetricTrend：返回门店所有带 metrics 的 brief
@@ -22,9 +22,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { getMetricTrend } from '@/lib/performance-learning-service'
-import { ApiError } from '@/lib/api-error'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { getMetricTrend } from '@/lib/merchant/performance-learning-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

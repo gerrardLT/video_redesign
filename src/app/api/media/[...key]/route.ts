@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { Readable } from 'stream'
 import { createReadStream } from 'fs'
 import { stat } from 'fs/promises'
 import path from 'path'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 import {
   isOSSConfigured,
   getSignedObjectUrl,
-} from '@/lib/storage'
+} from '@/lib/shared/storage'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,17 +1,26 @@
-/**
+﻿/**
  * 属性测试：双模型生成引擎 (Dual Model Generation)
  *
  * 覆盖设计文档中的正确性属性 1-10
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import * as fc from 'fast-check'
-import { buildHappyHorseRequestBody } from '@/lib/happyhorse'
-import { computeSegments } from '@/lib/segment-service'
+
+// Mock db/redis 模块，避免 DATABASE_URL 缺失导致的初始化错误
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+vi.mock('@/lib/shared/redis', () => ({
+  redis: new Proxy({}, { get: () => vi.fn() })
+}))
+
+import { buildHappyHorseRequestBody } from '@/lib/shared/happyhorse'
+import { computeSegments } from '@/lib/video/segment-service'
 import {
   estimateHappyHorseCreditCost,
   calculateHappyHorseActualCost,
-} from '@/lib/credit-calc'
-import { isValidEngine, isHappyHorseDirectMode } from '@/lib/generation-orchestrator'
+} from '@/lib/shared/credit-calc'
+import { isValidEngine, isHappyHorseDirectMode } from '@/lib/video/generation-orchestrator'
 
 // Feature: dual-model-generation, Property 1: 引擎字段验证
 describe('Property 1: 引擎字段验证', () => {

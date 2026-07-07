@@ -2,24 +2,24 @@ import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
 
 /**
- * Feature: parsing-pipeline-gemini-rollback
- * Property 5: Idempotent cleanup completeness
+ * Feature: codebase-hygiene-fixes
+ * Property: PostgreSQL 幂等清理完整性
  *
- * **Validates: Requirements 7.1, 5.7**
+ * **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
  *
- * For any projectId with pre-existing ShotGroup, Shot, and Character records,
- * executing the cleanup phase SHALL delete all records of all three types for
- * that project before any new records are created.
+ * 对任意 projectId 下已存在的 ShotGroup、Shot、Character 记录，
+ * 执行幂等清理阶段 SHALL 在创建新记录前删除该项目的所有三种类型记录。
  *
- * Since this involves database operations, we test the PROPERTY through simulation:
- * - Create a mock Prisma-like interface
- * - Simulate pre-existing records of varying quantities
- * - After cleanup, all three record types should have count = 0 for that projectId
- * - Cleanup order is ShotGroup → Shot → Character (FK dependency)
- * - If any deleteMany fails, subsequent deleteMany records are NOT called
+ * 由于涉及数据库操作，通过模拟验证属性：
+ * - 创建类 Prisma 接口模拟
+ * - 模拟不同数量的已有记录
+ * - 清理后三种记录类型的 count 均为 0
+ * - 清理顺序为 ShotGroup → Shot → Character（外键依赖顺序）
+ * - 若某步 deleteMany 因 PostgreSQL 事务冲突（P2034）失败，后续步骤不执行
+ * - 清理操作幂等——对已清空状态再次执行结果相同
  */
 
-// --- Simulated Prisma-like interface for testing cleanup logic ---
+// --- 模拟类 Prisma 接口用于测试清理逻辑 ---
 
 interface MockStore {
   shotGroups: Map<string, number> // projectId → count
@@ -40,7 +40,7 @@ interface CleanupResult {
 }
 
 /**
- * Simulates the idempotent cleanup logic from parse-video.ts:
+ * 模拟 parse-video.ts 中的幂等清理逻辑：
  *
  * ```typescript
  * await prisma.shotGroup.deleteMany({ where: { projectId } })
@@ -48,7 +48,8 @@ interface CleanupResult {
  * await prisma.character.deleteMany({ where: { projectId } })
  * ```
  *
- * Returns the call order and final state after cleanup.
+ * 失败时抛出 PostgreSQL 事务写冲突错误（P2034）。
+ * 返回调用顺序和清理后的最终状态。
  */
 function simulateIdempotentCleanup(
   projectId: string,
@@ -67,21 +68,21 @@ function simulateIdempotentCleanup(
 
   // Step 1: prisma.shotGroup.deleteMany({ where: { projectId } })
   if (failAt === 'shotGroup') {
-    return { callOrder, finalStore, error: new Error('SQLITE_BUSY: database is locked') }
+    return { callOrder, finalStore, error: new Error('P2034: Transaction failed due to a write conflict') }
   }
   callOrder.push({ model: 'shotGroup', projectId, order: orderCounter++ })
   finalStore.shotGroups.set(projectId, 0)
 
   // Step 2: prisma.shot.deleteMany({ where: { projectId } })
   if (failAt === 'shot') {
-    return { callOrder, finalStore, error: new Error('SQLITE_BUSY: database is locked') }
+    return { callOrder, finalStore, error: new Error('P2034: Transaction failed due to a write conflict') }
   }
   callOrder.push({ model: 'shot', projectId, order: orderCounter++ })
   finalStore.shots.set(projectId, 0)
 
   // Step 3: prisma.character.deleteMany({ where: { projectId } })
   if (failAt === 'character') {
-    return { callOrder, finalStore, error: new Error('SQLITE_BUSY: database is locked') }
+    return { callOrder, finalStore, error: new Error('P2034: Transaction failed due to a write conflict') }
   }
   callOrder.push({ model: 'character', projectId, order: orderCounter++ })
   finalStore.characters.set(projectId, 0)
@@ -179,7 +180,7 @@ describe('Idempotent cleanup completeness (Property 5)', () => {
 
           // Error should be thrown
           expect(error).not.toBeNull()
-          expect(error!.message).toContain('SQLITE_BUSY')
+          expect(error!.message).toContain('P2034')
 
           // Zero calls should have completed (failed at first step)
           expect(callOrder).toHaveLength(0)
@@ -215,7 +216,7 @@ describe('Idempotent cleanup completeness (Property 5)', () => {
 
           // Error should be thrown
           expect(error).not.toBeNull()
-          expect(error!.message).toContain('SQLITE_BUSY')
+          expect(error!.message).toContain('P2034')
 
           // Only shotGroup deletion should have completed
           expect(callOrder).toHaveLength(1)

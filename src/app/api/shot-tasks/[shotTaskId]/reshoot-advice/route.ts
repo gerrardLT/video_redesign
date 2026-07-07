@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/shot-tasks/[shotTaskId]/reshoot-advice — 质检失败重拍建议（需求 3.4）
  *
  * 读取该 ShotTask 最近一次质检结果（RawAsset.qualityReport）+ 该镜头的量化阈值
@@ -21,10 +21,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { ApiError } from '@/lib/api-error'
-import { buildCaptureGuide, buildReshootAdvice, type ShotTaskWithGuide } from '@/lib/capture-director'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { ApiError } from '@/lib/shared/api-error'
+import { buildCaptureGuide, buildReshootAdvice, type ShotTaskWithGuide } from '@/lib/merchant/capture-director'
 import type { QualityInspectionResult, ShotTaskType } from '@/types/merchant'
 
 interface RouteContext {

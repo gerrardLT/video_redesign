@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId] — 获取门店详情
  * PUT /api/stores/[storeId] — 更新门店信息
  *
@@ -15,10 +15,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import { StoreUpdateSchema } from '@/lib/validations/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

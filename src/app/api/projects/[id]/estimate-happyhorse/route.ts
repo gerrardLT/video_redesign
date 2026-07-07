@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/projects/:id/estimate-happyhorse
  * HappyHorse 积分预估接口
  *
@@ -14,8 +14,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { estimateHappyHorseCreditCost } from '@/lib/credit-calc'
+import { prisma } from '@/lib/shared/db'
+import { estimateHappyHorseCreditCost } from '@/lib/shared/credit-calc'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 5: 指标趋势有序且完整
+﻿// Feature: local-life-depth-enhancements, Property 5: 指标趋势有序且完整
 
 import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
@@ -23,14 +23,14 @@ import fc from 'fast-check'
 // Mock Prisma（仅 getMetricTrend 用到的读取）
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     contentBrief: { findMany: vi.fn() },
   },
 }))
 
-const { prisma } = await import('@/lib/db')
-const { getMetricTrend } = await import('@/lib/performance-learning-service')
+const { prisma } = await import('@/lib/shared/db')
+const { getMetricTrend } = await import('@/lib/merchant/performance-learning-service')
 
 // ========================
 // 常量与工具

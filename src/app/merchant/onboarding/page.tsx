@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 商家问诊表单页 — /merchant/onboarding
@@ -8,9 +8,10 @@
  * 2. 产品与卖点（主打产品列表、核心卖点、拍摄能力）
  * 3. 优惠活动（可选，可跳过）
  *
- * 手机端优先的响应式布局，暖色调 UI，使用日常用语。
+ * 手机端优先的响应式布局，v3 禅意编辑式 UI（serif 标题 + 暖奶油纯色底 + 3px 圆角 + 大地绿主色），使用日常用语。
+ * 行业选择器的 emoji 属数据展示场景，按 Req 2.3 保留；标题/按钮的装饰性 emoji 已移除。
  *
- * Requirements: 1.1, 1.3, 15.2, 15.3
+ * Requirements: 1.1, 1.3, 14.1, 14.2, 15.2, 15.3
  */
 
 import { useState, useCallback } from 'react'
@@ -21,7 +22,7 @@ import type { MerchantIndustry } from '@/types/merchant'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 // ========================
 // 行业选项（带 emoji 图标的网格按钮）
@@ -279,22 +280,27 @@ export default function OnboardingPage() {
   }, [formData, router])
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-amber-50">
-      {/* 顶部进度条 */}
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b border-orange-100">
+    <div className="min-h-screen bg-[var(--ll-canvas)]">
+      {/* 顶部进度条 — v3 Zen: 暖奶油半透明磨砂 + 2px 细线进度 + Space Grotesk 步数 */}
+      <div className="sticky top-0 z-10 bg-[var(--ll-surface)]/90 backdrop-blur-sm border-b border-[var(--ll-hair)]">
         <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-orange-700 font-medium">
+            <span className="text-sm text-[var(--ll-green-sb)] font-medium">
               {step === 1 && '第 1 步：门店信息'}
               {step === 2 && '第 2 步：产品与卖点'}
               {step === 3 && '第 3 步：优惠活动'}
             </span>
-            <span className="text-xs text-orange-500">{step} / 3</span>
+            <span className="text-xs text-[var(--ll-text-3)] font-[var(--font-num)] tabular-nums">{step} / 3</span>
           </div>
-          <div className="h-1.5 bg-orange-100 rounded-full overflow-hidden">
+          <div className="h-[2px] bg-[var(--ll-hair)] rounded-[1px] overflow-hidden">
             <div
-              className="h-full bg-orange-500 rounded-full transition-all duration-300"
-              style={{ width: `${(step / 3) * 100}%` }}
+              className="h-full bg-[var(--ll-green)] rounded-[1px]"
+              style={{
+                width: `${(step / 3) * 100}%`,
+                transitionProperty: 'width',
+                transitionDuration: '600ms',
+                transitionTimingFunction: 'var(--ease-out)',
+              }}
             />
           </div>
         </div>
@@ -306,10 +312,10 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                👋 欢迎入驻
+              <h1 className="text-[29px] font-semibold text-[var(--ll-text)] font-[var(--font-serif)] leading-[1.38]">
+                欢迎入驻
               </h1>
-              <p className="mt-1 text-base text-gray-500">
+              <p className="mt-1 text-base text-[var(--ll-text-2)]">
                 填写门店基本信息，我们帮您策划短视频内容
               </p>
             </div>
@@ -452,10 +458,10 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                🍽️ 产品与卖点
+              <h1 className="text-[29px] font-semibold text-[var(--ll-text)] font-[var(--font-serif)] leading-[1.38]">
+                产品与卖点
               </h1>
-              <p className="mt-1 text-base text-gray-500">
+              <p className="mt-1 text-base text-[var(--ll-text-2)]">
                 告诉我们您的主打产品和核心优势
               </p>
             </div>
@@ -609,10 +615,10 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                🎉 优惠活动
+              <h1 className="text-[29px] font-semibold text-[var(--ll-text)] font-[var(--font-serif)] leading-[1.38]">
+                优惠活动
               </h1>
-              <p className="mt-1 text-base text-gray-500">
+              <p className="mt-1 text-base text-[var(--ll-text-2)]">
                 添加正在进行的活动或套餐，没有也可以跳过
               </p>
             </div>
@@ -698,15 +704,15 @@ export default function OnboardingPage() {
         )}
       </div>
 
-      {/* 底部固定操作栏 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-orange-100 px-4 py-4 safe-area-pb">
+      {/* 底部固定操作栏 — v3 Zen: 暖奶油磨砂 + 发丝线 + 大地绿主按钮 */}
+      <div className="fixed bottom-0 left-0 right-0 bg-[var(--ll-surface)]/95 backdrop-blur-sm border-t border-[var(--ll-hair)] px-4 py-4 safe-area-pb">
         <div className="max-w-lg mx-auto flex gap-3">
           {step > 1 && (
             <Button
               type="button"
               variant="outline"
               onClick={goBack}
-              className="h-12 flex-1 rounded-xl border-orange-300 text-orange-700 hover:bg-orange-50 text-base"
+              className="h-12 flex-1 rounded-[3px] border-[var(--ll-hair)] text-[var(--ll-text-2)] hover:bg-[var(--ll-green-light)] text-base"
             >
               上一步
             </Button>
@@ -715,7 +721,7 @@ export default function OnboardingPage() {
             <Button
               type="button"
               onClick={handleNext}
-              className="h-12 flex-1 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-base font-medium"
+              className="h-12 flex-1 rounded-[3px] bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] active:bg-[var(--ll-green-active)] text-white text-base font-medium tracking-[.04em]"
             >
               下一步
             </Button>
@@ -724,9 +730,9 @@ export default function OnboardingPage() {
               type="button"
               onClick={handleSubmit}
               disabled={submitting}
-              className="h-12 flex-1 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-base font-medium disabled:opacity-60"
+              className="h-12 flex-1 rounded-[3px] bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] active:bg-[var(--ll-green-active)] text-white text-base font-medium tracking-[.04em] disabled:opacity-60"
             >
-              {submitting ? '提交中...' : '🚀 开始生成方案'}
+              {submitting ? '提交中...' : '开始生成方案'}
             </Button>
           )}
         </div>

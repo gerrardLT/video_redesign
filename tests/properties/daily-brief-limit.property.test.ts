@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 20: 单日 brief 数量上界
+﻿// Feature: local-life-depth-enhancements, Property 20: 单日 brief 数量上界
 //
 // 属性：对任意 改期/新增 操作序列，任意一天的 brief 数量 SHALL NOT 超过单日上界
 //   （默认 3，或 StoreProfile.weeklyCadence 对应日的 count 配置值）；超过上界的操作
@@ -38,7 +38,7 @@ const h = vi.hoisted(() => {
 // ============================================================
 // prisma 内存桩
 // ============================================================
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const { state } = h
 
   // 与服务内 utcDayStart 一致：按自然日 UTC 零点归一化
@@ -121,8 +121,8 @@ vi.mock('@/lib/db', () => {
 })
 
 // instantiatePlaybookWithProvenance 走桩：隔离 LLM，返回确定性 draft + provenance
-vi.mock('@/lib/playbook-engine', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/playbook-engine')>()
+vi.mock('@/lib/merchant/playbook-engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/merchant/playbook-engine')>()
   return {
     ...actual,
     instantiatePlaybookWithProvenance: vi.fn(async () => ({
@@ -147,7 +147,7 @@ vi.mock('@/lib/playbook-engine', async (importOriginal) => {
   }
 })
 
-const { addContentBrief, editContentBrief } = await import('@/lib/content-calendar-service')
+const { addContentBrief, editContentBrief } = await import('@/lib/merchant/content-calendar-service')
 
 // ============================================================
 // 测试夹具

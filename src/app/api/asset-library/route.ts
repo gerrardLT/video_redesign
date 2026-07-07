@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 资产库列表 API
  * GET /api/asset-library - 获取用户资产列表（支持分类筛选、关键字搜索、分页）
  *
@@ -12,7 +12,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { listAssets } from '@/lib/asset-library-service'
+import { listAssets } from '@/lib/shared/asset-library-service'
 
 export const dynamic = 'force-dynamic'
 

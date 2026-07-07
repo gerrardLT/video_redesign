@@ -1,10 +1,10 @@
-/**
+﻿/**
  * GET /api/merchant/me
  * 获取当前登录用户的商家和门店信息
  * 供 merchant layout 使用
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

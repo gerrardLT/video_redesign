@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 生成看门狗 Worker
  * 处理 'generate-watchdog' 队列的定时任务
  *
@@ -17,10 +17,10 @@
  */
 
 import { Worker, type ConnectionOptions } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
 import { failProjectChain } from './generate-video'
-import { logger } from '@/lib/logger'
+import { logger } from '@/lib/shared/logger'
 
 const connection = redis as unknown as ConnectionOptions
 

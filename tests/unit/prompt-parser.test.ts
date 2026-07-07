@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveReferences } from '@/lib/prompt-parser'
+import { resolveReferences } from '@/lib/video/prompt-parser'
 
 /**
  * 单元测试: resolveReferences

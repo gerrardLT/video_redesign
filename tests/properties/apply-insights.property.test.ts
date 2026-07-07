@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 4: 复盘建议应用保真
+﻿// Feature: local-life-depth-enhancements, Property 4: 复盘建议应用保真
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -20,7 +20,7 @@ import fc from 'fast-check'
 // Mock Prisma（内存桩，捕获写入参数）
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     store: {
       findUnique: vi.fn(),
@@ -32,8 +32,8 @@ vi.mock('@/lib/db', () => ({
 }))
 
 // 动态导入以确保 mock 生效
-const { prisma } = await import('@/lib/db')
-const { applyInsights } = await import('@/lib/performance-learning-service')
+const { prisma } = await import('@/lib/shared/db')
+const { applyInsights } = await import('@/lib/merchant/performance-learning-service')
 
 // 类型收窄：mock 后的 prisma 方法
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -9,7 +9,7 @@
 
 import { describe, it } from 'vitest'
 import fc from 'fast-check'
-import { formatAppearancePrompt } from '@/lib/appearance-comparator'
+import { formatAppearancePrompt } from '@/lib/video/appearance-comparator'
 import type { AppearanceDescriptor } from '@/types/appearance'
 
 /**

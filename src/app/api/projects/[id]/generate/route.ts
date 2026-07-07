@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/projects/[id]/generate - 一键生成视频
  *
  * 核心流程：
@@ -22,12 +22,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { isRateLimited } from '@/lib/rate-limiter'
-import { orchestrateGeneration, type OrchestrationGroup } from '@/lib/generation-orchestrator'
-import { getUserPrivileges } from '@/lib/privilege-engine'
-import { buildRejectionResponse } from '@/lib/concurrency-controller'
-import { ApiError } from '@/lib/api-error'
+import { prisma } from '@/lib/shared/db'
+import { isRateLimited } from '@/lib/shared/rate-limiter'
+import { orchestrateGeneration, type OrchestrationGroup } from '@/lib/video/generation-orchestrator'
+import { getUserPrivileges } from '@/lib/shared/privilege-engine'
+import { buildRejectionResponse } from '@/lib/shared/concurrency-controller'
+import { ApiError } from '@/lib/shared/api-error'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,8 +80,8 @@ export async function POST(
     // 引擎转发：当显式传入 engine=happyhorse 或项目默认引擎为 happyhorse 时，转发到 HappyHorse 编排
     const requestedEngine = parseResult.data.engine || project.engine || 'seedance'
     if (requestedEngine === 'happyhorse') {
-      const { orchestrateHappyHorseGeneration } = await import('@/lib/generation-orchestrator')
-      const { getUserPrivileges: getPriv } = await import('@/lib/privilege-engine')
+      const { orchestrateHappyHorseGeneration } = await import('@/lib/video/generation-orchestrator')
+      const { getUserPrivileges: getPriv } = await import('@/lib/shared/privilege-engine')
       const privileges = await getPriv(userId)
 
       if (!project.videoUrl || !project.duration) {

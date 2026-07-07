@@ -1,8 +1,8 @@
-// Feature: asset-expiry-policy, Property 1: ExpiryStatus 计算正确性
+﻿// Feature: asset-expiry-policy, Property 1: ExpiryStatus 计算正确性
 
 import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
-import { computeExpiryStatus } from '@/lib/expiry-status'
+import { computeExpiryStatus } from '@/lib/shared/expiry-status'
 
 /**
  * Property 1: ExpiryStatus 计算正确性

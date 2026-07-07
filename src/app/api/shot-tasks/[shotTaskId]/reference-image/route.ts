@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/shot-tasks/[shotTaskId]/reference-image — 生成镜头参考图（需求 3.5）
  *
  * 基于 StoreProfile + 镜头脚本，复用 Flux 文生图生成该镜头的参考画面供商家对照。
@@ -20,10 +20,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { ApiError } from '@/lib/api-error'
-import { generateShotReferenceImage } from '@/lib/capture-director'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { ApiError } from '@/lib/shared/api-error'
+import { generateShotReferenceImage } from '@/lib/merchant/capture-director'
 
 interface RouteContext {
   params: Promise<{ shotTaskId: string }>

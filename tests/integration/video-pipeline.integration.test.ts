@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { buildReferenceData } from '@/lib/reference-builder'
+import { buildReferenceData } from '@/lib/video/reference-builder'
 
 describe('Video Pipeline Integration Tests', () => {
   // ===================================================================

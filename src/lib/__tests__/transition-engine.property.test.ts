@@ -3,10 +3,16 @@
  *
  * Tag: Feature: video-quality-enhancements
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import * as fc from 'fast-check'
-import { computeTransitionPlan, type SegmentInfo } from '@/lib/transition-engine'
-import { normScene } from '@/lib/frame-continuity'
+
+// Mock db/redis 模块，避免 DATABASE_URL 缺失导致的初始化错误（frame-continuity 间接 import db）
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+
+import { computeTransitionPlan, type SegmentInfo } from '@/lib/video/transition-engine'
+import { normScene } from '@/lib/video/frame-continuity'
 
 // ========================
 // 辅助生成器
@@ -273,7 +279,7 @@ describe('Property 9: 合并总时长不变量', () => {
 // Property 7: 音视频转场同步
 // ========================
 
-import { buildTransitionFilters } from '@/lib/transition-engine'
+import { buildTransitionFilters } from '@/lib/video/transition-engine'
 
 describe('Property 7: 音视频转场同步', () => {
   /**

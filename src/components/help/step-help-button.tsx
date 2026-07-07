@@ -1,8 +1,8 @@
-'use client'
+﻿'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 /**
  * 步骤名称到帮助页面锚点的映射

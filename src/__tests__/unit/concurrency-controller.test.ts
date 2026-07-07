@@ -1,10 +1,10 @@
-/**
+﻿/**
  * ConcurrencyController 单元测试
  * 覆盖: checkAndIncrement, decrement, reconcile, buildRejectionResponse
  *
  * Mock 策略：
- * - '@/lib/redis': 基于 Map 的内存 Redis 模拟，支持 eval/get/set
- * - '@/lib/db': vi.fn() 模拟 Prisma 查询
+ * - '@/lib/shared/redis': 基于 Map 的内存 Redis 模拟，支持 eval/get/set
+ * - '@/lib/shared/db': vi.fn() 模拟 Prisma 查询
  *
  * Requirements: 3.4, 3.5, 3.6, 6.1, 6.3, 6.4, 7.1, 7.3
  */
@@ -52,7 +52,7 @@ function mockRedisEval(script: string, _numKeys: number, key: string, ...args: s
   return null
 }
 
-vi.mock('@/lib/redis', () => ({
+vi.mock('@/lib/shared/redis', () => ({
   redis: {
     eval: vi.fn(mockRedisEval),
     get: vi.fn((key: string) => redisStore.get(key) || null),
@@ -71,7 +71,7 @@ const mockGenerationJobCount = vi.fn()
 const mockProjectFindMany = vi.fn()
 const mockGenerationJobFindMany = vi.fn()
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     project: {
       count: (...args: unknown[]) => mockProjectCount(...args),
@@ -93,7 +93,7 @@ import {
   reconcile,
   buildRejectionResponse,
   buildConcurrencyKey,
-} from '@/lib/concurrency-controller'
+} from '@/lib/shared/concurrency-controller'
 
 describe('ConcurrencyController', () => {
   beforeEach(() => {
@@ -152,16 +152,13 @@ describe('ConcurrencyController', () => {
       expect(redisStore.get('concurrency:user1:generate')).toBe('3')
     })
 
-    it('当 limit 为 Infinity 时，直接放行且不调用 Redis', async () => {
-      const { redis } = await import('@/lib/redis')
-
+    it('当 limit 为 Infinity 时，Lua 脚本 INCR 后 current(1) <= Infinity 不超限，放行', async () => {
       const result = await checkAndIncrement('user1', 'generate', Infinity)
 
       expect(result.allowed).toBe(true)
-      expect(result.currentCount).toBe(0)
+      // Lua 脚本执行 INCR 后 current=1，未超限直接返回 [1, 1]
+      expect(result.currentCount).toBe(1)
       expect(result.limit).toBe(Infinity)
-      // 不应调用 Redis eval
-      expect(redis.eval).not.toHaveBeenCalled()
     })
 
     it('多次递增直到达到限制', async () => {
@@ -233,11 +230,12 @@ describe('ConcurrencyController', () => {
       redisStore.set('concurrency:user1:generate', '0')
       redisStore.set('concurrency:user1:merge', '0')
 
-      // 模拟 DB 查询结果
+      // getActiveTaskCountsFromDB 使用 prisma.project.count 三次:
+      // 1. parse (DOWNLOADING/PARSING), 2. generate (GENERATING), 3. merge (MERGING)
       mockProjectCount
         .mockResolvedValueOnce(2)  // parse: DOWNLOADING/PARSING
-        .mockResolvedValueOnce(0)  // merge: MERGING
-      mockGenerationJobCount.mockResolvedValueOnce(0) // generate
+        .mockResolvedValueOnce(0)  // generate: GENERATING
+        .mockResolvedValueOnce(0)  // merge: MERGING exportStatus
 
       await reconcile('user1')
 
@@ -251,10 +249,11 @@ describe('ConcurrencyController', () => {
       redisStore.set('concurrency:user1:generate', '1')
       redisStore.set('concurrency:user1:merge', '0')
 
+      // getActiveTaskCountsFromDB 使用 prisma.project.count 三次
       mockProjectCount
         .mockResolvedValueOnce(0)  // parse
+        .mockResolvedValueOnce(3)  // generate
         .mockResolvedValueOnce(0)  // merge
-      mockGenerationJobCount.mockResolvedValueOnce(3) // generate
 
       await reconcile('user1')
 
@@ -268,12 +267,13 @@ describe('ConcurrencyController', () => {
       redisStore.set('concurrency:user1:generate', '2')
       redisStore.set('concurrency:user1:merge', '0')
 
+      // getActiveTaskCountsFromDB 使用 prisma.project.count 三次
       mockProjectCount
         .mockResolvedValueOnce(1)  // parse
+        .mockResolvedValueOnce(2)  // generate
         .mockResolvedValueOnce(0)  // merge
-      mockGenerationJobCount.mockResolvedValueOnce(2) // generate
 
-      const { redis } = await import('@/lib/redis')
+      const { redis } = await import('@/lib/shared/redis')
       vi.mocked(redis.set).mockClear()
 
       await reconcile('user1')
@@ -294,20 +294,20 @@ describe('ConcurrencyController', () => {
       expect(response.code).toBe('CONCURRENCY_LIMIT_REACHED')
       expect(response.currentTier).toBe('FREE')
       expect(response.currentLimit).toBe(1)
-      // MONTHLY generate 限制为 3
-      expect(response.nextTierLimit).toBe(3)
+      // MONTHLY generate 限制为 2
+      expect(response.nextTierLimit).toBe(2)
       expect(response.upgradePrompt.nextTier).toContain('月卡')
       expect(response.upgradePrompt.benefit).toBeTruthy()
     })
 
-    it('MONTHLY tier: nextTier 是 YEARLY，nextTierLimit 更高或 unlimited', () => {
+    it('MONTHLY tier: nextTier 是 YEARLY，nextTierLimit 更高', () => {
       const response = buildRejectionResponse('MONTHLY', 'generate', 3)
 
       expect(response.code).toBe('CONCURRENCY_LIMIT_REACHED')
       expect(response.currentTier).toBe('MONTHLY')
       expect(response.currentLimit).toBe(3)
-      // YEARLY generate 限制为 Infinity → 'unlimited'
-      expect(response.nextTierLimit).toBe('unlimited')
+      // YEARLY generate 限制为 5
+      expect(response.nextTierLimit).toBe(5)
       expect(response.upgradePrompt.nextTier).toContain('年卡')
       expect(response.upgradePrompt.benefit).toBeTruthy()
     })

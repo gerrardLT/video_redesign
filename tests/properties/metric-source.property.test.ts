@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 28: 来源共存不覆盖
+﻿// Feature: local-life-depth-enhancements, Property 28: 来源共存不覆盖
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -40,7 +40,7 @@ const db = vi.hoisted(() => ({
   metricMutations: [] as any[],
 }))
 
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const platformAccount = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findUnique: vi.fn(async ({ where }: any) => {
@@ -99,12 +99,12 @@ vi.mock('@/lib/db', () => {
 })
 
 // logger 桩：避免测试期日志噪声
-vi.mock('@/lib/logger', () => ({
+vi.mock('@/lib/shared/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
 // 动态导入以确保 mock 生效
-const { crawlAccountMetrics, encryptCredential } = await import('@/lib/platform-metrics-crawler')
+const { crawlAccountMetrics, encryptCredential } = await import('@/lib/merchant/platform-metrics-crawler')
 
 // PublishPlatform 枚举取值（与 src/types/merchant.ts 对齐）
 const PLATFORMS = ['DOUYIN', 'KUAISHOU', 'XIAOHONGSHU', 'WECHAT_CHANNELS', 'MANUAL_EXPORT'] as const

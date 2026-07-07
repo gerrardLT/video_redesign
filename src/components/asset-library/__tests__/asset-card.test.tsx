@@ -33,7 +33,7 @@ vi.mock('@base-ui/react/tooltip', () => ({
     Root: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     Trigger: ({ children, render }: { children: React.ReactNode; render: React.ReactElement }) => {
       // 将 children 渲染到 render 的 button 内
-      const { children: _ignored, ...props } = render.props
+      const { children: _ignored, ...props } = (render as any).props
       return <button {...props}>{children}</button>
     },
     Portal: ({ children }: { children: React.ReactNode }) => <>{children}</>,

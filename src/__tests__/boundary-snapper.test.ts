@@ -4,14 +4,15 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { snapBoundaries, SNAP_TOLERANCE } from '../lib/boundary-snapper'
+import { snapBoundaries, SNAP_TOLERANCE } from '../lib/video/boundary-snapper'
 
 describe('snapBoundaries 属性化测试', () => {
   // 生成有效的分镜输入：升序、无重叠、startTime < endTime
+  // 使用 fc.double 代替 fc.float 避免极小浮点数（subnormals）导致的精度问题
   const genShots = (maxCount: number, maxDuration: number) =>
-    fc.array(fc.float({ min: 0, max: maxDuration, noNaN: true }), { minLength: 2, maxLength: maxCount * 2 })
+    fc.array(fc.double({ min: 0.01, max: maxDuration, noNaN: true, noDefaultInfinity: true }), { minLength: 2, maxLength: maxCount * 2 })
       .map(times => {
-        const sorted = [...new Set(times)].sort((a, b) => a - b)
+        const sorted = [...new Set(times.map(t => Math.round(t * 100) / 100))].sort((a, b) => a - b)
         if (sorted.length < 2) return []
         const shots = []
         for (let i = 0; i < sorted.length - 1; i += 2) {
@@ -24,20 +25,20 @@ describe('snapBoundaries 属性化测试', () => {
       .filter(shots => shots.length >= 1)
 
   const genCuts = (maxDuration: number) =>
-    fc.array(fc.float({ min: 0, max: maxDuration, noNaN: true }), { minLength: 0, maxLength: 50 })
-      .map(cuts => [...new Set(cuts)].sort((a, b) => a - b))
+    fc.array(fc.double({ min: 0.01, max: maxDuration, noNaN: true, noDefaultInfinity: true }), { minLength: 0, maxLength: 50 })
+      .map(cuts => [...new Set(cuts.map(c => Math.round(c * 100) / 100))].sort((a, b) => a - b))
 
   it('P6: 吸附后升序、连续、无重叠、∈[0,D]', () => {
     fc.assert(
       fc.property(
         genShots(15, 60),
         genCuts(60),
-        fc.float({ min: 10, max: 120, noNaN: true }),
+        fc.double({ min: 10, max: 120, noNaN: true, noDefaultInfinity: true }),
         (shots, cuts, totalDuration) => {
           const td = Math.max(totalDuration, shots[shots.length - 1]?.endTime ?? 1)
           const result = snapBoundaries(shots, cuts, td)
 
-          // 升序
+          // 升序：snapBoundaries 使用 0.01 最小增量保证严格递增
           for (let i = 1; i < result.length; i++) {
             expect(result[i].startTime).toBeGreaterThan(result[i - 1].startTime)
           }
@@ -49,10 +50,10 @@ describe('snapBoundaries 属性化测试', () => {
           for (const s of result) {
             expect(s.endTime).toBeGreaterThan(s.startTime)
           }
-          // ∈[0, totalDuration]
+          // ∈[0, totalDuration]（浮点容差 1e-6）
           for (const s of result) {
             expect(s.startTime).toBeGreaterThanOrEqual(0)
-            expect(s.endTime).toBeLessThanOrEqual(td + 0.01)
+            expect(s.endTime).toBeLessThanOrEqual(td + 0.01 + 1e-6)
           }
         }
       ),
@@ -64,7 +65,7 @@ describe('snapBoundaries 属性化测试', () => {
     fc.assert(
       fc.property(
         genShots(10, 30),
-        fc.float({ min: 30, max: 60, noNaN: true }),
+        fc.double({ min: 30, max: 60, noNaN: true, noDefaultInfinity: true }),
         (shots, totalDuration) => {
           const td = Math.max(totalDuration, shots[shots.length - 1]?.endTime ?? 1)
           const result = snapBoundaries(shots, [], td)

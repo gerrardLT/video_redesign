@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 参数配置组件
@@ -10,8 +10,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { getDurationOptions } from '@/lib/credit-calc'
-import { cn } from '@/lib/utils'
+import { getDurationOptions } from '@/lib/shared/credit-calc'
+import { cn } from '@/lib/shared/utils'
 import { Clock } from 'lucide-react'
 import type { WorkspaceAspectRatio, WorkspaceResolution } from '@/types/workspace'
 

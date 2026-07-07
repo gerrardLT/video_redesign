@@ -2,6 +2,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
+// Mock db/redis 模块，避免 DATABASE_URL 缺失导致的初始化错误
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+vi.mock('@/lib/shared/redis', () => ({
+  redis: new Proxy({}, { get: () => vi.fn() })
+}))
+
 /**
  * Feature: local-life-depth-enhancements
  * Property 19: 无引用即通用模板
@@ -49,8 +57,8 @@ vi.stubGlobal(
 )
 
 // 动态导入以确保上述 env / fetch 桩生效
-const { instantiatePlaybookWithProvenance } = await import('@/lib/playbook-engine')
-type Playbook = Awaited<ReturnType<typeof import('@/lib/playbook-engine')['selectPlaybooks']>>[number]
+const { instantiatePlaybookWithProvenance } = await import('@/lib/merchant/playbook-engine')
+type Playbook = Awaited<ReturnType<typeof import('@/lib/merchant/playbook-engine')['selectPlaybooks']>>[number]
 type Store = Parameters<typeof instantiatePlaybookWithProvenance>[0]['store']
 type StoreProfile = Parameters<typeof instantiatePlaybookWithProvenance>[0]['profile']
 type ProductOffer = NonNullable<Parameters<typeof instantiatePlaybookWithProvenance>[0]['offer']>

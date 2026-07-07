@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 资产库筛选栏组件
@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 import { useAssetLibraryStore, type AssetCategory } from '@/stores/asset-library-store'
 
 interface AssetFilterBarProps {

@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { estimateParseCreditCost, getBalance } from '@/lib/credit-service'
-import { getUserPrivileges } from '@/lib/privilege-engine'
-import { buildRejectionResponse } from '@/lib/concurrency-controller'
-import { scheduleWithPriority } from '@/lib/priority-scheduler'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/shared/db'
+import { estimateParseCreditCost, getBalance } from '@/lib/shared/credit-service'
+import { getUserPrivileges } from '@/lib/shared/privilege-engine'
+import { buildRejectionResponse } from '@/lib/shared/concurrency-controller'
+import { scheduleWithPriority } from '@/lib/shared/priority-scheduler'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,7 +84,7 @@ export async function POST(
 
     // 带优先级的解析任务入队
     try {
-      const { videoParseQueue } = await import('@/lib/queue')
+      const { videoParseQueue } = await import('@/lib/shared/queue')
       await scheduleWithPriority(
         videoParseQueue,
         'parse-video',

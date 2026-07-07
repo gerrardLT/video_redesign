@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/offers — 获取门店优惠列表
  * POST /api/stores/[storeId]/offers — 创建新优惠
  *
@@ -16,11 +16,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 import { Prisma } from '@/generated/prisma'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import { ProductOfferSchema } from '@/lib/validations/merchant'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

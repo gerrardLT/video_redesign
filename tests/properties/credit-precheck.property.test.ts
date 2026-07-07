@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 1: 额度预检与守恒
+﻿// Feature: local-life-depth-enhancements, Property 1: 额度预检与守恒
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -78,16 +78,16 @@ const h = vi.hoisted(() => {
 // ========================
 
 // Prisma
-vi.mock('@/lib/db', () => ({ prisma: h.prismaMock }))
+vi.mock('@/lib/shared/db', () => ({ prisma: h.prismaMock }))
 
 // credit-service：getBalance 返回随机余额（预检分支驱动）；estimateGroupCreditCost 透传确定成本
-vi.mock('@/lib/credit-service', () => ({
+vi.mock('@/lib/shared/credit-service', () => ({
   getBalance: vi.fn(async () => h.state.balance),
   estimateGroupCreditCost: vi.fn((durationSec: number) => Math.ceil(durationSec)),
 }))
 
 // merchant-billing-service：reserve/charge/refund 记录调用序列；estimateRenderCost 返回确定成本
-vi.mock('@/lib/merchant-billing-service', () => ({
+vi.mock('@/lib/merchant/merchant-billing-service', () => ({
   estimateRenderCost: vi.fn((groupDurations: number[]) =>
     groupDurations.reduce((s, d) => s + Math.ceil(d), 0),
   ),
@@ -103,12 +103,12 @@ vi.mock('@/lib/merchant-billing-service', () => ({
 }))
 
 // 内容熵服务（合规重跑用）：返回高独特性分，使重跑判定为 LOW（不影响计费守恒）
-vi.mock('@/lib/content-entropy-service', () => ({
+vi.mock('@/lib/merchant/content-entropy-service', () => ({
   calculateContentEntropy: vi.fn(async () => ({ uniquenessScore: 100 })),
 }))
 
 // Flux 文生图（参考图生成用）
-vi.mock('@/lib/flux', () => ({
+vi.mock('@/lib/shared/flux', () => ({
   generateFirstFrame: vi.fn(async () => {
     if (!h.state.fluxOk) throw new Error('[stub] Flux 文生图失败')
     return { imageUrl: 'https://oss.example.com/shot-ref.jpg' }
@@ -116,33 +116,33 @@ vi.mock('@/lib/flux', () => ({
 }))
 
 // OSS 存储（渲染上传/下载用）
-vi.mock('@/lib/storage', () => ({
+vi.mock('@/lib/shared/storage', () => ({
   uploadBuffer: vi.fn(async () => {}),
   getSignedObjectUrl: vi.fn(() => 'https://oss.example.com/signed'),
   downloadToTemp: vi.fn(async () => {}),
 }))
 
 // Seedance（补充片段用；本测试镜头均有素材，不会触发）
-vi.mock('@/lib/seedance', () => ({
+vi.mock('@/lib/video/seedance', () => ({
   createSeedanceTask: vi.fn(async () => ({ taskId: 'seed-task' })),
   getSeedanceTaskStatus: vi.fn(async () => ({ status: 'succeeded', videoUrl: 'https://x/v.mp4' })),
 }))
 
 // 分布式锁（渲染并发控制用）
-vi.mock('@/lib/distributed-lock', () => ({
+vi.mock('@/lib/shared/distributed-lock', () => ({
   acquireLock: vi.fn(async () => h.state.lockOk),
   releaseLock: vi.fn(async () => {}),
 }))
 
 // 进度发布（SSE，渲染中调用）
-vi.mock('@/lib/progress-publisher', () => ({
+vi.mock('@/lib/shared/progress-publisher', () => ({
   publishStateChange: vi.fn(async () => {}),
   publishCompleted: vi.fn(async () => {}),
   publishFailed: vi.fn(async () => {}),
 }))
 
 // 受影响范围计算（局部重拍用）
-vi.mock('@/lib/impact-scope-service', () => ({
+vi.mock('@/lib/merchant/impact-scope-service', () => ({
   computeReshootScope: vi.fn(async () => ({ affectedGroupIds: ['shot-1'], hasContinuityChain: false })),
 }))
 
@@ -193,10 +193,10 @@ process.env.MERCHANT_LLM_API_KEY = 'stub-key'
 // 动态导入被测服务（确保 mock 生效）
 // ========================
 
-const { regenerateCopy, rewriteForPlatform } = await import('@/lib/publish-copy-service')
-const { rewriteToCompliant } = await import('@/lib/compliance-service')
-const { generateShotReferenceImage } = await import('@/lib/capture-director')
-const { regenerateSingleVariant, rerenderAffectedScope } = await import('@/lib/local-render-service')
+const { regenerateCopy, rewriteForPlatform } = await import('@/lib/merchant/publish-copy-service')
+const { rewriteToCompliant } = await import('@/lib/merchant/compliance-service')
+const { generateShotReferenceImage } = await import('@/lib/merchant/capture-director')
+const { regenerateSingleVariant, rerenderAffectedScope } = await import('@/lib/merchant/local-render-service')
 
 // ========================
 // 各动作固定成本（与服务实现一致）

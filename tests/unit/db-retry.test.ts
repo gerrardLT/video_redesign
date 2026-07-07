@@ -1,24 +1,34 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { withRetry, isSQLiteLockError, RETRY_CONFIG, _internals } from '@/lib/db-retry'
+﻿import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import {
+  isRetriableError,
+  withRetry,
+  RETRY_CONFIG,
+  _internals,
+} from '@/lib/shared/db-retry'
 
-describe('isSQLiteLockError', () => {
-  it('识别 SQLITE_BUSY 错误', () => {
-    expect(isSQLiteLockError(new Error('SQLITE_BUSY: database table is locked'))).toBe(true)
+describe('isRetriableError', () => {
+  it('识别包含 P2034 的错误', () => {
+    expect(isRetriableError(new Error('P2034: Transaction failed due to a write conflict'))).toBe(true)
   })
 
-  it('识别 "database is locked" 错误', () => {
-    expect(isSQLiteLockError(new Error('database is locked'))).toBe(true)
+  it('识别包含 "deadlock detected" 的错误', () => {
+    expect(isRetriableError(new Error('deadlock detected'))).toBe(true)
+  })
+
+  it('识别包含 "could not serialize access" 的错误', () => {
+    expect(isRetriableError(new Error('could not serialize access due to concurrent update'))).toBe(true)
   })
 
   it('不识别其他 Error', () => {
-    expect(isSQLiteLockError(new Error('connection refused'))).toBe(false)
+    expect(isRetriableError(new Error('connection refused'))).toBe(false)
+    expect(isRetriableError(new Error('unique constraint violation'))).toBe(false)
   })
 
   it('不识别非 Error 类型', () => {
-    expect(isSQLiteLockError('string error')).toBe(false)
-    expect(isSQLiteLockError(null)).toBe(false)
-    expect(isSQLiteLockError(undefined)).toBe(false)
-    expect(isSQLiteLockError(42)).toBe(false)
+    expect(isRetriableError('string error')).toBe(false)
+    expect(isRetriableError(null)).toBe(false)
+    expect(isRetriableError(undefined)).toBe(false)
+    expect(isRetriableError(42)).toBe(false)
   })
 })
 
@@ -27,8 +37,8 @@ describe('RETRY_CONFIG', () => {
     expect(RETRY_CONFIG.maxRetries).toBe(3)
   })
 
-  it('延迟间隔为 500ms、1000ms、1500ms', () => {
-    expect(RETRY_CONFIG.delays).toEqual([500, 1000, 1500])
+  it('延迟间隔为 [200, 500, 1000]', () => {
+    expect(RETRY_CONFIG.delays).toEqual([200, 500, 1000])
   })
 })
 
@@ -39,6 +49,7 @@ describe('withRetry', () => {
   beforeEach(() => {
     sleepCalls.length = 0
     originalSleep = _internals.sleep
+    // 注入零延迟 sleep，仅记录调用参数
     _internals.sleep = async (ms: number) => {
       sleepCalls.push(ms)
     }
@@ -48,25 +59,25 @@ describe('withRetry', () => {
     _internals.sleep = originalSleep
   })
 
-  it('成功时直接返回结果', async () => {
+  it('首次成功直接返回结果，不调用 sleep', async () => {
     const result = await withRetry(() => Promise.resolve(42))
     expect(result).toBe(42)
     expect(sleepCalls).toHaveLength(0)
   })
 
-  it('非锁竞争错误立即抛出，不重试', async () => {
+  it('非可重试错误立即抛出，不重试', async () => {
     let callCount = 0
     const op = async (): Promise<never> => {
       callCount++
-      throw new Error('some other error')
+      throw new Error('connection refused')
     }
 
-    await expect(withRetry(op)).rejects.toThrow('some other error')
+    await expect(withRetry(op)).rejects.toThrow('connection refused')
     expect(callCount).toBe(1)
     expect(sleepCalls).toHaveLength(0)
   })
 
-  it('非 Error 类型的异常不触发重试', async () => {
+  it('非 Error 类型异常不触发重试', async () => {
     let callCount = 0
     const op = async (): Promise<never> => {
       callCount++
@@ -78,11 +89,11 @@ describe('withRetry', () => {
     expect(sleepCalls).toHaveLength(0)
   })
 
-  it('SQLITE_BUSY 错误触发重试，恢复后返回结果', async () => {
+  it('P2034 事务冲突触发重试，恢复后返回结果', async () => {
     let callCount = 0
     const op = async () => {
       callCount++
-      if (callCount <= 2) throw new Error('SQLITE_BUSY: database table is locked')
+      if (callCount <= 2) throw new Error('P2034: Transaction failed due to a write conflict')
       return 'recovered'
     }
 
@@ -90,14 +101,14 @@ describe('withRetry', () => {
 
     expect(result).toBe('recovered')
     expect(callCount).toBe(3) // 2 失败 + 1 成功
-    expect(sleepCalls).toEqual([500, 1000]) // 等待了两次
+    expect(sleepCalls).toEqual([200, 500]) // 按 delays 顺序等待
   })
 
-  it('"database is locked" 错误同样触发重试', async () => {
+  it('"deadlock detected" 同样触发重试', async () => {
     let callCount = 0
     const op = async () => {
       callCount++
-      if (callCount <= 1) throw new Error('database is locked')
+      if (callCount <= 1) throw new Error('deadlock detected')
       return 'ok'
     }
 
@@ -105,46 +116,39 @@ describe('withRetry', () => {
 
     expect(result).toBe('ok')
     expect(callCount).toBe(2)
-    expect(sleepCalls).toEqual([500])
+    expect(sleepCalls).toEqual([200])
   })
 
-  it('最多重试 3 次后抛出原始错误（共 4 次尝试）', async () => {
-    const originalError = new Error('SQLITE_BUSY')
+  it('"could not serialize access" 同样触发重试', async () => {
     let callCount = 0
-    const op = async (): Promise<never> => {
+    const op = async () => {
       callCount++
-      throw originalError
+      if (callCount <= 1) throw new Error('could not serialize access due to concurrent update')
+      return 'serialized'
     }
 
-    await expect(withRetry(op, 'exhaust-test')).rejects.toBe(originalError)
-    expect(callCount).toBe(4) // 1 初始 + 3 重试
-    expect(sleepCalls).toEqual([500, 1000, 1500])
+    const result = await withRetry(op)
+
+    expect(result).toBe('serialized')
+    expect(callCount).toBe(2)
+    expect(sleepCalls).toEqual([200])
   })
 
-  it('重试间隔为 500ms、1000ms、1500ms', async () => {
+  it('最多重试 3 次后抛出最后一次错误（共 4 次尝试），sleep 序列为 [200, 500, 1000]', async () => {
     let callCount = 0
     const op = async (): Promise<never> => {
       callCount++
-      throw new Error('database is locked')
-    }
-
-    await expect(withRetry(op)).rejects.toThrow('database is locked')
-    expect(sleepCalls).toEqual([500, 1000, 1500])
-  })
-
-  it('超过重试次数时抛出最后一次错误', async () => {
-    let callCount = 0
-    const op = async (): Promise<never> => {
-      callCount++
-      throw new Error(`SQLITE_BUSY attempt ${callCount}`)
+      throw new Error(`P2034: conflict attempt ${callCount}`)
     }
 
     try {
-      await withRetry(op)
+      await withRetry(op, 'exhaust-test')
     } catch (e) {
-      // lastError 在每次 catch 中被覆盖，抛出最后一次的错误
       expect(e).toBeInstanceOf(Error)
-      expect((e as Error).message).toBe('SQLITE_BUSY attempt 4')
+      expect((e as Error).message).toBe('P2034: conflict attempt 4')
     }
+
+    expect(callCount).toBe(4) // 1 初始 + 3 重试
+    expect(sleepCalls).toEqual([200, 500, 1000])
   })
 })

@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+﻿import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 /**
  * AssetIngestionService 单元测试
@@ -16,7 +16,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 // Mock setup
 // ========================
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     asset: {
       findFirst: vi.fn(),
@@ -26,8 +26,8 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-import { prisma } from '@/lib/db'
-import { ingestCharacterImage } from '@/lib/asset-ingestion-service'
+import { prisma } from '@/lib/shared/db'
+import { ingestCharacterImage } from '@/lib/shared/asset-ingestion-service'
 
 const mockFindFirst = prisma.asset.findFirst as ReturnType<typeof vi.fn>
 const mockCreate = prisma.asset.create as ReturnType<typeof vi.fn>

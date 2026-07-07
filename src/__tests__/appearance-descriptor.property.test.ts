@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { AppearanceDescriptorSchema } from '@/lib/shot-schema'
+import { AppearanceDescriptorSchema } from '@/lib/video/shot-schema'
 
 // ========================
 // 生成器

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DELETE /api/content-briefs/[briefId]/assets/[assetId] — 删除素材
  *
  * 删除 RawAsset 记录并回退关联 ShotTask 状态为 PENDING。
@@ -17,10 +17,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { ApiError } from '@/lib/api-error'
-import { deleteObject } from '@/lib/storage'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { ApiError } from '@/lib/shared/api-error'
+import { deleteObject } from '@/lib/shared/storage'
 
 interface RouteContext {
   params: Promise<{ briefId: string; assetId: string }>

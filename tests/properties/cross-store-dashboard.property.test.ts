@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 35: 跨店看板真实聚合
+﻿// Feature: local-life-depth-enhancements, Property 35: 跨店看板真实聚合
 //
 // 属性测试：对任意多门店随机数据，getCrossStoreDashboard(userId) 返回的每个门店 KPI
 // （本周完成度 weeklyCompletion、最佳视频表现 bestVideo、待办数 todoCount）SHALL 等于
@@ -20,7 +20,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
-import { resolvePeriods } from '@/lib/period-service'
+import { resolvePeriods } from '@/lib/merchant/period-service'
 
 // ============================================================
 // 内存桩状态（vi.hoisted 在所有 import 之前执行，供 mock 工厂引用）
@@ -55,7 +55,7 @@ const h = vi.hoisted(() => {
 // ============================================================
 // prisma 内存桩：忠实复现作用域与聚合查询语义
 // ============================================================
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const { state } = h
   const prisma = {
     store: {
@@ -123,7 +123,7 @@ vi.mock('@/lib/db', () => {
 })
 
 // 动态导入以确保 mock 生效
-const { getCrossStoreDashboard } = await import('@/lib/cross-store-service')
+const { getCrossStoreDashboard } = await import('@/lib/merchant/cross-store-service')
 
 // ============================================================
 // 常量（与被测服务口径保持一致）

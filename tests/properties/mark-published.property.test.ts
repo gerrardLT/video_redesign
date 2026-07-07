@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 31: 发布标记往返
+﻿// Feature: local-life-depth-enhancements, Property 31: 发布标记往返
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fc from 'fast-check'
 
@@ -32,11 +32,13 @@ const dbState = vi.hoisted(() => ({
   exists: true,
 }))
 
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const publishQueueItem = {
-    // markPublished 仅 select publishedPlatforms；行不存在时返回 null
+    // markPublished select publishedPlatforms + contentBriefId；行不存在时返回 null
     findUnique: vi.fn(async () =>
-      dbState.exists ? { publishedPlatforms: dbState.publishedPlatforms } : null,
+      dbState.exists
+        ? { publishedPlatforms: dbState.publishedPlatforms, contentBriefId: 'brief_test' }
+        : null,
     ),
     // 捕获写入的 publishedPlatforms 落到内存行（模拟持久化）
     update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
@@ -46,11 +48,16 @@ vi.mock('@/lib/db', () => {
       return { id: 'item_test', ...data }
     }),
   }
-  return { prisma: { publishQueueItem } }
+  const contentBrief = {
+    // markPublished 同步 ContentBrief 状态（EXPORTED → PUBLISHED）
+    findUnique: vi.fn(async () => ({ status: 'EXPORTED' })),
+    update: vi.fn(async () => ({})),
+  }
+  return { prisma: { publishQueueItem, contentBrief } }
 })
 
 // 动态导入以确保 mock 生效
-const { markPublished } = await import('@/lib/publish-queue-service')
+const { markPublished } = await import('@/lib/merchant/publish-queue-service')
 
 // PublishPlatform 枚举取值（与 src/types/merchant.ts PublishPlatformSchema 对齐）
 const PUBLISH_PLATFORMS = [

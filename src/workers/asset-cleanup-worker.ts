@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 资产清理 Worker
  * 处理 asset-cleanup 队列的 'daily-cleanup' 定时任务
  *
@@ -9,10 +9,10 @@
  * 4. 记录清理结果日志
  */
 import { Worker, type Job } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { getExpiredAssets, cleanupExpiredFiles } from '@/lib/asset-lifecycle-service'
-import { extractKeyFromUrl } from '@/lib/storage'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { getExpiredAssets, cleanupExpiredFiles } from '@/lib/shared/asset-lifecycle-service'
+import { extractKeyFromUrl } from '@/lib/shared/storage'
+import { logger } from '@/lib/shared/logger'
 import type { ConnectionOptions } from 'bullmq'
 
 const connection = redis as unknown as ConnectionOptions

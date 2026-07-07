@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ProgressPublisher 单元测试
  *
  * 测试进度事件发布器的核心逻辑：
@@ -12,13 +12,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/redis', () => ({
+vi.mock('@/lib/shared/redis', () => ({
   redis: {
     publish: vi.fn().mockResolvedValue(0),
   },
 }))
 
-vi.mock('@/lib/logger', () => ({
+vi.mock('@/lib/shared/logger', () => ({
   logger: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -32,9 +32,9 @@ import {
   publishCompleted,
   publishFailed,
   publishChainProgress,
-} from '@/lib/progress-publisher'
-import { redis } from '@/lib/redis'
-import { logger } from '@/lib/logger'
+} from '@/lib/shared/progress-publisher'
+import { redis } from '@/lib/shared/redis'
+import { logger } from '@/lib/shared/logger'
 import type { ProgressEventPayload, ChainMetadata } from '@/lib/sse/types'
 
 beforeEach(() => {

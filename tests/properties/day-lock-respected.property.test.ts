@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 23: 锁定/跳过被尊重
+﻿// Feature: local-life-depth-enhancements, Property 23: 锁定/跳过被尊重
 //
 // 属性：对任意被标记为 LOCKED 或 SKIPPED 的日期集合，下一轮自动计划生成
 //   （generateContentPlan）SHALL NOT 在这些日期创建/覆盖/改写任何 brief，
@@ -41,8 +41,8 @@ function utcDayStart(d: Date): Date {
 // ============================================================
 // playbook-engine 桩：隔离剧本选择与 LLM 实例化
 // ============================================================
-vi.mock('@/lib/playbook-engine', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/playbook-engine')>()
+vi.mock('@/lib/merchant/playbook-engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/merchant/playbook-engine')>()
   const fakePlaybook = {
     id: 'pb-1',
     industry: 'RESTAURANT',
@@ -94,7 +94,7 @@ vi.mock('@/lib/playbook-engine', async (importOriginal) => {
 // ============================================================
 // prisma 内存桩
 // ============================================================
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   const { state } = h
   const prisma = {
     store: {
@@ -177,7 +177,7 @@ vi.mock('@/lib/db', () => {
   return { prisma }
 })
 
-const { generateContentPlan } = await import('@/lib/content-calendar-service')
+const { generateContentPlan } = await import('@/lib/merchant/content-calendar-service')
 
 // 固定起始日：2026-01-05（周一，UTC），便于稳定推导每天偏移
 const START_DATE = new Date(Date.UTC(2026, 0, 5))

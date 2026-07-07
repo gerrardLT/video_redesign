@@ -5,6 +5,7 @@ import { jwtVerify } from 'jose'
 const PUBLIC_API_PATHS = [
   '/api/auth/login',
   '/api/auth/register',
+  '/api/auth/dev-login', // 开发模式一键登录（仅 NODE_ENV=development 可用）
   '/api/payments/wechat/callback',
   '/api/payments/alipay/callback',
   '/api/showcase',

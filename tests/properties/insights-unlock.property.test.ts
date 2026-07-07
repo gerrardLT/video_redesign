@@ -1,4 +1,4 @@
-// Feature: local-life-depth-enhancements, Property 7: 复盘解锁门槛
+﻿// Feature: local-life-depth-enhancements, Property 7: 复盘解锁门槛
 //
 // 属性测试：带 metrics 的 brief 数量 n，当 n<3 时系统返回空建议并提示剩余 3-n 条，绝不伪造建议。
 // 被测：src/lib/performance-learning-service.ts 的 getInsightsUnlockGate
@@ -16,7 +16,7 @@ import fc from 'fast-check'
 // ============================================================
 const { countMock } = vi.hoisted(() => ({ countMock: vi.fn() }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   prisma: {
     contentBrief: {
       count: countMock,
@@ -24,7 +24,7 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-import { getInsightsUnlockGate } from '@/lib/performance-learning-service'
+import { getInsightsUnlockGate } from '@/lib/merchant/performance-learning-service'
 
 const MIN_METRICS_BRIEFS = 3
 

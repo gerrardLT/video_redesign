@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/content-briefs/[briefId]/assets — 上传素材
  *
  * 接收 multipart/form-data 文件上传，执行：
@@ -35,11 +35,11 @@ import path from 'path'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 
-import { prisma } from '@/lib/db'
-import { getUserIdFromRequest } from '@/lib/merchant-auth'
-import { ApiError } from '@/lib/api-error'
-import { inspectRawAsset } from '@/lib/capture-director'
-import { uploadBuffer } from '@/lib/storage'
+import { prisma } from '@/lib/shared/db'
+import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { ApiError } from '@/lib/shared/api-error'
+import { inspectRawAsset } from '@/lib/merchant/capture-director'
+import { uploadBuffer } from '@/lib/shared/storage'
 
 const execFileAsync = promisify(execFile)
 

@@ -1,20 +1,20 @@
-/**
+﻿/**
  * 视频解析 Worker
  * 处理 'video-parse' 队列任务
  * 流程：获取视频 → 余额预检 → FFmpeg Normalize → 上传 OSS → AI 视频直传分析 → 写入数据库 → 分组 → 音频切片 → 更新项目状态
  */
 
 import { Worker, Job, type ConnectionOptions } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { prisma } from '@/lib/db'
-import { getVideoMetadata, normalizeVideo } from '@/lib/ffmpeg'
-import { parseVideoDirectly } from '@/lib/video-analyzer'
-import type { ParsedShot } from '@/lib/video-analyzer'
-import { groupShots } from '@/lib/grouping-service'
-import { uploadFile, toAcceleratedUrl } from '@/lib/storage'
-import { estimateParseCreditCost, freezeParseCredits, chargeParseCreditsFromReserve, refundParseCredits } from '@/lib/credit-service'
-import { withCreditLock } from '@/lib/distributed-lock'
-import { publishStateChange, publishCompleted, publishFailed } from '@/lib/progress-publisher'
+import { redis } from '@/lib/shared/redis'
+import { prisma } from '@/lib/shared/db'
+import { getVideoMetadata, normalizeVideo } from '@/lib/video/ffmpeg'
+import { parseVideoDirectly } from '@/lib/video/video-analyzer'
+import type { ParsedShot } from '@/lib/video/video-analyzer'
+import { groupShots } from '@/lib/video/grouping-service'
+import { uploadFile, toAcceleratedUrl } from '@/lib/shared/storage'
+import { estimateParseCreditCost, freezeParseCredits, chargeParseCreditsFromReserve, refundParseCredits } from '@/lib/shared/credit-service'
+import { withCreditLock } from '@/lib/shared/distributed-lock'
+import { publishStateChange, publishCompleted, publishFailed } from '@/lib/shared/progress-publisher'
 import type { CharacterAppearanceRecord, AppearanceDescriptor } from '@/types/appearance'
 import path from 'path'
 import { mkdir, unlink } from 'fs/promises'
@@ -398,7 +398,7 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
 
     // 4. FFmpeg 场景剪辑点检测 + AI 视频直传解析
     // 先用 FFmpeg 检测真实的画面剪辑/转场点，再将结果传给 AI 约束分镜切分行为
-    const { detectSceneCuts } = await import('@/lib/ffmpeg')
+    const { detectSceneCuts } = await import('@/lib/video/ffmpeg')
     let sceneCuts: number[] = []
     try {
       sceneCuts = await detectSceneCuts(videoPath)
@@ -724,7 +724,7 @@ async function processParseVideo(job: Job<ParseVideoJobData>): Promise<void> {
     // 9.1（延迟执行）：所有 DB 写操作已完成，此时安全入队 generate-character jobs
     if (pendingCharGens.length > 0) {
       try {
-        const { imageGenerateQueue } = await import('@/lib/queue')
+        const { imageGenerateQueue } = await import('@/lib/shared/queue')
         for (const c of pendingCharGens) {
           await imageGenerateQueue.add('generate-character-image', {
             characterId: c.id,

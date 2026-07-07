@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Feature: video-export-upscale
  * 属性测试：视频导出超分功能正确性验证
  *
@@ -10,9 +10,18 @@
  * 5. 退款幂等性
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import * as fc from 'fast-check'
-import { estimateUpscaleCreditCost } from '@/lib/credit-service'
+
+// Mock db/redis 模块，避免 DATABASE_URL 缺失导致的初始化错误
+vi.mock('@/lib/shared/db', () => ({
+  prisma: new Proxy({}, { get: () => new Proxy({}, { get: () => vi.fn() }) })
+}))
+vi.mock('@/lib/shared/redis', () => ({
+  redis: new Proxy({}, { get: () => vi.fn() })
+}))
+
+import { estimateUpscaleCreditCost } from '@/lib/shared/credit-service'
 
 describe('Feature: video-export-upscale, Property 1: 超分积分计算公式正确性', () => {
   /**
@@ -81,7 +90,8 @@ describe('Feature: video-export-upscale, Property 1: 超分积分计算公式正
         fc.double({ min: 0.01, max: 600, noNaN: true, noDefaultInfinity: true }),
         nonStandardArb,
         (duration, resolution) => {
-          const cost = estimateUpscaleCreditCost(duration, resolution)
+          // 测试非标准分辨率的运行时处理（用 as any 绕过类型检查）
+          const cost = estimateUpscaleCreditCost(duration, resolution as any)
           expect(cost).toBe(0)
         }
       ),

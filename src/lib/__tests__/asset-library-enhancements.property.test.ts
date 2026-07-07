@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 资产库增强 - 属性测试 (Property-Based Tests)
  *
  * 使用 fast-check 对资产库增强功能的核心服务层逻辑进行属性测试。
@@ -13,7 +13,7 @@ import * as fc from 'fast-check'
 // Mock setup
 // ========================
 
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/shared/db', () => {
   return {
     prisma: {
       project: {
@@ -33,11 +33,11 @@ vi.mock('@/lib/db', () => {
   }
 })
 
-vi.mock('@/lib/logger', () => ({
+vi.mock('@/lib/shared/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }))
 
-vi.mock('@/lib/storage', () => ({
+vi.mock('@/lib/shared/storage', () => ({
   deleteObject: vi.fn(),
   extractKeyFromUrl: vi.fn((url: string) => url),
   isOSSConfigured: vi.fn(() => true),
@@ -45,12 +45,12 @@ vi.mock('@/lib/storage', () => ({
 }))
 
 // 在 mock 声明之后导入被测模块和 mock 对象
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/shared/db'
 import {
   listProjectsWithCharacterCount,
   applyToCharacter,
-} from '@/lib/asset-library-service'
-import { ApiError } from '@/lib/api-error'
+} from '@/lib/shared/asset-library-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 // 获取 mock 函数引用（从已 mock 的 prisma 对象中）
 const mockProjectFindMany = vi.mocked(prisma.project.findMany)
@@ -70,11 +70,10 @@ beforeEach(() => {
 /** 非空字符串（模拟 ID、名称等） */
 const nonEmptyStr = fc.string({ minLength: 1, maxLength: 50 })
 
-/** 日期生成器（覆盖较广的时间范围） */
-const dateArb = fc.date({
-  min: new Date('2020-01-01T00:00:00Z'),
-  max: new Date('2030-12-31T23:59:59Z'),
-})
+/** 日期生成器（覆盖较广的时间范围，保证是有效 Date） */
+const dateArb = fc
+  .integer({ min: Date.UTC(2020, 0, 1), max: Date.UTC(2030, 11, 31) })
+  .map((ms) => new Date(ms))
 
 /** 项目生成器（含随机 updatedAt） */
 const projectArb = fc.record({

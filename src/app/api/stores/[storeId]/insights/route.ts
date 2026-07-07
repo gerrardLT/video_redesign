@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET /api/stores/[storeId]/insights — 获取复盘洞察（含解锁门控）
  *
  * 调用 performance-learning-service.getInsightsUnlockGate：
@@ -21,9 +21,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant-auth'
-import { getInsightsUnlockGate } from '@/lib/performance-learning-service'
-import { ApiError } from '@/lib/api-error'
+import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
+import { getInsightsUnlockGate } from '@/lib/merchant/performance-learning-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * HistoryList — 历史记录列表组件
@@ -10,7 +10,7 @@
 import { useState, useCallback } from 'react'
 import useSWR from 'swr'
 import { History, CheckSquare, Square, Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 /** 历史记录数据结构 */
 export interface HistoryRecord {

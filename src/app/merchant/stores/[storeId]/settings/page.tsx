@@ -77,6 +77,20 @@ interface OfferData {
 // 门店信息编辑组件
 // ========================
 
+/** 安全解析 Json 字段（兼容 string / array 两种存储形态） */
+function parseJsonArray(val: unknown): string[] {
+  if (Array.isArray(val)) return val
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 function StoreInfoForm({ store, storeId }: { store: StoreData; storeId: string }) {
   const [form, setForm] = useState({
     name: store.name,
@@ -86,8 +100,8 @@ function StoreInfoForm({ store, storeId }: { store: StoreData; storeId: string }
     address: store.address || '',
     avgTicket: store.avgTicket?.toString() || '',
     openingHours: store.openingHours || '',
-    mainProducts: (store.mainProducts || []).join('、'),
-    mainSellingPoints: (store.mainSellingPoints || []).join('、'),
+    mainProducts: parseJsonArray(store.mainProducts).join('、'),
+    mainSellingPoints: parseJsonArray(store.mainSellingPoints).join('、'),
   })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -135,7 +149,7 @@ function StoreInfoForm({ store, storeId }: { store: StoreData; storeId: string }
   return (
     <Card className="border-amber-100 rounded-2xl">
       <CardHeader>
-        <CardTitle className="text-amber-900">门店基本信息</CardTitle>
+        <CardTitle className="font-[var(--font-serif)] text-[var(--ll-text)]">门店基本信息</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -314,7 +328,7 @@ function OffersManagement({ storeId }: { storeId: string }) {
     <Card className="border-amber-100 rounded-2xl">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-amber-900">优惠活动管理</CardTitle>
+          <CardTitle className="font-[var(--font-serif)] text-[var(--ll-text)]">优惠活动管理</CardTitle>
           <Button
             variant="outline"
             size="sm"
@@ -490,8 +504,8 @@ function StoreProfileCard({ storeId }: { storeId: string }) {
     <Card className="border-amber-100 rounded-2xl">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-1.5 text-amber-900">
-            <Sparkles className="h-4 w-4 text-amber-500" />
+          <CardTitle className="flex items-center gap-1.5 font-[var(--font-serif)] text-[var(--ll-text)]">
+            <Sparkles className="h-4 w-4 text-[var(--ll-green)]" strokeWidth={1.5} />
             AI 门店画像
           </CardTitle>
           <Button
@@ -609,7 +623,7 @@ export default function StoreSettingsPage() {
           <ArrowLeft className="h-4 w-4 mr-1" />
           返回
         </Button>
-        <h2 className="text-xl font-bold text-amber-900">门店设置</h2>
+        <h2 className="text-[var(--text-title)] font-semibold font-[var(--font-serif)] text-[var(--ll-text)]">门店设置</h2>
       </div>
 
       {/* 门店信息编辑 */}

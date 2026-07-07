@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * SubscriptionQuotaBar — 额度用量条
@@ -12,7 +12,7 @@
  * Requirements: 15.2, 15.4
  */
 
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/shared/utils'
 
 interface SubscriptionQuotaBarProps {
   /** 当前已使用量 */

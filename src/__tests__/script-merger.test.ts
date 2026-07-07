@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { mergeTimelineScript, type MergeInputShot } from '../lib/script-merger'
+import { mergeTimelineScript, type MergeInputShot } from '../lib/video/script-merger'
 
 describe('mergeTimelineScript 属性化测试', () => {
   // 生成有效的组内分镜输入

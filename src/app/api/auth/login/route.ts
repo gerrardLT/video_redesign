@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod/v4'
-import { prisma } from '@/lib/db'
-import { signToken, comparePassword } from '@/lib/auth'
-import { checkRateLimit } from '@/lib/rate-limiter'
+import { prisma } from '@/lib/shared/db'
+import { signToken, comparePassword } from '@/lib/shared/auth'
+import { checkRateLimit } from '@/lib/shared/rate-limiter'
 
 export const dynamic = 'force-dynamic'
 

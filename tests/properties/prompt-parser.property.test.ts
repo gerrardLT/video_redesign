@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
-import { parseAssetReferences, validateReferences } from '@/lib/prompt-parser'
+import { parseAssetReferences, validateReferences } from '@/lib/video/prompt-parser'
 
 /**
  * Feature: video-reshaping-mvp

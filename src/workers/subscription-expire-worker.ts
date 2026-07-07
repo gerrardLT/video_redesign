@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 订阅到期 Worker
  * 处理 subscription-expire 队列任务：
  *
@@ -8,10 +8,10 @@
  * 安全机制：已经是 EXPIRED 的记录会被 expireSubscription 内部幂等跳过。
  */
 import { Worker, type Job } from 'bullmq'
-import { redis } from '@/lib/redis'
-import { expireSubscription } from '@/lib/subscription-service'
-import { prisma } from '@/lib/db'
-import { logger } from '@/lib/logger'
+import { redis } from '@/lib/shared/redis'
+import { expireSubscription } from '@/lib/shared/subscription-service'
+import { prisma } from '@/lib/shared/db'
+import { logger } from '@/lib/shared/logger'
 import type { ConnectionOptions } from 'bullmq'
 
 const connection = redis as unknown as ConnectionOptions

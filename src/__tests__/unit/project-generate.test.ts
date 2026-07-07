@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Unit Test: POST /api/projects/[id]/generate — 项目级链式生成路由
  *
  * 测试当前契约（链式分镜组生成，非旧的 segment 分段契约）：
@@ -33,6 +33,7 @@ const {
     project: {
       findFirst: vi.fn(),
       update: vi.fn().mockResolvedValue({}),
+      count: vi.fn().mockResolvedValue(0),
     },
     user: {
       findUniqueOrThrow: vi.fn(),
@@ -110,38 +111,38 @@ const {
   }
 })
 
-vi.mock('@/lib/db', () => ({ prisma: mockPrisma }))
-vi.mock('@/lib/queue', () => ({ videoGenerateQueue: mockQueue }))
-vi.mock('@/lib/credit-service', () => ({
+vi.mock('@/lib/shared/db', () => ({ prisma: mockPrisma }))
+vi.mock('@/lib/shared/queue', () => ({ videoGenerateQueue: mockQueue }))
+vi.mock('@/lib/shared/credit-service', () => ({
   estimateGroupCreditCost: (duration: number, resolution: string) =>
     mockEstimateGroupCreditCost(duration, resolution),
   refundCredits: (...args: unknown[]) => mockRefundCredits(...args),
 }))
-vi.mock('@/lib/rate-limiter', () => ({
+vi.mock('@/lib/shared/rate-limiter', () => ({
   isRateLimited: () => false,
 }))
 // 分布式锁在单测中直接放行：withCreditLock(fn) → fn()
-vi.mock('@/lib/distributed-lock', () => ({
+vi.mock('@/lib/shared/distributed-lock', () => ({
   withCreditLock: (fn: () => unknown) => fn(),
 }))
-vi.mock('@/lib/group-gen-context', () => ({
+vi.mock('@/lib/video/group-gen-context', () => ({
   buildGroupGenReference: (...args: unknown[]) => mockBuildGroupGenReference(...args),
 }))
-vi.mock('@/lib/privilege-engine', () => ({
+vi.mock('@/lib/shared/privilege-engine', () => ({
   getUserPrivileges: (...args: unknown[]) => mockGetUserPrivileges(...args),
 }))
-vi.mock('@/lib/concurrency-controller', () => ({
+vi.mock('@/lib/shared/concurrency-controller', () => ({
   checkAndIncrement: (...args: unknown[]) => mockCheckAndIncrement(...args),
   buildRejectionResponse: (...args: unknown[]) => mockBuildRejectionResponse(...args),
   decrement: (...args: unknown[]) => mockDecrement(...args),
 }))
-vi.mock('@/lib/generation-orchestrator', () => ({
+vi.mock('@/lib/video/generation-orchestrator', () => ({
   orchestrateGeneration: (...args: unknown[]) => mockOrchestrateGeneration(...args),
 }))
 
 // 导入路由 handler（mock 必须先于导入）
 import { POST } from '@/app/api/projects/[id]/generate/route'
-import { ApiError } from '@/lib/api-error'
+import { ApiError } from '@/lib/shared/api-error'
 
 // ========================
 // 辅助函数

@@ -3,11 +3,14 @@
 import { useState } from 'react'
 import Link from 'next/link'
 
+const IS_DEV = process.env.NODE_ENV === 'development'
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [devLoading, setDevLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -100,6 +103,39 @@ export default function LoginPage() {
             去注册
           </Link>
         </p>
+
+        {/* 开发模式：Admin 快速登录 */}
+        {IS_DEV && (
+          <div className="pt-4 border-t border-[var(--cine-line-2)]">
+            <button
+              type="button"
+              disabled={devLoading}
+              onClick={async () => {
+                setError('')
+                setDevLoading(true)
+                try {
+                  const res = await fetch('/api/auth/dev-login', { method: 'POST' })
+                  const data = await res.json()
+                  if (!res.ok) {
+                    setError(data.error || 'Dev 登录失败')
+                    return
+                  }
+                  window.location.href = '/merchant'
+                } catch {
+                  setError('网络错误，请稍后重试')
+                } finally {
+                  setDevLoading(false)
+                }
+              }}
+              className="w-full rounded-lg border border-[var(--cine-gold)]/30 bg-[var(--cine-gold)]/10 px-4 py-2.5 text-sm font-medium text-[var(--cine-gold)] transition-colors hover:bg-[var(--cine-gold)]/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {devLoading ? '正在准备...' : '⚡ Admin 快速登录（10000积分 + 年卡会员）'}
+            </button>
+            <p className="mt-2 text-center text-[11px] text-[var(--cine-text-3)]">
+              仅开发环境可用 · 自动创建 admin@dev.local
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

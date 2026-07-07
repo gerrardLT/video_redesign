@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Property-Based Test: scriptHash 确定性与格式
  * Feature: production-reliability, Property 1: scriptHash 确定性与无冲突性
  *
@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { computeScriptHash } from '@/lib/script-hash'
+import { computeScriptHash } from '@/lib/shared/script-hash'
 
 describe('computeScriptHash 属性测试', () => {
   it('Property 1.1: 相同输入恒产生相同输出（确定性）', () => {

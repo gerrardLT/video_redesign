@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SSE 实时进度推送 — Route Handler
  *
  * GET /api/sse/progress
@@ -24,7 +24,7 @@ import { connectionRegistry } from '@/lib/sse/connection-registry'
 import { redisSubscriber } from '@/lib/sse/redis-subscriber'
 import { serialize, serializeHeartbeat, serializeRetry } from '@/lib/sse/event-serializer'
 import type { ProgressEventPayload } from '@/lib/sse/types'
-import { logger } from '@/lib/logger'
+import { logger } from '@/lib/shared/logger'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'

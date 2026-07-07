@@ -1,5 +1,5 @@
-import { Metadata } from 'next'
-import { listBySection, type GroupedArticles } from '@/lib/help-center-service'
+﻿import { Metadata } from 'next'
+import { listBySection, type GroupedArticles } from '@/lib/shared/help-center-service'
 import { HelpSearchClient } from './help-search-client'
 
 export const metadata: Metadata = {

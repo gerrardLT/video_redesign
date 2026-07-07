@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * 积分预估组件
@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { estimateWorkspaceCost } from '@/lib/credit-calc'
+import { estimateWorkspaceCost } from '@/lib/shared/credit-calc'
 
 export function CreditEstimate() {
   const model = useWorkspaceStore((s) => s.model)

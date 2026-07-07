@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/projects/:id/background-music
  * 上传项目背景音乐（Seedance 模式合并导出时替换原音轨）
  *
@@ -8,8 +8,8 @@
  * 上传至 OSS 并将 ossKey 写入 Project.bgmKey
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { uploadBuffer } from '@/lib/storage'
+import { prisma } from '@/lib/shared/db'
+import { uploadBuffer } from '@/lib/shared/storage'
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const ALLOWED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/mp4', 'audio/x-m4a']

@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { canRetry, assertTransition } from '@/lib/state-machine'
-import { estimateCreditCost, reserveCredits } from '@/lib/credit-service'
-import { videoGenerateQueue } from '@/lib/queue'
-import { buildReferenceData } from '@/lib/reference-builder'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/shared/db'
+import { canRetry, assertTransition } from '@/lib/shared/state-machine'
+import { estimateCreditCost, reserveCredits } from '@/lib/shared/credit-service'
+import { videoGenerateQueue } from '@/lib/shared/queue'
+import { buildReferenceData } from '@/lib/video/reference-builder'
 
 export const dynamic = 'force-dynamic'
 

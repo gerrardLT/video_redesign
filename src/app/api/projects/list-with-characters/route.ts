@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 项目列表与角色列表查询 API
  * GET /api/projects/list-with-characters
  *
@@ -12,8 +12,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   listProjectsWithCharacterCount,
   listCharactersByProject,
-} from '@/lib/asset-library-service'
-import { ApiError } from '@/lib/api-error'
+} from '@/lib/shared/asset-library-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 export const dynamic = 'force-dynamic'
 

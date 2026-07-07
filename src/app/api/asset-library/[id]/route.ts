@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { deleteAsset } from '@/lib/asset-library-service'
-import { ApiError } from '@/lib/api-error'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { deleteAsset } from '@/lib/shared/asset-library-service'
+import { ApiError } from '@/lib/shared/api-error'
 
 export const dynamic = 'force-dynamic'
 
