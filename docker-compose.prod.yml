@@ -30,8 +30,24 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    # 数据库迁移由 deploy.sh 在宿主机执行（runner 镜像精简后无完整 prisma 依赖）
+    # 数据库迁移由 deploy.sh 通过独立 migrator 容器执行（runner 镜像精简后无完整 prisma 依赖）
     command: ["node", "server.js"]
+
+  # 数据库迁移（一次性任务，由 deploy.sh 调用）
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    env_file:
+      - .env.production
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/video_redesign
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - migrate
 
   # Workers（后台任务：视频解析/生成/合并/人物图等）
   workers:

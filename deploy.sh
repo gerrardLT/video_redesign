@@ -132,17 +132,12 @@ sleep 8
 
 # ========================
 # 第 5 步：数据库迁移（prisma migrate deploy — 生产标准方式）
-# 说明：在宿主机直接执行迁移（postgres 5432 端口已映射到宿主机，宿主机有完整 node_modules）。
-#       不在容器内执行，因为 runner 镜像精简后缺少 prisma CLI 完整依赖链。
-#       不使用 db push --accept-data-loss（有丢数据风险）。
+# 使用独立的 migrator 容器执行（基于 deps 阶段，有完整 prisma CLI 依赖链）
+# 不在 runner 容器内执行（精简镜像缺依赖）
+# 不在宿主机执行（宿主机未装 Node.js）
 # ========================
 log "===== 同步数据库 schema（prisma migrate deploy）====="
-# 从 .env.production 读取 POSTGRES_PASSWORD（宿主机 shell 环境不一定有此变量）
-_PG_PASS=$(grep -E '^POSTGRES_PASSWORD=' .env.production | cut -d= -f2- || echo "postgres")
-_PG_PASS="${_PG_PASS:-postgres}"
-_MIGRATE_DB_URL="postgresql://postgres:${_PG_PASS}@localhost:5432/video_redesign"
-
-if DATABASE_URL="$_MIGRATE_DB_URL" npx prisma migrate deploy; then
+if $DC --profile migrate run --rm migrate; then
   ok "数据库迁移完成"
 else
   err "数据库迁移失败！请检查日志。数据库已在第 1 步备份，可手动回滚"

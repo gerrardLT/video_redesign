@@ -40,6 +40,26 @@ ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
 RUN pnpm build
 
 # ========================
+# Stage 2.5: Database Migrator（用于执行 prisma migrate deploy）
+# 基于 deps 阶段，拥有完整 node_modules（含 prisma CLI 及其所有依赖）
+# 仅用于一次性迁移任务，不作为长期运行容器
+# ========================
+FROM node:22-alpine AS migrator
+WORKDIR /app
+
+# 从 deps 阶段拷贝完整 node_modules（prisma CLI 需要）
+COPY --from=deps /app/node_modules ./node_modules
+
+# 拷贝 prisma 相关文件
+COPY prisma ./prisma/
+COPY prisma.config.ts ./prisma.config.ts
+
+# 拷贝 .env.production（为 prisma 提供配置，实际 DATABASE_URL 由 docker-compose 环境变量覆盖）
+COPY .env.production ./.env
+
+CMD ["npx", "prisma", "migrate", "deploy"]
+
+# ========================
 # Stage 3: Production Runner
 # ========================
 FROM node:22-alpine AS runner
