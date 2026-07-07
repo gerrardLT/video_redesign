@@ -31,7 +31,7 @@ services:
       timeout: 10s
       retries: 3
     # 启动前执行数据库迁移
-    command: ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+    command: ["sh", "-c", "node ./node_modules/prisma/build/index.js migrate deploy && node server.js"]
 
   # Workers（后台任务：视频解析/生成/合并/人物图等）
   workers:
