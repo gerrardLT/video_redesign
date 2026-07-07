@@ -90,6 +90,7 @@ COPY --from=builder /app/node_modules/zod ./node_modules/zod
 COPY --from=builder /app/node_modules/fast-check ./node_modules/fast-check
 COPY --from=builder /app/node_modules/pg ./node_modules/pg
 COPY --from=builder /app/node_modules/@prisma/adapter-pg ./node_modules/@prisma/adapter-pg
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
 # .env.production 复制为 .env，供 Prisma CLI (dotenv/config) 和运行时读取
 COPY --from=builder /app/.env.production ./.env
