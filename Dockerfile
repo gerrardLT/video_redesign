@@ -6,13 +6,14 @@
 #   base          → 共享基础镜像（Node 22 + pnpm 10）
 #   deps          → 安装全部依赖（dev + prod，含 native addon 编译）
 #   builder       → Next.js 构建 + Prisma client 生成
-#   deploy-prod   → pnpm deploy --prod 输出平坦 node_modules（无符号链接）
+#   deploy-prod   → pnpm install --prod + hoisted 输出平坦 node_modules（无符号链接）
 #   migrator      → 数据库迁移执行器（prisma migrate deploy）
 #   app-runner    → Next.js standalone 生产运行器
 #   workers-runner → BullMQ Workers 独立运行器
 #
-# 核心改动：用 pnpm deploy --prod 替代手动 COPY node_modules 子目录，
-# 彻底解决 pnpm 符号链接在 Docker COPY 中不兼容的问题。
+# 核心改动：用 pnpm install --prod + node-linker=hoisted 替代 pnpm deploy --prod，
+# 因为 pnpm deploy 仅限 workspace（monorepo）项目，当前为 single package。
+# hoisted 模式输出传统平坦 node_modules（无 .pnpm 符号链接结构）。
 # 新增依赖只需 pnpm add xxx，Dockerfile 无需修改。
 # ============================================================================
 
@@ -75,24 +76,30 @@ RUN --mount=type=cache,id=nextjs-cache,target=/app/.next/cache \
 
 
 # ========================
-# Stage: deploy-prod（核心改动）
-# 使用 pnpm deploy --prod 生成无符号链接的平坦 node_modules
-# 输出目录 /deploy 包含完整的 production 依赖树（真实文件，非 symlinks）
+# Stage: deploy-prod
+# 使用 pnpm install --prod + node-linker=hoisted 生成平坦 node_modules
+# hoisted 模式下 node_modules 为真实文件（无 .pnpm 符号链接结构）
+# 输出目录 /deploy 包含完整的 production 依赖树
 # ========================
-FROM deps AS deploy-prod
+FROM base AS deploy-prod
 
-# pnpm deploy 生成独立部署目录：
-# - 所有 dependencies 中的包被解引用为真实文件（无符号链接）
-# - 自动解析完整依赖树，新增依赖无需修改 Dockerfile
-# - --prod 排除 devDependencies（tsx/dotenv 已移至 dependencies）
+WORKDIR /deploy
+
+# 设置 node-linker=hoisted：输出传统平坦 node_modules（无符号链接）
+RUN echo "node-linker=hoisted" > .npmrc
+
+# 拷贝 package 定义
+COPY package.json pnpm-lock.yaml ./
+
+# 仅安装 production 依赖（hoisted 模式，无符号链接）
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm deploy --prod /deploy
+    pnpm install --frozen-lockfile --prod
 
 
 # ========================
 # Stage: migrator
 # 独立的数据库迁移容器（按需启动，执行完成后自动退出）
-# 基于完整 node_modules（prisma CLI 在 devDependencies 中，pnpm deploy --prod 不包含）
+# 基于完整 node_modules（prisma CLI 在 devDependencies 中，deploy-prod 不包含）
 # ========================
 FROM base AS migrator
 
@@ -168,7 +175,7 @@ RUN apk add --no-cache ffmpeg yt-dlp
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# 从 pnpm deploy --prod 输出获取完整、平坦的 node_modules（无符号链接）
+# 从 deploy-prod 阶段获取平坦 node_modules（hoisted 模式，无符号链接）
 # 包含：tsx、esbuild、bullmq、ioredis、pg、ali-oss、dotenv、jose、bcryptjs、zod 等
 COPY --from=deploy-prod /deploy/node_modules ./node_modules
 COPY --from=deploy-prod /deploy/package.json ./package.json
