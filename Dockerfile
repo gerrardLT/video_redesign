@@ -1,129 +1,146 @@
+# syntax=docker/dockerfile:1.4
+# ============================================================================
+# Video Redesign — 多阶段 Docker 构建
+# ============================================================================
+# 构建阶段总览：
+#   base          → 共享基础镜像（Node 22 + pnpm 10）
+#   deps          → 安装全部依赖（dev + prod，含 native addon 编译）
+#   builder       → Next.js 构建 + Prisma client 生成
+#   deploy-prod   → pnpm deploy --prod 输出平坦 node_modules（无符号链接）
+#   migrator      → 数据库迁移执行器（prisma migrate deploy）
+#   app-runner    → Next.js standalone 生产运行器
+#   workers-runner → BullMQ Workers 独立运行器
+#
+# 核心改动：用 pnpm deploy --prod 替代手动 COPY node_modules 子目录，
+# 彻底解决 pnpm 符号链接在 Docker COPY 中不兼容的问题。
+# 新增依赖只需 pnpm add xxx，Dockerfile 无需修改。
+# ============================================================================
+
+
 # ========================
-# Stage 1: Dependencies
+# Stage: base
+# 所有阶段共享的基础镜像配置
 # ========================
-FROM node:22-alpine AS deps
+FROM node:22-alpine AS base
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN corepack enable && corepack prepare pnpm@10 --activate
+
 WORKDIR /app
 
-# 安装 ffmpeg（视频处理必需）、构建工具和 pnpm
-RUN apk add --no-cache ffmpeg python3 make g++ && \
-    corepack enable && corepack prepare pnpm@10 --activate
 
+# ========================
+# Stage: deps
+# 安装全部依赖（含 devDependencies，构建阶段需要 TypeScript 等工具）
+# 使用 BuildKit cache mount 复用 pnpm store，避免重复下载
+# ========================
+FROM base AS deps
+
+# native addon 编译工具（esbuild、prisma engines 等需要）
+RUN apk add --no-cache python3 make g++
+
+# 先拷贝 lock 文件，最大化层缓存命中（源码变更不会 invalidate 此层）
 COPY package.json pnpm-lock.yaml ./
+
+# 拷贝 prisma 目录（prisma postinstall 需要 schema 文件）
 COPY prisma ./prisma/
 
-RUN pnpm install --frozen-lockfile --prod=false && npx prisma generate
+# BuildKit cache mount: 复用 pnpm 全局 store，即使 lockfile 变更也能复用已下载的包
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
 
-# 将 esbuild 从 pnpm 符号链接结构中解引用拷贝出来（Docker COPY 不支持符号链接路径）
-RUN mkdir -p /app/esbuild-pkg && \
-    cp -rL node_modules/esbuild /app/esbuild-pkg/esbuild && \
-    cp -rL node_modules/@esbuild /app/esbuild-pkg/@esbuild 2>/dev/null || true
 
 # ========================
-# Stage 2: Build
+# Stage: builder
+# 执行 Next.js 构建和 Prisma client 生成
 # ========================
-FROM node:22-alpine AS builder
-WORKDIR /app
+FROM deps AS builder
 
-RUN apk add --no-cache ffmpeg && \
-    corepack enable && corepack prepare pnpm@10 --activate
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/prisma ./prisma
+# 拷贝全部源码（.dockerignore 已排除 node_modules/.next/.git 等）
 COPY . .
 
-# 构建时使用临时环境变量（Prisma generate 不需要连接数据库）
+# Prisma generate（输出到 src/generated/prisma/，不需要真实数据库连接）
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
-
-# Prisma 客户端生成（输出到 src/generated/prisma，须在 COPY 源码后执行）
 RUN npx prisma generate
 
-# 构建时需要的环境变量（Next.js 内联 NEXT_PUBLIC_* 到客户端包）
+# Next.js 构建环境变量（NEXT_PUBLIC_* 会内联到客户端包）
 ARG NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
 
-# 构建 Next.js
-RUN pnpm build
+# BuildKit cache mount: Next.js 增量编译缓存（webpack/turbopack 模块缓存）
+RUN --mount=type=cache,id=nextjs-cache,target=/app/.next/cache \
+    pnpm build
+
 
 # ========================
-# Stage 2.5: Database Migrator（用于执行 prisma migrate deploy）
-# 基于 deps 阶段，拥有完整 node_modules（含 prisma CLI 及其所有依赖）
-# 仅用于一次性迁移任务，不作为长期运行容器
+# Stage: deploy-prod（核心改动）
+# 使用 pnpm deploy --prod 生成无符号链接的平坦 node_modules
+# 输出目录 /deploy 包含完整的 production 依赖树（真实文件，非 symlinks）
 # ========================
-FROM node:22-alpine AS migrator
-WORKDIR /app
+FROM deps AS deploy-prod
 
-# 从 deps 阶段拷贝完整 node_modules（prisma CLI 需要）
+# pnpm deploy 生成独立部署目录：
+# - 所有 dependencies 中的包被解引用为真实文件（无符号链接）
+# - 自动解析完整依赖树，新增依赖无需修改 Dockerfile
+# - --prod 排除 devDependencies（tsx/dotenv 已移至 dependencies）
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm deploy --prod /deploy
+
+
+# ========================
+# Stage: migrator
+# 独立的数据库迁移容器（按需启动，执行完成后自动退出）
+# 基于完整 node_modules（prisma CLI 在 devDependencies 中，pnpm deploy --prod 不包含）
+# ========================
+FROM base AS migrator
+
+# 从 deps 阶段获取完整 node_modules（含 prisma CLI 及其所有依赖）
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./package.json
 
-# 拷贝 prisma 相关文件
+# Prisma schema、迁移文件和配置
 COPY prisma ./prisma/
 COPY prisma.config.ts ./prisma.config.ts
 
-# 拷贝 .env.production（为 prisma 提供配置，实际 DATABASE_URL 由 docker-compose 环境变量覆盖）
+# .env.production 作为运行时 .env（实际 DATABASE_URL 由 docker-compose 环境变量覆盖）
 COPY .env.production ./.env
 
 CMD ["npx", "prisma", "migrate", "deploy"]
 
+
 # ========================
-# Stage 3: Production Runner
+# Stage: app-runner
+# Next.js 生产运行器，基于 standalone 输出（已包含精简的运行时 node_modules）
+# 不需要 deploy-prod 的产物（standalone 已内含 Next.js 运行依赖）
 # ========================
-FROM node:22-alpine AS runner
+FROM node:22-alpine AS app-runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# 安装 ffmpeg + ffprobe + yt-dlp（运行时视频处理和链接下载必需）
+# 运行时工具：FFmpeg（视频处理）+ yt-dlp（链接下载）
 RUN apk add --no-cache ffmpeg yt-dlp
 
-# 创建非 root 用户
+# 安全：非 root 用户
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# P2 修复：镜像瘦身 — 仅拷贝 standalone 产物 + Workers 运行时必需依赖
-# standalone 模式已内含 Next.js 运行所需的 node_modules 子集（~50MB vs 完整 ~800MB）
-
-# Next.js standalone 产物（含精简 node_modules）
+# Next.js standalone 产物（含精简 node_modules 子集，约 50MB）
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Prisma 客户端和 schema（运行时 + migrate deploy 需要）
-COPY --from=builder /app/prisma ./prisma
+# Prisma client（运行时 ORM 查询需要）
 COPY --from=builder /app/src/generated/prisma ./src/generated/prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
-# Workers 源码（tsx 运行时编译执行）
-COPY --from=builder /app/src/workers ./src/workers
-COPY --from=builder /app/src/lib ./src/lib
-COPY --from=builder /app/src/services ./src/services
-COPY --from=builder /app/src/constants ./src/constants
-COPY --from=builder /app/src/types ./src/types
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/package.json ./package.json
-
-# Workers 运行时依赖（仅拷贝 Worker 进程需要但 standalone 未包含的包）
-# standalone 已包含 Next.js 应用依赖；Worker 额外需要：bullmq, ioredis, tsx, ali-oss 等
-COPY --from=builder /app/node_modules/bullmq ./node_modules/bullmq
-COPY --from=builder /app/node_modules/ioredis ./node_modules/ioredis
-COPY --from=builder /app/node_modules/tsx ./node_modules/tsx
-# esbuild（tsx 运行时依赖）：从 deps 阶段解引用拷贝的固定路径获取（pnpm 符号链接不支持 Docker COPY）
-COPY --from=deps /app/esbuild-pkg/esbuild ./node_modules/esbuild
-COPY --from=deps /app/esbuild-pkg/@esbuild ./node_modules/@esbuild
-COPY --from=builder /app/node_modules/ali-oss ./node_modules/ali-oss
-COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
-COPY --from=builder /app/node_modules/jose ./node_modules/jose
-COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
-COPY --from=builder /app/node_modules/zod ./node_modules/zod
-COPY --from=builder /app/node_modules/fast-check ./node_modules/fast-check
-COPY --from=builder /app/node_modules/pg ./node_modules/pg
-COPY --from=builder /app/node_modules/@prisma/adapter-pg ./node_modules/@prisma/adapter-pg
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-
-# .env.production 复制为 .env，供 Prisma CLI (dotenv/config) 和运行时读取
+# .env.production 复制为 .env，供运行时读取环境变量
 COPY --from=builder /app/.env.production ./.env
 
-# 创建上传目录（含 temp 子目录：generate/merge/upscale 等 worker 的本地中转目录）
+# 上传目录（含 temp 子目录：generate/merge/upscale 等 worker 的本地中转目录）
 RUN mkdir -p /app/public/uploads/temp && chown -R nextjs:nodejs /app/public/uploads
 
 USER nextjs
@@ -133,5 +150,50 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# 启动脚本由 docker-compose command 指定
 CMD ["node", "server.js"]
+
+
+# ========================
+# Stage: workers-runner
+# BullMQ Workers 独立运行器
+# 从 deploy-prod 获取平坦 node_modules（无符号链接，包含 tsx/esbuild/bullmq 等完整依赖）
+# ========================
+FROM node:22-alpine AS workers-runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# 运行时工具：FFmpeg（视频处理）+ yt-dlp（链接下载）
+RUN apk add --no-cache ffmpeg yt-dlp
+
+# 安全：非 root 用户
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# 从 pnpm deploy --prod 输出获取完整、平坦的 node_modules（无符号链接）
+# 包含：tsx、esbuild、bullmq、ioredis、pg、ali-oss、dotenv、jose、bcryptjs、zod 等
+COPY --from=deploy-prod /deploy/node_modules ./node_modules
+COPY --from=deploy-prod /deploy/package.json ./package.json
+
+# Workers 源码（tsx 运行时编译执行 TypeScript）
+COPY --from=builder /app/src/workers ./src/workers
+COPY --from=builder /app/src/lib ./src/lib
+COPY --from=builder /app/src/services ./src/services
+COPY --from=builder /app/src/constants ./src/constants
+COPY --from=builder /app/src/types ./src/types
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+
+# Prisma client（Worker 进程 ORM 查询需要）
+COPY --from=builder /app/src/generated/prisma ./src/generated/prisma
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+
+# .env.production 复制为 .env，供运行时读取环境变量
+COPY --from=builder /app/.env.production ./.env
+
+# 上传临时目录（Worker 处理视频时的本地中转）
+RUN mkdir -p /app/public/uploads/temp && chown -R nextjs:nodejs /app/public/uploads
+
+USER nextjs
+
+CMD ["node", "--import", "tsx", "src/workers/index.ts"]

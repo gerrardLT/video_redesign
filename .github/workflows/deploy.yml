@@ -2,6 +2,11 @@
 # 触发：推送到 main 分支
 # 流程：代码检查 → SSH 到生产服务器 → 执行 deploy.sh
 #
+# 构建要求：
+# - 生产服务器需要 Docker BuildKit 支持（Docker 18.09+）
+# - deploy.sh 中使用 BuildKit cache mount 加速构建（pnpm store + .next/cache）
+# - 部署前通过环境变量 DOCKER_BUILDKIT=1 和 COMPOSE_DOCKER_CLI_BUILD=1 显式启用
+#
 # 需要在 GitHub repo Settings → Secrets and variables → Actions 中配置：
 # - SERVER_SSH_KEY: 服务器 SSH 私钥（ed25519 或 rsa）
 # - SERVER_HOST: 服务器 IP（165.154.147.155）
@@ -24,7 +29,7 @@ jobs:
   deploy:
     name: 部署到宝塔服务器
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: 📦 检出代码
@@ -53,6 +58,10 @@ jobs:
             
             # 进入项目目录
             cd /www/wwwroot/video-redesign
+            
+            # 显式启用 BuildKit（Dockerfile 中使用 cache mount 需要）
+            export DOCKER_BUILDKIT=1
+            export COMPOSE_DOCKER_CLI_BUILD=1
             
             # 执行部署脚本（已包含：拉代码→构建→迁移→重启）
             bash deploy.sh

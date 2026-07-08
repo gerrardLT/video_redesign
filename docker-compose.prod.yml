@@ -1,12 +1,14 @@
 # 生产部署 docker-compose（宝塔面板适用）
+# 构建架构：Dockerfile 多阶段构建，app/workers/migrate 分别对应不同 build target
 # 使用方式：docker-compose -f docker-compose.prod.yml up -d --build
 
 services:
-  # Next.js 前端 + API
+  # Next.js 前端 + API（build target: app-runner）
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      target: app-runner
       args:
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     ports:
@@ -49,9 +51,12 @@ services:
     profiles:
       - migrate
 
-  # Workers（后台任务：视频解析/生成/合并/人物图等）
+  # Workers（后台任务：视频解析/生成/合并/人物图等，build target: workers-runner）
   workers:
-    image: video-redesign-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: workers-runner
     command: ["node", "--import", "tsx", "src/workers/index.ts"]
     env_file:
       - .env.production
