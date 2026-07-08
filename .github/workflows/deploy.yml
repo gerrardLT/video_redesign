@@ -48,8 +48,8 @@ jobs:
           # 添加服务器到 known_hosts（避免首次连接交互确认）
           ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts 2>/dev/null
 
-          # SSH 到服务器执行部署
-          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'DEPLOY_SCRIPT'
+          # SSH 到服务器执行部署（ServerAliveInterval 防止长时间构建时连接超时断开）
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 $SERVER_USER@$SERVER_HOST << 'DEPLOY_SCRIPT'
             set -e
             
             echo "===== 开始自动部署 ====="
