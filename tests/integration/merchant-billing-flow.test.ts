@@ -29,6 +29,16 @@ import {
   refundCreditsByBizRef,
 } from '@/lib/shared/credit-service'
 
+// PostgreSQL 连接检测：CI 环境无数据库时自动跳过整个测试文件
+let pgAvailable = false
+try {
+  await prisma.$queryRaw`SELECT 1`
+  pgAvailable = true
+} catch {
+  pgAvailable = false
+  console.warn('⚠️ PostgreSQL 不可用，跳过集成测试文件: merchant-billing-flow.test.ts')
+}
+
 /** 仓库根目录（vitest 运行时 cwd 即仓库根），用于读取生产源码做结构断言 */
 const REPO_ROOT = process.cwd()
 
@@ -78,8 +88,8 @@ afterAll(async () => {
   await redis.quit()
 })
 
-/** 缺少基础设施时跳过整组集成测试 */
-const skipIfNoInfra = !process.env.DATABASE_URL || !process.env.REDIS_URL
+/** 缺少基础设施时跳过整组集成测试（环境变量缺失或 PostgreSQL 连接失败） */
+const skipIfNoInfra = !process.env.DATABASE_URL || !process.env.REDIS_URL || !pgAvailable
 
 describe.skipIf(skipIfNoInfra)('商家计费渲染补偿集成测试（真实 PostgreSQL + Redis 锁）', () => {
   describe('渲染成功路径：reserve → charge（差额退回，Req 6.5）', () => {
