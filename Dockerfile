@@ -132,10 +132,8 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Prisma client（运行时 ORM 查询需要）
+# Prisma client（运行时 ORM 查询需要，Prisma 7 输出完全在 src/generated/prisma/）
 COPY --from=builder /app/src/generated/prisma ./src/generated/prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # .env.production 复制为 .env，供运行时读取环境变量
 COPY --from=builder /app/.env.production ./.env
