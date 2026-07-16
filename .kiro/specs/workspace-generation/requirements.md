@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：🔒 已封存（视频重绘后端能力保留，前端 /dashboard/workspace 已下线）
+> **对应实现**：`src/lib/video/{workspace-generation-service,workspace-request-builder,workspace-validators}.ts`、`src/lib/shared/happyhorse-workspace.ts`、`src/stores/happyhorse-store.ts`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 工作台（Workspace）是用户进行视频生成的核心入口页面。用户在此输入 prompt、上传参考素材（图片/视频/音频）、选择模型（Seedance 2.0 或 HappyHorse）、配置生成参数，一键触发视频生成任务。生成过程通过 SSE 实时推送进度，生成结果展示在页面下方画廊区域。工作台模式与现有「分镜工厂」模式互补——工作台面向快速单次生成，分镜工厂面向长视频逐组重绘。

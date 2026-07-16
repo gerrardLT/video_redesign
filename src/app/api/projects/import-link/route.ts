@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     // 限流：3 次/分钟/用户
     const rateLimitKey = `${userId}:import-link`
-    const rateResult = checkRateLimit(rateLimitKey, 3, 60 * 1000)
+    const rateResult = await checkRateLimit(rateLimitKey, 3, 60 * 1000)
     if (!rateResult.allowed) {
       return NextResponse.json(
         { error: '操作过于频繁，请稍后再试（每分钟最多 3 次）' },

@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "视频重塑 · AI 本地生活营销平台",
+  title: "AI 本地生活营销平台",
   description:
-    "面向本地生活商家的 AI 短视频营销平台：商家问诊建店、AI 生成每周内容计划、按分镜拍摄、一键生成并发布。内置视频重塑创作模块，保持人物一致、分镜级控制。",
+    "面向本地生活商家的 AI 短视频营销平台：商家问诊建店、AI 生成每周内容计划、按分镜拍摄、一键生成并发布。底层内置 AI 视频生成能力，保持人物一致、分镜级控制。",
 };
 
 export default function RootLayout({
@@ -32,8 +32,8 @@ export default function RootLayout({
       <head>
         {/* 字体加载：
             - Manrope + Noto Sans SC：本地生活商家端（Starbucks 风格）正文/UI
-            - Noto Serif SC：落地页/营销展示标题（编辑感衬线）
-            统一通过 Google Fonts 加载，修复此前落地页引用 Noto 却从未加载、回退系统宋体的问题 */}
+            - Noto Serif SC：营销展示标题（编辑感衬线）
+            统一通过 Google Fonts 加载 */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

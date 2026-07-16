@@ -14,28 +14,11 @@
  *
  * Requirements: 10.1, 10.4
  */
-import { NextRequest, NextResponse } from 'next/server'
-import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
+import { NextResponse } from 'next/server'
 import { getStoreSwitcher } from '@/lib/merchant/cross-store-service'
-import { ApiError } from '@/lib/shared/api-error'
-export async function GET(request: NextRequest) {
-  try {
-    // 1. 鉴权
-    const userId = getUserIdFromRequest(request)
-    // 2. 获取门店切换器数据（单店/无多店权益时返回 multiStore:false）
-    const switcher = await getStoreSwitcher({ userId })
-    return NextResponse.json(switcher)
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return NextResponse.json(
-        { error: { code: error.code, message: error.message } },
-        { status: error.statusCode }
-      )
-    }
-    console.error('[GET /api/stores/switcher] 未知错误:', error)
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
-      { status: 500 }
-    )
-  }
-}
+import { withMerchantHandler } from '@/lib/merchant/api-route-handler'
+
+export const GET = withMerchantHandler('GET /api/stores/switcher', async ({ userId }) => {
+  const switcher = await getStoreSwitcher({ userId })
+  return NextResponse.json(switcher)
+})

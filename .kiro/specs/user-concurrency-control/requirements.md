@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：✅ 已实现（当前生效）
+> **对应实现**：`src/lib/shared/{privilege-engine,priority-scheduler,concurrency-controller}.ts`、`src/lib/video/generation-orchestrator.ts`、`src/workers/concurrency-reconcile.ts`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 基于用户等级的并发控制系统，作为 SaaS 产品差异化卖点。不同订阅等级（免费/月卡/年卡）的用户在解析、生成、合并三种任务类型上拥有不同的并发额度与队列优先级。付费用户享受更高并发度、优先级队列调度、以及并行生成模式（一键同时入队所有分镜组），而免费用户则走链式串行生成、标准优先级、且受限于较低并发额度。系统在任务入队前校验用户并发额度，超限时拒绝并提示升级。

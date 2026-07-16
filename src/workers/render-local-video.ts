@@ -60,6 +60,12 @@ export interface RenderLocalVideoJobData {
   shotTaskId?: string
   /** 运营型用户高级抽屉参数（可选，仅单版本重生成透传） */
   advancedParams?: RenderAdvancedParams
+  /** 选定风格 ID（可选，屏 C 单选生成时传入，仅生成单版本） */
+  selectedStyle?: string
+  /** 创作模式（可选，来自 creation-mode-router，透传给 renderLocalVideoVariants） */
+  creationMode?: import('@/generated/prisma').CreationMode
+  /** 门店 ID */
+  storeId?: string
 }
 
 /** 归一化后的待合规检查版本（统一携带所属 brief，供入队 compliance-review） */
@@ -74,7 +80,7 @@ interface RenderedVariantRef {
 // ========================
 
 async function processRenderLocalVideo(job: Job<RenderLocalVideoJobData>): Promise<void> {
-  const { contentBriefId, userId, videoVariantId, shotTaskId, advancedParams } = job.data
+  const { contentBriefId, userId, videoVariantId, shotTaskId, advancedParams, selectedStyle, creationMode } = job.data
   const mode: RenderLocalVideoMode = job.data.mode ?? 'INTEGRAL'
 
   console.log(
@@ -91,6 +97,8 @@ async function processRenderLocalVideo(job: Job<RenderLocalVideoJobData>): Promi
     videoVariantId,
     shotTaskId,
     advancedParams,
+    selectedStyle,
+    creationMode,
   })
 
   console.log(`[render-local-video] 渲染完成（mode=${mode}），涉及 ${variants.length} 个版本`)
@@ -117,8 +125,10 @@ async function dispatchRender(params: {
   videoVariantId?: string
   shotTaskId?: string
   advancedParams?: RenderAdvancedParams
+  selectedStyle?: string
+  creationMode?: import('@/generated/prisma').CreationMode
 }): Promise<RenderedVariantRef[]> {
-  const { mode, contentBriefId, userId, videoVariantId, shotTaskId, advancedParams } = params
+  const { mode, contentBriefId, userId, videoVariantId, shotTaskId, advancedParams, selectedStyle, creationMode } = params
 
   if (mode === 'REGEN_VARIANT') {
     if (!videoVariantId) {
@@ -151,11 +161,11 @@ async function dispatchRender(params: {
     return variants.map((v) => ({ id: v.id, type: v.type, contentBriefId }))
   }
 
-  // 缺省：整体渲染全部 3 个版本
+  // 缺省：整体渲染全部 3 个版本（或 selectedStyle 指定单版本）
   if (!contentBriefId) {
     throw new Error('[render-local-video] 整体渲染模式缺少 contentBriefId')
   }
-  const variants = await renderLocalVideoVariants({ contentBriefId, userId })
+  const variants = await renderLocalVideoVariants({ contentBriefId, userId, selectedStyle, creationMode })
   return variants.map((v) => ({ id: v.id, type: v.type, contentBriefId }))
 }
 

@@ -189,7 +189,7 @@ export async function createAssetExpiringNotification(
   const meta: Record<string, string> = {
     assetId: assetInfo.assetId,
     projectId: assetInfo.projectId,
-    link: `/dashboard/projects/${assetInfo.projectId}`,
+    link: `/merchant/stores/${assetInfo.projectId}`,
     bookmarkLink: `/api/assets/${assetInfo.assetId}/bookmark`,
     expiresAt: assetInfo.expiresAt.toISOString(),
   }
@@ -220,7 +220,7 @@ export async function createPaymentSuccessNotification(
   const content = `您已成功购买「${orderInfo.packageName}」，支付 ¥${amountYuan}，${orderInfo.credits} 积分已到账。`
   const meta: Record<string, string> = {
     orderId: orderInfo.orderId,
-    link: `/dashboard/orders`,
+    link: `/merchant`,
   }
 
   return create({

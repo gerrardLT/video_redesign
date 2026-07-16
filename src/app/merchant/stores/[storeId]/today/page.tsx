@@ -263,7 +263,7 @@ export default function TodayTaskPage() {
         </div>
       </section>
 
-      {/* 今日任务 Hero — v3 Zen 设计签名 */}
+      {/* 今日任务 Hero */}
       <section className="py-6 zen-reveal">
         {/* Kicker 文字 + 绿发丝线 */}
         <div className="flex items-center gap-2 mb-3.5">

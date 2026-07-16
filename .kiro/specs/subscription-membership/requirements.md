@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：✅ 已实现（当前生效）
+> **对应实现**：`src/lib/shared/{subscription-service,credit-dispatcher,privilege-engine}.ts`、`src/workers/subscription-*.ts`、`/membership`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 在现有积分包（Package + PackageOrder）一次性购买体系基础上，新增订阅制会员体系。通过月卡/年卡会员套餐提供每月自动到账积分与会员特权，建立持续付费粘性机制，降低用户流失率。订阅制与积分包并存，互不排斥；会员积分与购买积分合并计算，不区分来源。

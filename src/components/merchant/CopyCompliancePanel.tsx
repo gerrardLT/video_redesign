@@ -309,7 +309,7 @@ export function CopyCompliancePanel({
 
   if (!platformCopies || platforms.length === 0) {
     return (
-      <div className="mt-6 p-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/60 text-sm text-gray-500">
+      <div className="mt-6 p-4 rounded-xl border border-dashed border-[var(--ll-hair)] bg-[var(--ll-muted)]/60 text-sm text-[var(--ll-text-3)]">
         该内容暂无平台文案，生成视频后即可在此编辑与改写。
       </div>
     )
@@ -317,7 +317,7 @@ export function CopyCompliancePanel({
 
   return (
     <div className="mt-6">
-      <h2 className="text-sm font-bold text-gray-800 mb-3">文案编辑与合规</h2>
+      <h2 className="text-sm font-bold text-[var(--ll-text)] mb-3">文案编辑与合规</h2>
 
       {/* 平台切换标签 */}
       <div className="flex gap-1.5 mb-3 overflow-x-auto">
@@ -327,8 +327,8 @@ export function CopyCompliancePanel({
             className={cn(
               'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all',
               activePlatform === platform
-                ? 'bg-amber-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-[var(--ll-green)] text-black'
+                : 'bg-[var(--ll-muted)] text-[var(--ll-text-2)] hover:bg-[var(--ll-muted)]/80'
             )}
             onClick={() => setActivePlatform(platform)}
           >
@@ -362,7 +362,7 @@ export function CopyCompliancePanel({
 
       {/* 就地编辑表单 */}
       {draft && (
-        <Card className="p-4 rounded-xl border border-gray-100 space-y-3">
+        <Card className="p-4 rounded-xl border border-[var(--ll-hair)] space-y-3">
           <EditField
             label="标题"
             value={draft.title}
@@ -382,17 +382,17 @@ export function CopyCompliancePanel({
 
           {/* 标签（chips + 添加）*/}
           <div>
-            <label className="text-xs text-gray-400 font-medium">标签</label>
+            <label className="text-xs text-[var(--ll-text-3)] font-medium">标签</label>
             <div className="flex flex-wrap gap-1.5 mt-1">
               {draft.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-xs rounded-full"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--ll-muted)] text-[var(--ll-text-2)] text-xs rounded-full"
                 >
                   #{tag}
                   <button
                     type="button"
-                    className="hover:text-amber-900"
+                    className="hover:text-[var(--ll-text)]"
                     onClick={() => removeTag(tag)}
                     aria-label={`删除标签 ${tag}`}
                   >
@@ -406,7 +406,7 @@ export function CopyCompliancePanel({
                 type="text"
                 value={tagInput}
                 placeholder="输入标签后回车添加"
-                className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:border-amber-400 focus:outline-none"
+                className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-[var(--ll-hair)] focus:border-[var(--ll-green)] focus:outline-none"
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -435,9 +435,9 @@ export function CopyCompliancePanel({
           />
 
           {/* 操作按钮 */}
-          <div className="pt-2 border-t border-gray-100 space-y-2">
+          <div className="pt-2 border-t border-[var(--ll-hair)] space-y-2">
             <Button
-              className="w-full h-10 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white"
+              className="w-full h-10 rounded-xl text-sm font-bold bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black"
               disabled={!dirty || busy}
               onClick={handleSave}
             >
@@ -487,7 +487,7 @@ export function CopyCompliancePanel({
                 按平台改写
               </Button>
             </div>
-            <p className="text-[11px] text-gray-400 text-center">
+            <p className="text-[11px] text-[var(--ll-text-3)] text-center">
               重新生成 / 按平台改写为 AI 动作，会消耗少量积分
             </p>
           </div>
@@ -521,19 +521,19 @@ function EditField({
 }) {
   return (
     <div>
-      <label className="text-xs text-gray-400 font-medium">{label}</label>
+      <label className="text-xs text-[var(--ll-text-3)] font-medium">{label}</label>
       {multiline ? (
         <textarea
           value={value}
           rows={4}
-          className="mt-1 w-full px-3 py-2 text-sm text-gray-800 rounded-lg border border-gray-200 focus:border-amber-400 focus:outline-none resize-y leading-relaxed"
+          className="mt-1 w-full px-3 py-2 text-sm text-[var(--ll-text)] rounded-lg border border-[var(--ll-hair)] focus:border-[var(--ll-green)] focus:outline-none resize-y leading-relaxed"
           onChange={(e) => onChange(e.target.value)}
         />
       ) : (
         <input
           type="text"
           value={value}
-          className="mt-1 w-full px-3 py-2 text-sm text-gray-800 rounded-lg border border-gray-200 focus:border-amber-400 focus:outline-none"
+          className="mt-1 w-full px-3 py-2 text-sm text-[var(--ll-text)] rounded-lg border border-[var(--ll-hair)] focus:border-[var(--ll-green)] focus:outline-none"
           onChange={(e) => onChange(e.target.value)}
         />
       )}
@@ -561,10 +561,10 @@ function ComplianceRiskBlock({
     <Card
       className={cn(
         'p-4 rounded-xl border-2 mb-3',
-        isBlocked ? 'border-red-200 bg-red-50/50' : 'border-orange-200 bg-orange-50/50'
+        isBlocked ? 'border-[var(--ll-danger)]/30 bg-[var(--ll-danger)]/10' : 'border-[var(--ll-warning)]/30 bg-[var(--ll-warning)]/10'
       )}
     >
-      <div className={cn('flex items-center gap-2', isBlocked ? 'text-red-600' : 'text-orange-600')}>
+      <div className={cn('flex items-center gap-2', isBlocked ? 'text-[var(--ll-danger)]' : 'text-[var(--ll-warning)]')}>
         {isBlocked ? <ShieldX className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
         <h3 className="text-sm font-bold">
           {isBlocked ? '合规不通过，需先改写' : '存在合规风险，建议改写'}
@@ -574,14 +574,14 @@ function ComplianceRiskBlock({
       {/* 命中违禁词 / 风险点（evidence：命中词 + 原因）*/}
       <div className="mt-3 space-y-2">
         {issues.length === 0 && (
-          <p className="text-xs text-gray-500">检测到风险，请使用一键改写规避优化文案</p>
+          <p className="text-xs text-[var(--ll-text-3)]">检测到风险，请使用一键改写规避优化文案</p>
         )}
         {issues.map((issue, i) => (
           <div
             key={i}
             className={cn(
               'p-2 rounded-lg text-xs',
-              isBlocked ? 'bg-white/70 text-red-700' : 'bg-white/70 text-orange-700'
+              isBlocked ? 'bg-[var(--ll-muted)]/70 text-[var(--ll-danger)]' : 'bg-[var(--ll-muted)]/70 text-[var(--ll-warning)]'
             )}
           >
             <p className="font-medium">{issue.reason}</p>
@@ -595,7 +595,7 @@ function ComplianceRiskBlock({
       <Button
         className={cn(
           'w-full h-10 rounded-xl text-sm font-bold mt-3 text-white',
-          isBlocked ? 'bg-red-500 hover:bg-red-600' : 'bg-orange-500 hover:bg-orange-600'
+          isBlocked ? 'bg-[var(--ll-danger)] hover:bg-[var(--ll-danger)]/80' : 'bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)]'
         )}
         disabled={disabled}
         onClick={onRewrite}
@@ -612,7 +612,7 @@ function ComplianceRiskBlock({
           </>
         )}
       </Button>
-      <p className="text-[11px] text-gray-400 text-center mt-1.5">
+      <p className="text-[11px] text-[var(--ll-text-3)] text-center mt-1.5">
         一键改写为 AI 动作，会消耗少量积分，改写后将自动重新检测
       </p>
     </Card>
@@ -635,10 +635,10 @@ function ComplianceRewriteResult({
     <Card
       className={cn(
         'p-4 rounded-xl border-2 mb-3',
-        stillBlocked ? 'border-orange-200 bg-orange-50/50' : 'border-green-200 bg-green-50/50'
+        stillBlocked ? 'border-[var(--ll-warning)]/30 bg-[var(--ll-warning)]/10' : 'border-[var(--ll-success)]/30 bg-[var(--ll-success)]/10'
       )}
     >
-      <div className={cn('flex items-center gap-2', stillBlocked ? 'text-orange-600' : 'text-green-600')}>
+      <div className={cn('flex items-center gap-2', stillBlocked ? 'text-[var(--ll-warning)]' : 'text-[var(--ll-success)]')}>
         {stillBlocked ? <ShieldAlert className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
         <h3 className="text-sm font-bold">
           {stillBlocked ? '已改写，但仍有剩余风险' : '改写完成，已通过合规检测'}
@@ -648,13 +648,13 @@ function ComplianceRewriteResult({
       {/* 改写后的文案 */}
       <div className="mt-3 space-y-2 text-xs">
         <div>
-          <span className="text-gray-400 font-medium">改写后标题：</span>
-          <span className="text-gray-800">{rewrittenCopy.title}</span>
+          <span className="text-[var(--ll-text-3)] font-medium">改写后标题：</span>
+          <span className="text-[var(--ll-text)]">{rewrittenCopy.title}</span>
         </div>
         {rewrittenCopy.caption && (
           <div>
-            <span className="text-gray-400 font-medium">改写后文案：</span>
-            <p className="text-gray-700 mt-0.5 whitespace-pre-wrap leading-relaxed">
+            <span className="text-[var(--ll-text-3)] font-medium">改写后文案：</span>
+            <p className="text-[var(--ll-text-2)] mt-0.5 whitespace-pre-wrap leading-relaxed">
               {rewrittenCopy.caption}
             </p>
           </div>
@@ -664,12 +664,12 @@ function ComplianceRewriteResult({
       {/* 剩余风险（如仍未通过，显式列出，不标记通过）*/}
       {stillBlocked && (
         <div className="mt-3 space-y-2">
-          <p className="text-xs font-medium text-orange-700 flex items-center gap-1">
+          <p className="text-xs font-medium text-[var(--ll-warning)] flex items-center gap-1">
             <AlertTriangle className="h-3.5 w-3.5" />
             剩余风险点（请继续手动调整）
           </p>
           {remainingIssues.map((issue, i) => (
-            <div key={i} className="p-2 bg-white/70 rounded-lg text-xs text-orange-700">
+            <div key={i} className="p-2 bg-[var(--ll-muted)]/70 rounded-lg text-xs text-[var(--ll-warning)]">
               <p className="font-medium">{issue.reason}</p>
               {issue.matchedText && (
                 <p className="mt-0.5 opacity-80">命中表达：「{issue.matchedText}」</p>
@@ -677,7 +677,7 @@ function ComplianceRewriteResult({
             </div>
           ))}
           {remainingIssues.length === 0 && (
-            <p className="text-xs text-orange-600">仍存在风险，请进一步调整文案后重试</p>
+            <p className="text-xs text-[var(--ll-warning)]">仍存在风险，请进一步调整文案后重试</p>
           )}
         </div>
       )}
@@ -702,15 +702,15 @@ function OverwriteConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-5"
+        className="w-full max-w-sm bg-[var(--ll-surface)] rounded-2xl shadow-xl p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 text-orange-600">
+        <div className="flex items-center gap-2 text-[var(--ll-warning)]">
           <AlertTriangle className="h-5 w-5" />
           <h3 className="text-base font-bold">将覆盖你的手动修改</h3>
         </div>
 
-        <p className="mt-3 text-sm text-gray-600">
+        <p className="mt-3 text-sm text-[var(--ll-text-2)]">
           当前文案是你手动编辑过的。「{label}」会用 AI 生成的新文案替换它，
           替换后无法恢复你的手动内容。确定要继续吗？
         </p>
@@ -720,7 +720,7 @@ function OverwriteConfirmDialog({
             取消
           </Button>
           <Button
-            className="flex-1 h-10 rounded-xl text-sm bg-orange-500 hover:bg-orange-600 text-white"
+            className="flex-1 h-10 rounded-xl text-sm bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black"
             onClick={onConfirm}
           >
             <RefreshCw className="h-4 w-4 mr-1.5" />

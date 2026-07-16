@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/shared/db'
 import { MerchantOnboardingSchema } from '@/lib/validations/merchant'
 import { generateStoreProfileQueue } from '@/lib/shared/queue'
+import { logger } from '@/lib/shared/logger'
 
 export async function POST(request: NextRequest) {
   // 1. 鉴权：从 middleware 注入的 x-user-id header 获取 userId
@@ -126,8 +127,11 @@ export async function POST(request: NextRequest) {
     merchantId = result.merchantId
     storeId = result.storeId
   } catch (error) {
-    console.error('[onboarding] 事务执行失败:', error)
-    throw error
+    logger.error('[onboarding] 事务执行失败', { error: error instanceof Error ? error.message : String(error) })
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
+      { status: 500 }
+    )
   }
 
   // 5. 事务提交后，通过 BullMQ 入队画像生成任务（Requirement 1.4）

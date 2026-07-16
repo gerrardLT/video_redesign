@@ -268,11 +268,11 @@ export function GenerationControlPanel({
 
   return (
     <div className="mt-6">
-      <h2 className="text-sm font-bold text-gray-800 mb-3">不满意？重新生成或重拍</h2>
+      <h2 className="text-sm font-bold text-[var(--ll-text)] mb-3">不满意？重新生成或重拍</h2>
 
       {/* 积分不足显式提示（需求 4.8）*/}
       {insufficient && (
-        <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700 flex items-start gap-2">
+        <div className="mb-3 p-3 bg-[var(--ll-danger)]/20 border border-[var(--ll-danger)]/30 rounded-xl text-sm text-[var(--ll-danger)] flex items-start gap-2">
           <Wallet className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <span>{error || '积分不足，请充值后再试'}</span>
         </div>
@@ -280,38 +280,38 @@ export function GenerationControlPanel({
 
       {/* 其它错误提示 */}
       {error && !insufficient && (
-        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+        <div className="mb-3 p-3 bg-red-900/20 border border-red-800/30 rounded-xl text-sm text-red-400">
           {error}
         </div>
       )}
 
       {/* ── 重新生成此版本 ── */}
-      <Card className="p-4 rounded-2xl border border-gray-100 space-y-3">
+      <Card className="p-4 rounded-2xl border border-white/10 space-y-3">
         <div className="flex items-center gap-2">
-          <Film className="h-4 w-4 text-amber-500" />
-          <h3 className="text-sm font-bold text-gray-800">重新生成此版本</h3>
+          <Film className="h-4 w-4 text-white/50" />
+          <h3 className="text-sm font-bold text-[var(--ll-text)]">重新生成此版本</h3>
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-[var(--ll-text-3)]">
           只重做当前这一版，其它版本保持不变。默认由 AI 自动决定风格与时长，无需任何设置。
         </p>
 
         {/* 当前版本已生效高级参数标注（需求 4.7 可解释）*/}
         {hasAppliedParams && appliedParams && (
-          <div className="p-2.5 bg-amber-50/60 border border-amber-100 rounded-lg text-xs text-amber-700 space-y-0.5">
+          <div className="p-2.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white/50 space-y-0.5">
             <p className="font-medium">本版本使用了以下参数：</p>
             <div className="flex flex-wrap gap-1.5">
               {appliedParams.style && (
-                <span className="px-2 py-0.5 bg-white/70 rounded-full">
+                <span className="px-2 py-0.5 bg-white/10 rounded-full">
                   风格：{STYLE_LABEL_MAP[appliedParams.style] ?? appliedParams.style}
                 </span>
               )}
               {typeof appliedParams.durationSec === 'number' && (
-                <span className="px-2 py-0.5 bg-white/70 rounded-full">
+                <span className="px-2 py-0.5 bg-white/10 rounded-full">
                   时长：{appliedParams.durationSec} 秒
                 </span>
               )}
               {appliedParams.templateId && (
-                <span className="px-2 py-0.5 bg-white/70 rounded-full">
+                <span className="px-2 py-0.5 bg-white/10 rounded-full">
                   模板：{TEMPLATE_LABEL_MAP[appliedParams.templateId] ?? appliedParams.templateId}
                 </span>
               )}
@@ -323,7 +323,7 @@ export function GenerationControlPanel({
         <div>
           <button
             type="button"
-            className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-amber-600 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium text-[var(--ll-text-3)] hover:text-white/60 transition-colors"
             onClick={() => setAdvancedOpen((v) => !v)}
             aria-expanded={advancedOpen}
           >
@@ -335,17 +335,17 @@ export function GenerationControlPanel({
           </button>
 
           {advancedOpen && (
-            <div className="mt-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100 space-y-3">
-              <p className="text-[11px] text-gray-400">
+            <div className="mt-3 p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-3">
+              <p className="text-[11px] text-[var(--ll-text-3)]">
                 不填则由 AI 自动决定。以下设置仅作用于这一次重新生成。
               </p>
 
               {/* 风格 */}
               <div>
-                <label className="text-xs text-gray-500 font-medium">风格</label>
+                <label className="text-xs text-[var(--ll-text-3)] font-medium">风格</label>
                 <select
                   value={advanced.style ?? ''}
-                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:border-amber-400 focus:outline-none"
+                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-white/10 bg-[var(--ll-surface)] text-[var(--ll-text)] focus:border-white/25 focus:outline-none"
                   onChange={(e) =>
                     setAdvanced((p) => ({ ...p, style: e.target.value || undefined }))
                   }
@@ -361,13 +361,13 @@ export function GenerationControlPanel({
 
               {/* 时长 */}
               <div>
-                <label className="text-xs text-gray-500 font-medium">时长（秒）</label>
+                <label className="text-xs text-[var(--ll-text-3)] font-medium">时长（秒）</label>
                 <input
                   type="number"
                   min={1}
                   value={advanced.durationSec ?? ''}
                   placeholder="AI 自动"
-                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:border-amber-400 focus:outline-none"
+                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-white/10 bg-[var(--ll-surface)] text-[var(--ll-text)] placeholder:text-white/20 focus:border-white/25 focus:outline-none"
                   onChange={(e) =>
                     setAdvanced((p) => ({
                       ...p,
@@ -379,10 +379,10 @@ export function GenerationControlPanel({
 
               {/* 模板 */}
               <div>
-                <label className="text-xs text-gray-500 font-medium">镜头模板</label>
+                <label className="text-xs text-[var(--ll-text-3)] font-medium">镜头模板</label>
                 <select
                   value={advanced.templateId ?? ''}
-                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:border-amber-400 focus:outline-none"
+                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-white/10 bg-[var(--ll-surface)] text-[var(--ll-text)] focus:border-white/25 focus:outline-none"
                   onChange={(e) =>
                     setAdvanced((p) => ({ ...p, templateId: e.target.value || undefined }))
                   }
@@ -400,7 +400,7 @@ export function GenerationControlPanel({
         </div>
 
         <Button
-          className="w-full h-10 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white"
+          className="w-full h-10 rounded-xl text-sm font-bold bg-white text-black hover:bg-white/90"
           disabled={busy}
           onClick={handleRegenerate}
         >
@@ -421,24 +421,24 @@ export function GenerationControlPanel({
             </>
           )}
         </Button>
-        <p className="text-[11px] text-gray-400 text-center">
+        <p className="text-[11px] text-[var(--ll-text-3)] text-center">
           重新生成为 AI 动作，会消耗少量积分
         </p>
       </Card>
 
       {/* ── 重拍某个镜头 ── */}
-      <Card className="mt-3 p-4 rounded-2xl border border-gray-100 space-y-3">
+      <Card className="mt-3 p-4 rounded-2xl border border-white/10 space-y-3">
         <div className="flex items-center gap-2">
-          <Clapperboard className="h-4 w-4 text-amber-500" />
-          <h3 className="text-sm font-bold text-gray-800">重拍某个镜头</h3>
+          <Clapperboard className="h-4 w-4 text-white/50" />
+          <h3 className="text-sm font-bold text-[var(--ll-text)]">重拍某个镜头</h3>
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-[var(--ll-text-3)]">
           只重拍不满意的镜头，系统会自动重新合成受影响的片段，其它镜头无需重传。
         </p>
 
         {/* 重拍结果提示（含承接链扩散数量，需求 4.5 可解释）*/}
         {reshootResult && (
-          <div className="p-2.5 bg-green-50 border border-green-100 rounded-lg text-xs text-green-700 flex items-start gap-2">
+          <div className="p-2.5 bg-green-900/20 border border-green-800/30 rounded-lg text-xs text-green-400 flex items-start gap-2">
             <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>
               已基于受影响范围重新合成（共 {reshootResult.affectedCount} 个镜头组）。
@@ -453,7 +453,7 @@ export function GenerationControlPanel({
 
         {/* 镜头列表 */}
         {shotTasks.length === 0 ? (
-          <p className="text-xs text-gray-400">暂无可重拍的镜头</p>
+          <p className="text-xs text-[var(--ll-text-3)]">暂无可重拍的镜头</p>
         ) : (
           <div className="space-y-2">
             {shotTasks.map((task) => {
@@ -466,22 +466,22 @@ export function GenerationControlPanel({
                   className={cn(
                     'w-full text-left p-3 rounded-xl border transition-all',
                     isSelected
-                      ? 'border-amber-300 bg-amber-50/40'
-                      : 'border-gray-100 hover:border-amber-200',
+                      ? 'border-white/30 bg-white/[0.08]'
+                      : 'border-white/10 hover:border-white/20',
                     busy && 'opacity-60 cursor-not-allowed'
                   )}
                   onClick={() => setSelectedShotId(isSelected ? null : task.id)}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex items-center justify-center">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-white/10 text-white/60 text-xs font-bold flex items-center justify-center">
                       {task.order}
                     </span>
-                    <span className="text-sm font-medium text-gray-800 truncate">{task.title}</span>
-                    <span className="ml-auto text-xs text-gray-400 flex-shrink-0">
+                    <span className="text-sm font-medium text-[var(--ll-text)] truncate">{task.title}</span>
+                    <span className="ml-auto text-xs text-[var(--ll-text-3)] flex-shrink-0">
                       {task.durationSec}秒
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500 line-clamp-2">{task.instruction}</p>
+                  <p className="mt-1 text-xs text-[var(--ll-text-3)] line-clamp-2">{task.instruction}</p>
                 </button>
               )
             })}
@@ -491,7 +491,7 @@ export function GenerationControlPanel({
         {/* 重拍按钮（选中镜头后出现）*/}
         {selectedShot && (
           <Button
-            className="w-full h-10 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white"
+            className="w-full h-10 rounded-xl text-sm font-bold bg-white text-black hover:bg-white/90"
             disabled={busy}
             onClick={() => setPendingReshoot(selectedShot)}
           >
@@ -508,7 +508,7 @@ export function GenerationControlPanel({
             )}
           </Button>
         )}
-        <p className="text-[11px] text-gray-400 text-center">
+        <p className="text-[11px] text-[var(--ll-text-3)] text-center">
           重拍合成为 AI 动作，会消耗少量积分
         </p>
       </Card>
@@ -542,26 +542,26 @@ function ReshootConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-5"
+        className="w-full max-w-sm bg-[var(--ll-surface)] border border-white/10 rounded-2xl shadow-xl p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 text-amber-600">
+        <div className="flex items-center gap-2 text-[var(--ll-danger)]">
           <AlertTriangle className="h-5 w-5" />
           <h3 className="text-base font-bold">确认重拍这个镜头？</h3>
         </div>
 
-        <p className="mt-3 text-sm text-gray-600">
+        <p className="mt-3 text-sm text-[var(--ll-text-2)]">
           系统会重新合成「{shotTitle}」所在的片段。
-          若该镜头与后续镜头是同一场景且画面相互承接，会<span className="font-medium text-amber-600">一并重算后续镜头组</span>，确保画面接得上、不断裂。
+          若该镜头与后续镜头是同一场景且画面相互承接，会<span className="font-medium text-[var(--ll-danger)]">一并重算后续镜头组</span>，确保画面接得上、不断裂。
         </p>
-        <p className="mt-2 text-xs text-gray-400">该操作为 AI 动作，会消耗少量积分。</p>
+        <p className="mt-2 text-xs text-[var(--ll-text-3)]">该操作为 AI 动作，会消耗少量积分。</p>
 
         <div className="mt-5 flex gap-3">
           <Button variant="outline" className="flex-1 h-10 rounded-xl text-sm" onClick={onCancel}>
             取消
           </Button>
           <Button
-            className="flex-1 h-10 rounded-xl text-sm bg-amber-500 hover:bg-amber-600 text-white"
+            className="flex-1 h-10 rounded-xl text-sm bg-white text-black hover:bg-white/90"
             onClick={onConfirm}
           >
             <Camera className="h-4 w-4 mr-1.5" />

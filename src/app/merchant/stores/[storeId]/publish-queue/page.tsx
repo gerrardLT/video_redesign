@@ -238,7 +238,7 @@ export default function PublishQueuePage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-8">
-      {/* 标题 — v3 Zen: serif 标题 + lucide strokeWidth 1.5 */}
+      {/* 标题 */}
       <div className="flex items-center gap-2 pt-1 zen-reveal">
         <Megaphone className="h-5 w-5 text-[var(--ll-green)]" strokeWidth={1.5} />
         <h1 className="text-[var(--text-title)] font-semibold font-[var(--font-serif)] text-[var(--ll-text)]">待发布清单</h1>
@@ -268,7 +268,7 @@ export default function PublishQueuePage() {
             type="button"
             variant={filter === tab.key ? 'default' : 'outline'}
             size="sm"
-            className={filter === tab.key ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}
+            className={filter === tab.key ? 'bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black' : ''}
             onClick={() => setFilter(tab.key)}
           >
             {tab.label}
@@ -314,10 +314,10 @@ function EmptyState({ filter }: { filter: FilterKey }) {
         : '还没有导出的视频'
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
-      <Inbox className="h-10 w-10 text-gray-300" />
-      <p className="text-sm text-gray-500">{text}</p>
+      <Inbox className="h-10 w-10 text-[var(--ll-text-3)]" />
+      <p className="text-sm text-[var(--ll-text-3)]">{text}</p>
       {filter !== 'PUBLISHED' && (
-        <p className="text-xs text-gray-400">完成拍摄并导出视频后，会自动出现在这里</p>
+        <p className="text-xs text-[var(--ll-text-3)]">完成拍摄并导出视频后，会自动出现在这里</p>
       )}
     </div>
   )
@@ -353,7 +353,7 @@ function PublishQueueCard({
   const typeLabel = variant ? VARIANT_TYPE_LABELS[variant.type] ?? variant.type : null
 
   return (
-    <Card className="rounded-2xl border-gray-100 p-4">
+    <Card className="rounded-2xl border-[var(--ll-hair)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-[var(--ll-text)]">
@@ -365,7 +365,7 @@ function PublishQueueCard({
                 {typeLabel}
               </Badge>
             )}
-            <span className="flex items-center gap-0.5 text-[11px] text-gray-400">
+            <span className="flex items-center gap-0.5 text-[11px] text-[var(--ll-text-3)]">
               <Clock className="h-3 w-3" />
               导出于 {formatDateTime(item.exportedAt)}
             </span>
@@ -378,7 +378,7 @@ function PublishQueueCard({
             <CheckCircle2 className="mr-0.5 h-3 w-3" /> 已发布
           </Badge>
         ) : (
-          <Badge variant="outline" className="shrink-0 border-amber-300 text-amber-600">
+          <Badge variant="outline" className="shrink-0 border-[var(--ll-hair)] text-[var(--ll-text-2)]">
             未发布
           </Badge>
         )}
@@ -401,7 +401,7 @@ function PublishQueueCard({
 
       {/* 主操作：去发布（打开发布引导） */}
       <Button
-        className="mt-4 w-full bg-amber-500 hover:bg-amber-600 text-white"
+        className="mt-4 w-full bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black"
         size="sm"
         onClick={() => setGuideOpen(true)}
       >
@@ -532,7 +532,7 @@ function PublishGuideDialog({
         <div className="space-y-4">
           {/* 平台选择 */}
           <div className="space-y-1.5">
-            <span className="text-sm text-gray-600">选择要发布的平台</span>
+            <span className="text-sm text-[var(--ll-text-2)]">选择要发布的平台</span>
             <Select value={platform} onValueChange={(v) => setPlatform(v as PublishPlatform)}>
               <SelectTrigger>
                 <SelectValue />
@@ -552,26 +552,26 @@ function PublishGuideDialog({
 
           {/* 文案预览 */}
           {platformCopy ? (
-            <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
-              <p className="text-sm font-medium text-gray-800">{platformCopy.title}</p>
-              <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-gray-600">
+            <div className="rounded-xl border border-[var(--ll-hair)] bg-[var(--ll-muted)]/60 p-3">
+              <p className="text-sm font-medium text-[var(--ll-text)]">{platformCopy.title}</p>
+              <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-[var(--ll-text-2)]">
                 {platformCopy.caption}
               </p>
               {platformCopy.tags?.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {platformCopy.tags.map((t, i) => (
-                    <span key={i} className="text-[11px] text-amber-600">
+                    <span key={i} className="text-[11px] text-[var(--ll-text-2)]">
                       #{t}
                     </span>
                   ))}
                 </div>
               )}
               {platformCopy.cta && (
-                <p className="mt-1.5 text-xs font-medium text-amber-600">{platformCopy.cta}</p>
+                <p className="mt-1.5 text-xs font-medium text-[var(--ll-text-2)]">{platformCopy.cta}</p>
               )}
             </div>
           ) : (
-            <p className="rounded-xl border border-dashed border-gray-200 p-3 text-center text-xs text-gray-400">
+            <p className="rounded-xl border border-dashed border-[var(--ll-hair)] p-3 text-center text-xs text-[var(--ll-text-3)]">
               该平台暂无文案，可前往版本导出页生成或编辑
             </p>
           )}
@@ -596,7 +596,7 @@ function PublishGuideDialog({
             </Button>
           </div>
 
-          <p className="text-[11px] leading-relaxed text-gray-400">
+          <p className="text-[11px] leading-relaxed text-[var(--ll-text-3)]">
             建议顺序：复制文案 → 下载视频 → 打开平台上传发布 → 回来标记已发布。
             标记后该内容会纳入后续数据回填与复盘。
           </p>

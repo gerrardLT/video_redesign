@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：✅ 已实现（当前生效）
+> **对应实现**：`src/lib/{video,merchant,shared,sse,platform-fetchers,validations,validators}/**`（lib 分域重组已落地）
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 本需求描述代码仓库的技术卫生修复工作，覆盖三个维度：将过时的 SQLite 语义测试文件重写为 PostgreSQL 语义、清理 Prisma Schema 中不再准确的注释、以及将 src/lib 平铺的约 95 个模块按业务域重新组织为子目录结构。改造后代码库的测试、注释与物理结构将准确反映当前技术栈（PostgreSQL 16 + Prisma 7.8）。

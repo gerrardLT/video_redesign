@@ -16,6 +16,20 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 领域业务错误基类。
+ *
+ * 服务层在遇到业务前置条件不满足（画像未完成、剧本不可用、单日限额等）时抛出。
+ * 默认 HTTP 422，子类可覆盖 statusCode。所有 DomainError 都是 ApiError，
+ * 统一由 mapMerchantError / apiErrorToResponse 处理。
+ */
+export class DomainError extends ApiError {
+  constructor(code: string, message: string, statusCode: number = 422) {
+    super(code, message, statusCode)
+    this.name = 'DomainError'
+  }
+}
+
 export const ERROR_CODES = {
   VALIDATION_ERROR: '参数校验失败',
   UNAUTHORIZED: '未登录',

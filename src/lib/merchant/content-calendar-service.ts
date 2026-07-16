@@ -25,6 +25,14 @@ import { generatePerformanceInsights } from './performance-learning-service'
 import { WEEKLY_GOAL_SCHEDULE } from '@/constants/merchant'
 import type { ContentGoal, MerchantIndustry, ShotTaskType, ShotTaskDraft } from '@/types/merchant'
 import type { Prisma } from '@/generated/prisma'
+import { toJson } from '@/lib/shared/prisma-json-helpers'
+import {
+  DayLimitExceededError,
+  InvalidDateError,
+  ProfileIncompleteError,
+  PlaybookUnavailableError,
+  GoalPlaybookMismatchError,
+} from './content-brief-api-error'
 
 /**
  * 解析出的未消费复盘反哺输入（来自 PlanGenerationInput 的强类型快照）。
@@ -137,13 +145,13 @@ export async function generateContentPlan(input: {
 
   // 2. 如无 StoreProfile 或 contentPositioning 为空 → 抛错 (Req 4.7)
   if (!store.profile) {
-    throw new Error(
+    throw new ProfileIncompleteError(
       `[content-calendar-service] 门店画像未完成，请先生成画像再创建内容计划 (storeId: ${storeId})`
     )
   }
 
   if (!store.profile.contentPositioning) {
-    throw new Error(
+    throw new ProfileIncompleteError(
       `[content-calendar-service] 门店画像内容定位为空，请先完善画像再创建内容计划 (storeId: ${storeId})`
     )
   }
@@ -394,11 +402,11 @@ export async function generateContentPlan(input: {
           suggestedTitle: draft.suggestedTitle,
           suggestedCoverTitle: draft.suggestedCoverTitle,
           suggestedCta: draft.suggestedCta,
-          platformCopies: draft.platformCopies as unknown as Prisma.InputJsonValue,
+          platformCopies: toJson(draft.platformCopies),
           tags: draft.tags,
           aiReasoning: draft.aiReasoning,
           // 生成时画像引用溯源快照（需求 5.1, 5.2, 5.6）；不回溯改写（需求 5.4）
-          provenance: provenance as unknown as Prisma.InputJsonValue,
+          provenance: toJson(provenance),
           // 创建关联的 ShotTasks
           shotTasks: {
             create: shotTasks.map((st) => ({
@@ -662,7 +670,7 @@ function utcDayStart(date: Date): Date {
 /** 校验日期合法，非法时显式抛错（不静默放过） */
 function assertValidDate(date: Date | undefined, label: string): asserts date is Date {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-    throw new Error(`[content-calendar-service] ${label} 不是合法日期`)
+    throw new InvalidDateError(`[content-calendar-service] ${label} 不是合法日期`)
   }
 }
 
@@ -722,7 +730,7 @@ async function assertDayCapacity(
   })
 
   if (count >= upperBound) {
-    throw new Error(
+    throw new DayLimitExceededError(
       `[content-calendar-service] ${formatDate(date)} 当日内容已达上限 ${upperBound} 条，无法新增或改期到该天（需求 6.2）`
     )
   }
@@ -747,12 +755,12 @@ async function loadStoreContext(storeId: string) {
     throw new Error(`[content-calendar-service] 门店不存在: ${storeId}`)
   }
   if (!store.profile) {
-    throw new Error(
+    throw new ProfileIncompleteError(
       `[content-calendar-service] 门店画像未完成，请先生成画像 (storeId: ${storeId})`
     )
   }
   if (!store.profile.contentPositioning) {
-    throw new Error(
+    throw new ProfileIncompleteError(
       `[content-calendar-service] 门店画像内容定位为空，请先完善画像 (storeId: ${storeId})`
     )
   }
@@ -858,10 +866,10 @@ function castPlaybookRecord(raw: {
 async function loadPlaybookById(playbookId: string): Promise<Playbook> {
   const raw = await prisma.playbook.findUnique({ where: { id: playbookId } })
   if (!raw) {
-    throw new Error(`[content-calendar-service] 剧本不存在: ${playbookId}`)
+    throw new PlaybookUnavailableError(`[content-calendar-service] 剧本不存在: ${playbookId}`)
   }
   if (!raw.isActive) {
-    throw new Error(`[content-calendar-service] 剧本已停用，无法使用: ${playbookId}`)
+    throw new PlaybookUnavailableError(`[content-calendar-service] 剧本已停用，无法使用: ${playbookId}`)
   }
   return castPlaybookRecord(raw)
 }
@@ -877,7 +885,7 @@ async function selectPlaybookForGoal(store: StoreContext, goal: ContentGoal): Pr
   })
   const playbook = playbooks[0]
   if (!playbook) {
-    throw new Error(`[content-calendar-service] 目标 ${goal} 无可用剧本，无法重实例化`)
+    throw new PlaybookUnavailableError(`[content-calendar-service] 目标 ${goal} 无可用剧本，无法重实例化`)
   }
   return playbook
 }
@@ -1053,13 +1061,13 @@ export async function editContentBrief(input: {
         suggestedTitle: draft.suggestedTitle,
         suggestedCoverTitle: draft.suggestedCoverTitle,
         suggestedCta: draft.suggestedCta,
-        platformCopies: draft.platformCopies as unknown as Prisma.InputJsonValue,
+        platformCopies: toJson(draft.platformCopies),
         tags: draft.tags,
         aiReasoning: draft.aiReasoning,
         // 换选题为全新 AI 草稿，整体替换文案，故清除人工修改标记（需求 6.3 重实例化）
         copyEdited: false,
         // 重实例化时刷新画像引用溯源快照（基于当前画像，需求 5.1, 5.2）
-        provenance: provenance as unknown as Prisma.InputJsonValue,
+        provenance: toJson(provenance),
         shotTasks: {
           create: buildShotTaskCreateData(draft.shotTasks),
         },
@@ -1096,7 +1104,7 @@ export async function addContentBrief(input: {
   if (playbookId) {
     playbook = await loadPlaybookById(playbookId)
     if (playbook.goal !== goal) {
-      throw new Error(
+      throw new GoalPlaybookMismatchError(
         `[content-calendar-service] 指定剧本目标(${playbook.goal})与新增目标(${goal})不一致`
       )
     }
@@ -1132,10 +1140,10 @@ export async function addContentBrief(input: {
         suggestedTitle: draft.suggestedTitle,
         suggestedCoverTitle: draft.suggestedCoverTitle,
         suggestedCta: draft.suggestedCta,
-        platformCopies: draft.platformCopies as unknown as Prisma.InputJsonValue,
+        platformCopies: toJson(draft.platformCopies),
         tags: draft.tags,
         aiReasoning: draft.aiReasoning,
-        provenance: provenance as unknown as Prisma.InputJsonValue,
+        provenance: toJson(provenance),
         shotTasks: {
           create: buildShotTaskCreateData(draft.shotTasks),
         },

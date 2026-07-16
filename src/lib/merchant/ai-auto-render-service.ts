@@ -46,6 +46,7 @@ import { assertBriefTransition } from './content-brief-state-machine'
 import type { VideoVariantType } from '@/types/merchant'
 import type { ContentBriefStatus } from '@/generated/prisma'
 import { Prisma } from '@/generated/prisma'
+import { toJson } from '@/lib/shared/prisma-json-helpers'
 
 // ========================
 // 常量
@@ -206,8 +207,8 @@ export async function aiAutoRender(input: {
           width: renderOutput.width,
           height: renderOutput.height,
           subtitles: renderOutput.subtitles,
-          renderParams: renderOutput.renderParams as unknown as Prisma.InputJsonValue,
-          generationLog: generationLogs as unknown as Prisma.InputJsonValue,
+          renderParams: toJson(renderOutput.renderParams),
+          generationLog: toJson(generationLogs),
         },
       })
 

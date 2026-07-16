@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import { ApiError } from '@/lib/shared/api-error'
+import { logger } from '@/lib/shared/logger'
 /** 统一作用域键 cookie 名称：任务中心/通知中心/跨店看板共享 */
 const CURRENT_STORE_COOKIE = 'currentStoreId'
 export async function POST(request: NextRequest) {
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
         { status: error.statusCode }
       )
     }
-    console.error('[POST /api/stores/switch] 未知错误:', error)
+    logger.error('[POST /api/stores/switch] 未知错误:', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
       { status: 500 }

@@ -33,6 +33,7 @@ model User {
   onboardingProgress  OnboardingProgress?
   subscriptionRecords SubscriptionRecord[]
   subscriptionOrders  SubscriptionOrder[]
+  conversations       Conversation[]
 
   @@map("users")
 }
@@ -65,14 +66,18 @@ model Project {
 
   isSample Boolean @default(false) @map("is_sample") // 标记是否为新手引导示例项目
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shots       Shot[]
-  shotGroups  ShotGroup[] // 分镜组反向关系
-  characters  Character[]
-  assets      Asset[]
-  styleConfig StyleConfig?
+  conversationId String? @map("conversation_id") // 来源对话会话（对话式 C 端触发的生成，可空）
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shots        Shot[]
+  shotGroups   ShotGroup[] // 分镜组反向关系
+  characters   Character[]
+  assets       Asset[]
+  styleConfig  StyleConfig?
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([conversationId])
   @@map("projects")
 }
 
@@ -684,6 +689,14 @@ enum VideoVariantType {
   PRODUCT
 }
 
+/// 创作模式 — Inhot 四模式
+enum CreationMode {
+  REPLICATE_TRENDING  // 复刻爆款
+  IMMERSIVE_SHORT     // 沉浸式短片
+  INSPIRE_TO_VIDEO    // 灵感生视频
+  PHOTO_ANIMATE       // 照片跟我动
+}
+
 enum ComplianceRiskLevel {
   LOW
   MEDIUM
@@ -901,6 +914,12 @@ model ContentBrief {
   planInputId         String? // 关联采纳的复盘建议输入 PlanGenerationInput.id（需求 1.7 反哺标注）
   renderMode          String             @default("MANUAL") @map("render_mode") // MANUAL | AUTO — 渲染模式（一键出片）
   autoGenStartedAt    DateTime?          @map("auto_gen_started_at") // 一键出片触发时间
+  creationMode        CreationMode?      // 创作模式（null = 传统计划生成）
+  sourceVideoUrl      String?            // 复刻爆款：源视频 URL
+  sourceImageKeys     Json?              // string[] — 照片跟我动：源图 OSS keys
+  textPrompt          String?            // 灵感生视频：文字描述
+  selectedStyleId     String?            // 用户选定的风格 ID（成片工作室单选）
+  selectedStyleAt     DateTime?          // 风格选定时间
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -956,6 +975,7 @@ model RawAsset {
   shotTaskId     String?
   uploaderUserId String? // 上传者 userId
   type           String // VIDEO | IMAGE
+  category       String? // PRODUCT | CHARACTER | OTHER（素材库分类；null 表示非素材库资产，如复刻临时下载的源视频）
   ossKey         String // OSS 存储路径
   url            String? // 签名 URL（临时，按需生成）
   filename       String?
@@ -975,6 +995,7 @@ model RawAsset {
   shotTask ShotTask? @relation(fields: [shotTaskId], references: [id], onDelete: SetNull)
 
   @@index([storeId])
+  @@index([storeId, category]) // 素材库按分类筛选
   @@index([shotTaskId])
   @@index([expiresAt])
   @@map("raw_assets")
@@ -1000,6 +1021,9 @@ model VideoVariant {
   regenScope     Json? // 上次局部重渲染的受影响分镜组集合（需求 4.5 追溯）
   score          Float? // AI 质量评分
   isSelected     Boolean          @default(false)
+  styleLabel     String?          // 风格标签（如「快节奏种草」）
+  styleProTags   Json?            // string[] — 优点标签
+  styleConTags   Json?            // string[] — 缺点标签
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
@@ -1156,7 +1180,8 @@ model PlanGenerationInput {
   acceptedNextGoals Json? // ContentGoal[] - 采纳的推荐下周目标
   reusePlaybookIds  Json? // string[] - 提升复用权重的剧本
   avoidPlaybookIds  Json? // string[] - 规避名单
-  acceptedSummaries Json // string[] - 用于计划"已采纳上轮复盘建议:<摘要>"标注
+  acceptedSummaries Json // string[] - 用于计划“已采纳上轮复盘建议:<摘要>”标注
+  stylePreference   Json? // { preferredStyleIds: string[], avoidedStyleIds: string[] } — 风格偏好反哺
   consumedAt        DateTime? // 被某次 content-plan 生成消费的时间（一次性）
   createdAt         DateTime  @default(now())
 
@@ -1246,4 +1271,59 @@ model StreakRecord {
   updatedAt      DateTime  @updatedAt
 
   @@map("streak_records")
+}
+
+// ================================================================
+// ============ 对话式 C 端（Studio）新增枚举与模型 ============
+// ============ (additive-only：独立新表，不修改/删除既有表结构) ============
+// ================================================================
+
+/// 对话模式：对应 Inhot 四种生成模式 + 商家技能
+enum ConversationMode {
+  REPLICATE // 复刻爆款
+  SHORTFILM // 沉浸式短片
+  IDEA2VIDEO // 输入灵感生视频（文生视频）
+  PHOTO2MOTION // 照片跟我动（图生视频）
+  MERCHANT // 商家经营技能
+}
+
+/// 对话消息角色
+enum ChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+/// 对话会话：承载一次连续的对话式创作上下文，关联现有 User
+model Conversation {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  title     String? // 会话标题，可由首条消息或意图自动生成
+  mode      ConversationMode @default(REPLICATE)
+  meta      Json? // 软关联信息（如 storeId、当前收集的槽位），不加外键
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+  projects Project[] // 本会话触发生成的底层项目（来源标记）
+
+  @@index([userId])
+  @@map("conversations")
+}
+
+/// 对话消息：用户/助手/系统消息，attachments 存图片/链接，actionRefs 关联产生的实体
+model ChatMessage {
+  id             String   @id @default(cuid())
+  conversationId String   @map("conversation_id")
+  role           ChatRole
+  content        String // 文本内容
+  attachments    Json? // 附件：{ images?: string[], links?: string[] }
+  actionRefs     Json?    @map("action_refs") // 关联实体：{ projectId?, contentBriefId?, jobId? }
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("chat_messages")
 }

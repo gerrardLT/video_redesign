@@ -18,6 +18,7 @@ import { getUserIdFromRequest } from '@/lib/merchant/merchant-auth'
 import { getMerchantPrivileges } from '@/lib/shared/privilege-engine'
 import { getBalance } from '@/lib/shared/credit-service'
 import { ApiError } from '@/lib/shared/api-error'
+import { logger } from '@/lib/shared/logger'
 export async function GET(request: NextRequest) {
   try {
     // 1. 鉴权
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
         { status: error.statusCode }
       )
     }
-    console.error('[GET /api/merchant/subscription] 未知错误:', error)
+    logger.error('[GET /api/merchant/subscription] 未知错误', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
       { status: 500 }

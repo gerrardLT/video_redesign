@@ -221,16 +221,60 @@ export async function freezeExportCredits(
 }
 
 /**
+ * 计算某商家关联键 (bizRefType, bizRefId) 当前「进行中」的冻结净额（pending）。
+ *
+ * 商家计费恒以 (bizRefType, bizRefId) 为关联键，一个 briefId 在其生命周期内可能经历
+ * 多轮「冻结 →（成功扣费 | 失败退款）」——失败后用户重新提交同一 briefId 会开启新一轮。
+ * 旧幂等键仅按 (bizRefType, bizRefId, action) 判断「是否存在」，无法区分轮次：
+ * 失败退款后重提交会因已存在 RESERVE 而跳过冻结，charge 又以为已冻结而不扣余额 → 白嫖。
+ *
+ * 改用金额守恒判据（不依赖记录形态，天然兼容 charge 内部的差额 REFUND）：
+ *   pending = Σ|RESERVE| - Σ REFUND - Σ|CHARGE|
+ * - pending > 0：存在一轮尚未结算的冻结（进行中）。
+ * - pending ≤ 0：无进行中的冻结（本轮已全部扣费或已退款），已结算。
+ *
+ * reserve 在 pending>0 时幂等跳过、否则开新一轮冻结；charge/refund 以 pending 作为本轮
+ * 待结算额，pending≤0 时幂等跳过。对单轮流程行为与旧实现完全等价。
+ *
+ * @param tx Prisma 事务客户端
+ * @param bizRefType 商家实体关联类型
+ * @param bizRefId 商家实体主键
+ * @returns 当前进行中的冻结净额（≤0 视为已结算）
+ */
+async function computeBizRefPending(
+  tx: Prisma.TransactionClient,
+  bizRefType: string,
+  bizRefId: string
+): Promise<number> {
+  const entries = await tx.creditLedger.findMany({
+    where: { bizRefType, bizRefId },
+    select: { action: true, amount: true },
+  })
+  let reservedTotal = 0
+  let refundedTotal = 0
+  let chargedTotal = 0
+  for (const e of entries) {
+    if (e.action === 'RESERVE') reservedTotal += Math.abs(e.amount)
+    else if (e.action === 'REFUND') refundedTotal += e.amount
+    else if (e.action === 'CHARGE') chargedTotal += Math.abs(e.amount)
+  }
+  return reservedTotal - refundedTotal - chargedTotal
+}
+
+/**
  * 商家操作积分冻结（RESERVE，按 (bizRefType, bizRefId) 关联，恒不写 jobId）
  *
  * 泛化 freezeExportCredits 的关联键：把单一 projectId 抽象为 (bizRefType, bizRefId) 元组，
  * 既能避免 jobId 外键约束（credit_ledger_job_id_fkey 要求 jobId 指向已存在的 generation_jobs.id，
  * 而商家操作无对应 GenerationJob），又能区分 CONTENT_BRIEF / CONTENT_PLAN / STORE 等不同商家实体。
  *
+ * @internal 仅由 merchant-billing-service 调用，外部禁止直接使用。商家平台所有计费操作统一经 merchant-billing-service 入口。
+ *
  * 与既有 freezeExportCredits / projectId 版本并存，不改动既有函数签名。
  *
  * - 经 withCreditLock 全局锁【跨进程】串行化 + Prisma 事务，防止 read-modify-write 丢失更新。
- * - 幂等键：(bizRefType, bizRefId, action='RESERVE') 已存在则跳过（重试不重复冻结）。
+ * - 幂等（金额守恒判据）：存在一轮尚未结算的冻结（pending>0）则跳过，避免重复冻结；
+ *   失败退款后 pending 归零，重提交同一 bizRefId 会正确开启新一轮冻结（详见 computeBizRefPending）。
  * - 余额 < amount → 抛 ApiError('INSUFFICIENT_CREDITS', 402)，余额不变、绝不为负、绝不欠费。
  * - 写 CreditLedger 时 jobId 恒为 null，关联字段写 bizRefType / bizRefId。
  *
@@ -250,11 +294,10 @@ export async function reserveCreditsByBizRef(params: {
   const { userId, bizRefType, bizRefId, amount, remark } = params
   await withCreditLock(() =>
     prisma.$transaction(async (tx) => {
-      // 幂等：已存在该 (bizRefType, bizRefId) 的 RESERVE 则跳过（重试场景）
-      const existing = await tx.creditLedger.findFirst({
-        where: { bizRefType, bizRefId, action: 'RESERVE' },
-      })
-      if (existing) return
+      // 幂等（金额守恒判据）：存在一轮尚未结算的冻结（pending>0）则跳过，避免重复冻结；
+      // 失败退款后 pending 归零，重提交同一 briefId 会正确开启新一轮冻结（修复失败重提交白嫖）。
+      const pending = await computeBizRefPending(tx, bizRefType, bizRefId)
+      if (pending > 0) return
 
       const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
       if (user.creditBalance < amount) {
@@ -504,14 +547,17 @@ export async function chargeCreditsTx(
  * 既能避免 jobId 外键约束（商家操作无对应 GenerationJob），又能区分 CONTENT_BRIEF /
  * CONTENT_PLAN / STORE 等不同商家实体。语义与 chargeCreditsTx 完全一致：
  *
- * - 幂等：已存在该 (bizRefType, bizRefId) 的 CHARGE 记录则跳过（队列重试不重复扣费）。
- * - 若存在对应 RESERVE（余额已在冻结时扣减）：将多冻结部分（reserved - actualAmount）
+ * - 幂等（金额守恒判据）：本轮冻结净额 pending≤0 时跳过（本轮已扣费/已退款），保证扣费恰好一次；
+ *   多轮场景下本轮冻结额取 pending（非单条 RESERVE 金额），正确处理失败重提交后的新一轮扣费。
+ * - 若存在对应 RESERVE（余额已在冻结时扣减）：将多冻结部分（pending - actualAmount）
  *   以 REFUND 退回并更新余额，再写一条 CHARGE 记账（余额不再二次变动），
  *   使最终净扣减恰好等于 actualAmount。
- * - 若不存在 RESERVE（未走冻结模型的直扣场景）：校验余额充足后直接扣减并写 CHARGE，
- *   余额不足抛 ApiError('INSUFFICIENT_CREDITS')，绝不欠费、绝不兜底扣至 0。
+ * - 若不存在 RESERVE（未走冻结模型的直扣场景）：已存在 CHARGE 则幂等跳过，否则校验余额充足后
+ *   直接扣减并写 CHARGE，余额不足抛 ApiError('INSUFFICIENT_CREDITS')，绝不欠费、绝不兜底扣至 0。
  *
  * tx 版本：可在外部事务中调用，与商家实体状态更新（如置 ContentBrief GENERATED）同事务。
+ *
+ * @internal 仅由 merchant-billing-service 调用，外部禁止直接使用。商家平台所有计费操作统一经 merchant-billing-service 入口。
  * 与既有 chargeCreditsTx（jobId / projectId 版本）并存，不改动既有函数签名。
  *
  * @param tx Prisma 事务客户端（与商家实体状态更新同事务）
@@ -529,20 +575,19 @@ export async function chargeCreditsByBizRef(
   // 幂等键：按 (bizRefType, bizRefId) 关联 CHARGE / RESERVE 流水
   const ledgerKey = { bizRefType, bizRefId }
 
-  // 幂等检查：已扣费则跳过（保证扣费恰好一次）
-  const existingCharge = await tx.creditLedger.findFirst({
-    where: { ...ledgerKey, action: 'CHARGE' },
-  })
-  if (existingCharge) return
-
-  // 查找 RESERVE：存在则走「冻结→扣费」差额退款；不存在则直扣
+  // 是否走过冻结模型：存在任一 RESERVE 即按「冻结→扣费」差额退款结算，否则直扣。
   const reserveEntry = await tx.creditLedger.findFirst({
     where: { ...ledgerKey, action: 'RESERVE' },
   })
 
   if (reserveEntry) {
-    // RESERVE→CHARGE：余额已在冻结时扣减，此处仅退还多冻结差额并记账
-    const reservedAmount = Math.abs(reserveEntry.amount)
+    // 本轮待结算的冻结净额（金额守恒判据，天然幂等且正确处理多轮）：
+    // pending≤0 表示本轮已结算（已扣费或已退款），直接跳过，保证扣费恰好一次。
+    const pending = await computeBizRefPending(tx, bizRefType, bizRefId)
+    if (pending <= 0) return
+    // RESERVE→CHARGE：余额已在冻结时扣减，此处仅退还本轮多冻结差额并记账。
+    // 本轮冻结额取 pending（而非单条 RESERVE 金额），多轮场景下才正确。
+    const reservedAmount = pending
     const diff = reservedAmount - actualAmount
     if (diff > 0) {
       const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
@@ -577,6 +622,11 @@ export async function chargeCreditsByBizRef(
   }
 
   // 无 RESERVE：直扣并校验余额，绝不欠费、绝不兜底扣至 0
+  // 幂等：直扣场景无冻结轮次概念，已存在 CHARGE 即跳过（重试不重复扣费）。
+  const existingCharge = await tx.creditLedger.findFirst({
+    where: { ...ledgerKey, action: 'CHARGE' },
+  })
+  if (existingCharge) return
   const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
   if (user.creditBalance < actualAmount) {
     throw new ApiError(
@@ -606,7 +656,7 @@ export async function chargeCreditsByBizRef(
  * 商家操作失败补偿退款（REFUND，按 (bizRefType, bizRefId) 关联，恒不写 jobId）
  *
  * 用于商家渲染 / 导出等操作在 CHARGE 之前失败的全额补偿退款：
- * 退还额 = 该关联键已 RESERVE 的冻结额度（full compensation），从对应 RESERVE 流水读取，
+ * 退还额 = 该关联键本轮进行中的冻结净额（pending，见 computeBizRefPending），
  * 无需调用方传入金额，避免与冻结额不一致。
  *
  * 泛化 refundParseCredits 的关联键：把单一 projectId 抽象为 (bizRefType, bizRefId) 元组，
@@ -614,10 +664,11 @@ export async function chargeCreditsByBizRef(
  * CONTENT_PLAN / STORE 等不同商家实体。与既有 refundParseCredits / refundCredits 并存，
  * 不改动既有函数签名。
  *
+ * @internal 仅由 merchant-billing-service 调用，外部禁止直接使用。商家平台所有计费操作统一经 merchant-billing-service 入口。
+ *
  * - 经 withCreditLock 全局锁【跨进程】串行化 + Prisma 事务，防止 read-modify-write 丢失更新。
- * - 幂等键：(bizRefType, bizRefId, action='REFUND') 已存在则跳过（不重复退款）。
- * - 若不存在对应 RESERVE（未冻结或冻结已被结算）：无可退冻结额，跳过（不凭空增加余额）。
- * - 退款后余额恢复到该操作冻结发生前的数值（冻结—退款往返一致）。
+ * - 幂等（金额守恒判据）：本轮冻结净额 pending≤0 时跳过（无进行中冻结 / 已结算 / 重复退款），不重复退款。
+ * - 退款后余额恢复到该操作本轮冻结发生前的数值（冻结—退款往返一致），绝不凭空增加余额。
  *
  * @param params.userId 用户 ID
  * @param params.bizRefType 商家实体关联类型（CONTENT_BRIEF | CONTENT_PLAN | STORE）
@@ -631,19 +682,10 @@ export async function refundCreditsByBizRef(params: {
   const { userId, bizRefType, bizRefId } = params
   await withCreditLock(() =>
     prisma.$transaction(async (tx) => {
-      // 幂等：已存在该 (bizRefType, bizRefId) 的 REFUND 则跳过（不重复退款）
-      const existingRefund = await tx.creditLedger.findFirst({
-        where: { bizRefType, bizRefId, action: 'REFUND' },
-      })
-      if (existingRefund) return
-
-      // 退还额从 RESERVE 流水读取：等于该关联键已冻结的额度（全额补偿）
-      const reserveEntry = await tx.creditLedger.findFirst({
-        where: { bizRefType, bizRefId, action: 'RESERVE' },
-      })
-      // 无对应 RESERVE：无可退冻结额，跳过（绝不凭空增加余额）
-      if (!reserveEntry) return
-      const amount = Math.abs(reserveEntry.amount)
+      // 幂等 + 多轮正确（金额守恒判据）：本轮进行中的冻结净额 pending≤0 时跳过
+      //（无进行中冻结 / 已结算 / 重复退款），绝不凭空增加余额。
+      const amount = await computeBizRefPending(tx, bizRefType, bizRefId)
+      if (amount <= 0) return
 
       const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
       const newBalance = user.creditBalance + amount

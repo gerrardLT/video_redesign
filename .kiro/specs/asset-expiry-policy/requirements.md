@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：✅ 已实现（当前生效）
+> **对应实现**：`src/lib/shared/{asset-lifecycle-service,expiry-status}.ts`、`src/workers/asset-cleanup-worker.ts`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 当前系统对所有 AI 生成资产统一设置 14 天过期策略，由 asset-cleanup Worker 定时清理。但用户资产库中的角色图是跨项目复用的永久资产，不应被自动清理。本功能引入"永久资产"与"临时资产"双轨生命周期策略，确保入库资产不会被误删，同时为用户提供清晰的过期状态感知和资产升级路径。

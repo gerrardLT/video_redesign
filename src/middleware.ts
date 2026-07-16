@@ -13,7 +13,7 @@ const PUBLIC_API_PATHS = [
 ]
 
 // 需要保护的页面路径前缀
-const PROTECTED_PAGE_PREFIXES = ['/dashboard', '/admin', '/projects', '/project', '/merchant']
+const PROTECTED_PAGE_PREFIXES = ['/admin', '/merchant']
 
 function getJwtSecret(): Uint8Array {
   // 必须由环境变量 JWT_SECRET 提供；缺失即抛错，禁止默认回退密钥
@@ -102,5 +102,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/dashboard/:path*', '/admin/:path*', '/projects/:path*', '/project/:path*', '/merchant', '/merchant/:path*'],
+  matcher: ['/api/:path*', '/admin/:path*', '/merchant', '/merchant/:path*'],
 }

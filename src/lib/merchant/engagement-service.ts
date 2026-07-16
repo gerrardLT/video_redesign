@@ -25,6 +25,7 @@
  */
 
 import { prisma } from '@/lib/shared/db'
+import { dispatchNotification } from '@/lib/shared/notification-dispatcher'
 import { resolvePeriods, periodIndexOf } from './period-service'
 import type { PublishedPlatformEntry } from './publish-queue-service'
 
@@ -394,15 +395,15 @@ export async function checkMilestones(input: { storeId: string }): Promise<Miles
 
   for (const m of milestones) {
     if (!awardedSet.has(m.id)) {
-      await prisma.storeNotification.create({
-        data: {
-          storeId,
+      await dispatchNotification(
+        { type: 'store', storeId },
+        {
           type: 'MILESTONE',
           title: m.title,
           body: m.description,
           actionHref: m.actionHref,
-        },
-      })
+        }
+      )
       awardedSet.add(m.id)
     }
   }

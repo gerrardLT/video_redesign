@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：✅ 已实现（当前生效）
+> **对应实现**：`src/lib/merchant/{content-score-service,engagement-service,task-center-service,cross-store-service,impact-scope-service,period-service}.ts`、`src/app/merchant/**`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 本地生活 AI 营销平台（`/merchant` 商家端）当前在「功能交互」与「功能深度」上流于表面。经对现有代码（`performance-learning-service`、`today`/`metrics`/`variants`/`calendar` 页、`compliance-service`、`capture-director`、`local-render-service`）的交叉验证，收敛出一个可预测、可干预、可复用的根因：

@@ -460,6 +460,7 @@ export async function getInsightsUnlockGate(input: {
  * @param input.reusePlaybookIds 采纳复用的剧本 ID（来自 playbooksToReuse → 提升复用权重）
  * @param input.avoidPlaybookIds 采纳规避的剧本 ID（来自 playbooksToAvoid → 规避名单）
  * @param input.acceptedSuggestionSummaries 采纳建议摘要，用于计划上的「已采纳上轮复盘建议」标注
+ * @param input.stylePreference 风格偏好反哺（preferredStyleIds + avoidedStyleIds），写入 PlanGenerationInput 供 style-recommendations 消费
  */
 export async function applyInsights(input: {
   storeId: string
@@ -467,8 +468,9 @@ export async function applyInsights(input: {
   reusePlaybookIds?: string[]
   avoidPlaybookIds?: string[]
   acceptedSuggestionSummaries: string[]
+  stylePreference?: { preferredStyleIds: string[]; avoidedStyleIds: string[] }
 }): Promise<PlanGenerationInput> {
-  const { storeId, acceptedNextGoals, reusePlaybookIds, avoidPlaybookIds, acceptedSuggestionSummaries } = input
+  const { storeId, acceptedNextGoals, reusePlaybookIds, avoidPlaybookIds, acceptedSuggestionSummaries, stylePreference } = input
 
   // 校验门店存在，避免写入指向不存在门店的孤儿输入（不静默吞错）
   const store = await prisma.store.findUnique({ where: { id: storeId }, select: { id: true } })
@@ -485,6 +487,8 @@ export async function applyInsights(input: {
       reusePlaybookIds: reusePlaybookIds && reusePlaybookIds.length > 0 ? reusePlaybookIds : undefined,
       avoidPlaybookIds: avoidPlaybookIds && avoidPlaybookIds.length > 0 ? avoidPlaybookIds : undefined,
       acceptedSummaries: acceptedSuggestionSummaries,
+      // 风格偏好反哺：用户从复盘建议中选择的偏好风格，供 style-recommendations API 消费
+      ...(stylePreference ? { stylePreference: JSON.parse(JSON.stringify(stylePreference)) } : {}),
     },
   })
 

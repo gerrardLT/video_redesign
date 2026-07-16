@@ -34,7 +34,7 @@ export async function POST(
     const userId = request.headers.get('x-user-id')!
 
     // 速率限制检查（与单分镜生成共用 generate 限流键）
-    if (isRateLimited(userId, 'generate')) {
+    if (await isRateLimited(userId, 'generate')) {
       return NextResponse.json({ error: '请求过于频繁，请稍后重试' }, { status: 429 })
     }
 

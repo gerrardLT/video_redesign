@@ -8,7 +8,7 @@
  */
 
 import { randomUUID } from 'crypto'
-import { PLATFORM_CAPTION_LIMITS, CREDIT_COST_COPY_REWRITE } from '@/constants/merchant'
+import { PLATFORM_CAPTION_LIMITS, CREDIT_COST_COPY_REWRITE, LLM_MAX_TOKENS } from '@/constants/merchant'
 import { prisma } from '../shared/db'
 import { ApiError } from '../shared/api-error'
 import { getBalance } from '../shared/credit-service'
@@ -23,6 +23,8 @@ import type {
   PlatformCopy,
 } from '@/types/merchant'
 import { generatePoiInjection, applyPoiToCopy } from './poi-injection-service'
+import type { Store, StoreProfile, ProductOffer } from './playbook-engine'
+import { asStringArray } from '@/lib/shared/prisma-json-helpers'
 import { Prisma } from '@/generated/prisma'
 
 // ========================
@@ -44,42 +46,8 @@ const LLM_API_KEY = process.env.MERCHANT_LLM_API_KEY
 const LLM_MODEL = process.env.MERCHANT_LLM_MODEL || 'qwen-plus'
 
 // ========================
-// 类型定义（Prisma 模型运行时类型别名，仅文案服务所需字段）
+// Store / StoreProfile / ProductOffer 参数类型统一自 playbook-engine.ts
 // ========================
-
-/** 门店基本信息 */
-export interface Store {
-  id: string
-  name: string
-  industry: string
-  city: string | null
-  district: string | null
-  businessArea: string | null
-  mainProducts: string[]
-  mainSellingPoints: string[]
-}
-
-/** 门店画像信息 */
-export interface StoreProfile {
-  id: string
-  storeId: string
-  contentPositioning: string | null
-  recommendedPersona: string | null
-  hookKeywords: string[] | null
-  forbiddenClaims: string[] | null
-  preferredCta: string[] | null
-}
-
-/** 商品/优惠信息 */
-export interface ProductOffer {
-  id: string
-  name: string
-  description: string | null
-  originalPrice: number | null
-  salePrice: number | null
-  sellingPoints: string[] | null
-  usageRules: string | null
-}
 
 // ========================
 // 平台风格描述（用于 LLM prompt）
@@ -296,7 +264,7 @@ ${styleGuide}`
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: LLM_MAX_TOKENS,
       }),
     })
 
@@ -516,10 +484,7 @@ function escapeRegExp(str: string): string {
 // 或 copyEdited=false 时方可替换，并在替换后清除标记（置 copyEdited=false）。
 // ============================================================
 
-/** Prisma Json 数组字段安全转 string[]（非数组时返回空数组） */
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.map((item) => String(item)) : []
-}
+/** Prisma Json 数组字段安全转 string[]（复用共享 helper，非数组时返回空数组） */
 
 /** 文案上下文：从 ContentBrief 装配 LLM 生成所需的门店 / 画像 / 优惠信息 */
 interface CopyContext {
@@ -563,12 +528,14 @@ async function loadCopyContext(
     if (offerRow) {
       offer = {
         id: offerRow.id,
+        storeId: offerRow.storeId,
         name: offerRow.name,
         description: offerRow.description,
         originalPrice: offerRow.originalPrice,
         salePrice: offerRow.salePrice,
         sellingPoints: asStringArray(offerRow.sellingPoints),
         usageRules: offerRow.usageRules,
+        isActive: offerRow.isActive,
       }
     }
   }
@@ -582,8 +549,12 @@ async function loadCopyContext(
     city: brief.store.city,
     district: brief.store.district,
     businessArea: brief.store.businessArea,
+    address: brief.store.address ?? null,
     mainProducts: asStringArray(brief.store.mainProducts),
     mainSellingPoints: asStringArray(brief.store.mainSellingPoints),
+    canShootKitchen: brief.store.canShootKitchen,
+    canShootStaff: brief.store.canShootStaff,
+    canShootCustomers: brief.store.canShootCustomers,
   }
 
   const profile: StoreProfile = {
@@ -594,6 +565,8 @@ async function loadCopyContext(
     hookKeywords: asStringArray(brief.store.profile.hookKeywords),
     forbiddenClaims: asStringArray(brief.store.profile.forbiddenClaims),
     preferredCta: asStringArray(brief.store.profile.preferredCta),
+    contentDos: asStringArray(brief.store.profile.contentDos),
+    contentDonts: asStringArray(brief.store.profile.contentDonts),
   }
 
   // 读取该平台现有文案（按平台改写模式的输入）

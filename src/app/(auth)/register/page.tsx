@@ -36,7 +36,7 @@ export default function RegisterPage() {
       }
 
       // 使用 window.location 确保 cookie 生效后再跳转（Next.js router.push 可能在 cookie 写入前触发）
-      window.location.href = '/dashboard'
+      window.location.href = '/merchant'
     } catch {
       setError('网络错误，请稍后重试')
     } finally {

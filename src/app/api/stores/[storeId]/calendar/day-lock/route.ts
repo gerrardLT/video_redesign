@@ -26,6 +26,7 @@ import { z } from 'zod/v4'
 import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import { setDayLockState } from '@/lib/merchant/content-calendar-service'
 import { ApiError } from '@/lib/shared/api-error'
+import { logger } from '@/lib/shared/logger'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>
@@ -89,7 +90,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         { status: 400 }
       )
     }
-    console.error('[PUT /api/stores/[storeId]/calendar/day-lock] 未知错误:', error)
+    logger.error('[PUT /api/stores/[storeId]/calendar/day-lock] 未知错误:', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
       { status: 500 }

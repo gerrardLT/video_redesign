@@ -24,6 +24,7 @@
 import { Worker, UnrecoverableError, type Job, type ConnectionOptions } from 'bullmq'
 import { redis } from '@/lib/shared/redis'
 import { prisma } from '@/lib/shared/db'
+import { dispatchNotification } from '@/lib/shared/notification-dispatcher'
 import { logger } from '@/lib/shared/logger'
 import {
   crawlAccountMetrics,
@@ -49,17 +50,15 @@ async function createCrawlFailedNotification(account: {
   platform: string
   reason: string
 }): Promise<void> {
-  await prisma.storeNotification.create({
-    data: {
-      storeId: account.storeId,
+  await dispatchNotification(
+    { type: 'store', storeId: account.storeId },
+    {
       type: 'CRAWL_FAILED',
       title: '平台数据抓取失败，需重新关联',
-      // 不向商家透出底层异常细节，仅给出可操作指引；详细 reason 落在 Worker 日志
       body: `「${account.platform}」账号的数据自动抓取已失效（可能是登录态过期或平台策略调整），请重新关联以恢复自动同步；在此之前可继续手动录入数据。`,
-      // 指向门店设置页（平台账号关联卡片所在），便于商家一键重新关联
       actionHref: `/merchant/stores/${account.storeId}/settings`,
-    },
-  })
+    }
+  )
 }
 
 /**

@@ -475,9 +475,25 @@ export async function createStoreProfile(input: {
   })
 
   // ====== 5. 保存到数据库 ======
-  const storeProfile = await prisma.storeProfile.create({
-    data: {
+  // 使用 upsert 保证幂等：重新生成（regenerate）或重复入队时，已存在的画像做覆盖更新，
+  // 避免 storeId 唯一约束冲突（Unique constraint failed）导致任务反复失败重试。
+  const storeProfile = await prisma.storeProfile.upsert({
+    where: { storeId: input.storeId },
+    create: {
       storeId: input.storeId,
+      contentPositioning,
+      recommendedPersona,
+      visualStyle,
+      hookKeywords,
+      forbiddenClaims,
+      preferredCta,
+      weeklyCadence: weeklyCadence as unknown as Prisma.InputJsonValue,
+      contentDos,
+      contentDonts,
+      aiSummary,
+      status,
+    },
+    update: {
       contentPositioning,
       recommendedPersona,
       visualStyle,

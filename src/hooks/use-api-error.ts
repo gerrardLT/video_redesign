@@ -26,8 +26,8 @@ export function useApiError() {
           router.push('/login')
           break
         case 'FORBIDDEN':
-          // 无权限，重定向到首页
-          router.push('/dashboard')
+          // 无权限，重定向到商家平台首页
+          router.push('/merchant')
           break
         case 'RATE_LIMITED':
           // 频率限制，提示用户

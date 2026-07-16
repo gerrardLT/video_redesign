@@ -14,7 +14,10 @@
  * （private），这是代码之外的基础设施动作，必须作为配套的运维跟进项落实。
  */
 import OSS from 'ali-oss'
-import type { Readable } from 'stream'
+import { Readable } from 'stream'
+import type { ReadableStream as WebReadableStream } from 'stream/web'
+import { createWriteStream } from 'fs'
+import { finished } from 'stream/promises'
 
 // ========================
 // OSS 客户端初始化
@@ -303,6 +306,13 @@ export async function downloadToTemp(url: string, destPath: string): Promise<voi
     throw new Error(`下载失败 (${response.status}): ${url}`)
   }
 
-  const arrayBuffer = await response.arrayBuffer()
-  await fsPromises.writeFile(destPath, Buffer.from(arrayBuffer))
+  if (!response.body) {
+    throw new Error(`下载响应体为空: ${url}`)
+  }
+
+  // 流式写入磁盘，避免将整个文件加载到内存（大文件 OOM 风险）
+  const writeStream = createWriteStream(destPath)
+  const nodeStream = Readable.fromWeb(response.body as WebReadableStream)
+  nodeStream.pipe(writeStream)
+  await finished(writeStream)
 }

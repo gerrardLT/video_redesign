@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import { getTaskCenter } from '@/lib/merchant/task-center-service'
 import { ApiError } from '@/lib/shared/api-error'
+import { logger } from '@/lib/shared/logger'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         { status: error.statusCode }
       )
     }
-    console.error('[GET /api/stores/[storeId]/task-center] 未知错误:', error)
+    logger.error('[GET /api/stores/[storeId]/task-center] 未知错误:', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
       { status: 500 }

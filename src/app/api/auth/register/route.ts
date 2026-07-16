@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       || request.headers.get('x-real-ip')
       || 'unknown'
     const rateLimitKey = `auth:register:${clientIp}`
-    const rateResult = checkRateLimit(rateLimitKey, 3, 60 * 1000)
+    const rateResult = await checkRateLimit(rateLimitKey, 3, 60 * 1000)
     if (!rateResult.allowed) {
       return NextResponse.json(
         { error: { code: 'RATE_LIMITED', message: '注册尝试过于频繁，请稍后重试' } },

@@ -449,7 +449,7 @@ function EditBriefDialog({
         <div className="mt-2 space-y-2">
           {op === 'RESCHEDULE' && (
             <div className="space-y-1.5">
-              <span className="text-sm text-gray-600">选择新的拍摄/发布日期</span>
+              <span className="text-sm text-[var(--ll-text-2)]">选择新的拍摄/发布日期</span>
               <Input
                 type="date"
                 value={newDate}
@@ -460,7 +460,7 @@ function EditBriefDialog({
 
           {op === 'CHANGE_GOAL' && (
             <div className="space-y-1.5">
-              <span className="text-sm text-gray-600">选择新的选题方向</span>
+              <span className="text-sm text-[var(--ll-text-2)]">选择新的选题方向</span>
               <Select value={newGoal} onValueChange={(v) => setNewGoal(v as ContentGoal)}>
                 <SelectTrigger>
                   <SelectValue placeholder="请选择选题方向" />
@@ -473,7 +473,7 @@ function EditBriefDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-[var(--ll-text-3)]">
                 换选题后将基于你的门店画像重新生成镜头脚本与文案草稿
               </p>
             </div>
@@ -481,9 +481,9 @@ function EditBriefDialog({
 
           {op === 'CHANGE_PLAYBOOK' && (
             <div className="space-y-1.5">
-              <span className="text-sm text-gray-600">选择新的剧本（同选题方向）</span>
+              <span className="text-sm text-[var(--ll-text-2)]">选择新的剧本（同选题方向）</span>
               {playbooksLoading ? (
-                <div className="flex items-center gap-2 py-2 text-sm text-gray-400">
+                <div className="flex items-center gap-2 py-2 text-sm text-[var(--ll-text-3)]">
                   <Spinner className="h-4 w-4" /> 加载剧本中…
                 </div>
               ) : playbookData && playbookData.playbooks.length > 0 ? (
@@ -500,9 +500,9 @@ function EditBriefDialog({
                   </SelectContent>
                 </Select>
               ) : (
-                <p className="py-2 text-sm text-gray-400">该选题方向暂无其它可用剧本</p>
+                <p className="py-2 text-sm text-[var(--ll-text-3)]">该选题方向暂无其它可用剧本</p>
               )}
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-[var(--ll-text-3)]">
                 换剧本后将基于你的门店画像重新生成镜头脚本与文案草稿
               </p>
             </div>
@@ -614,7 +614,7 @@ function AddBriefDialog({
 
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <span className="text-sm text-gray-600">选题方向</span>
+            <span className="text-sm text-[var(--ll-text-2)]">选题方向</span>
             <Select value={goal} onValueChange={(v) => { setGoal(v as ContentGoal); setPlaybookId('') }}>
               <SelectTrigger>
                 <SelectValue placeholder="请选择选题方向" />
@@ -631,9 +631,9 @@ function AddBriefDialog({
 
           {goal && (
             <div className="space-y-1.5">
-              <span className="text-sm text-gray-600">剧本（可选，留空由系统自动选择）</span>
+              <span className="text-sm text-[var(--ll-text-2)]">剧本（可选，留空由系统自动选择）</span>
               {playbooksLoading ? (
-                <div className="flex items-center gap-2 py-2 text-sm text-gray-400">
+                <div className="flex items-center gap-2 py-2 text-sm text-[var(--ll-text-3)]">
                   <Spinner className="h-4 w-4" /> 加载剧本中…
                 </div>
               ) : playbookData && playbookData.playbooks.length > 0 ? (
@@ -650,7 +650,7 @@ function AddBriefDialog({
                   </SelectContent>
                 </Select>
               ) : (
-                <p className="py-1 text-xs text-gray-400">该选题方向暂无可选剧本，将由系统自动选择</p>
+                <p className="py-1 text-xs text-[var(--ll-text-3)]">该选题方向暂无可选剧本，将由系统自动选择</p>
               )}
             </div>
           )}
@@ -1053,7 +1053,7 @@ export default function CalendarPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 pb-10">
-      {/* 计划头部 — v3 Zen: serif 标题 + hairline 分隔 */}
+      {/* 计划头部 */}
       <div className="flex items-start justify-between gap-3 zen-reveal">
         <div className="min-w-0">
           <h1 className="truncate text-[var(--text-title)] font-semibold font-[var(--font-serif)]">{plan.title || '内容计划'}</h1>

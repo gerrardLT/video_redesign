@@ -1,5 +1,10 @@
 # 本地生活 AI 营销平台 — 用户旅程 / 状态机 / 数据流 / 交互 / 功能模块
 
+> **文档状态**：📗 活文档（持续维护，当前有效）
+> **用途/说明**：商家平台用户旅程/状态机/数据流活文档，仓库权威现状文档之一
+> **权威来源**：本仓库权威文档为 `AGENTS.md` + `docs/local-life-user-journey.md`
+> **最后校准**：2026-07-11
+
 > 依据：`docs/AI本地生活营销平台改造实施方案.md`（设计意图）
 > 校准：对照仓库实际代码（`src/app/merchant`、`src/app/api`、`src/lib`、`src/workers`、`prisma/schema.prisma`）
 > 范围：第一阶段餐饮 MVP；含「设计 vs 现状」差距标注
@@ -126,7 +131,7 @@ journey
           → /merchant/stores/{storeId}/briefs/{briefId}/variants  成片/合规/文案/导出
           → /merchant/stores/{storeId}/briefs/{briefId}/metrics   数据回填/复盘
           → /merchant/stores/{storeId}/settings          门店设置
-      顶部入口：→ /dashboard（视频重塑高级模式，同会话免重认证）
+      AI 视频重绘后端能力保留（/api/projects/*），Inhot 四模式通过创作中心接入
 ```
 
 ### 2.2 5 步线性主操作（实施方案 §20 / Req 15.4）

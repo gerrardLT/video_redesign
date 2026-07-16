@@ -61,6 +61,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { briefId } = await context.params
     const userId = getUserIdFromRequest(request)
 
+    // 解析请求体：可选 selectedStyle 参数（屏 C 单选生成）
+    const body = await request.json().catch(() => ({})) as { selectedStyle?: string }
+    const selectedStyle = body.selectedStyle
+
     // 查询 ContentBrief 并验证归属
     const brief = await prisma.contentBrief.findUnique({
       where: { id: briefId },
@@ -147,14 +151,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // 3. 估算渲染积分成本并冻结（RESERVE）——入队前完成，余额不足拒绝入队
-    // 每个版本视为一个分镜组，组时长按本 brief 全部 ShotTask 的计划时长求和估算
-    // （素材编排时各版本均纳入有素材的镜头，此估值为保守上限，渲染成功后按实际时长 CHARGE，差额退回）。
+    // selectedStyle 存在时仅生成单版本（积分 = 原来 1/3），否则生成 3 版本
+    const variantCount = selectedStyle ? 1 : RENDER_VARIANT_COUNT
     const plannedGroupDuration = brief.shotTasks.reduce(
       (sum, task) => sum + task.durationSec,
       0
     )
     const groupDurations = Array.from(
-      { length: RENDER_VARIANT_COUNT },
+      { length: variantCount },
       () => plannedGroupDuration
     )
     const estimatedCost = estimateRenderCost(groupDurations, RENDER_RESOLUTION)
@@ -204,13 +208,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       throw reserveError
     }
 
-    // 4. 入队 render-local-video
+    // 4. 入队 render-local-video（携带 selectedStyle）
     const job = await renderLocalVideoQueue.add(
       `render-${briefId}`,
       {
         contentBriefId: briefId,
         userId,
         storeId: brief.storeId,
+        ...(selectedStyle ? { selectedStyle } : {}),
       },
       {
         jobId: `render-${briefId}-${Date.now()}`,

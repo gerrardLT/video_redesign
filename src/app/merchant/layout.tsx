@@ -1,57 +1,46 @@
 'use client'
 
 /**
- * 商家专属布局组件
+ * 商家专属布局组件 — 热店 STUDIO · Runway 暗色
  *
- * 面向非技术用户（餐饮商家）的极简布局：
- * - 顶部 Header：门店名称 + 进入视频重塑模块入口 + 通知图标（直达任务/通知中心，带真实未读红点）
- * - 底部导航：首页、日历、今日任务、我的（均为门店作用域路由）
- *   — v3 禅意风格：毛玻璃背景(blur 16px + rgba(244,242,237,.88))、
- *     lucide-react strokeWidth 1.5、选中态仅变色(--ll-green) + font-weight 600、
- *     禁止 scale/bounce 动画、语义化 aria-label
- * - 暖色调、克制微圆角、有层次的字体风格
+ * 视觉语言：Runway（纯黑 #000 / 暗底 #1a1a1a，零阴影，深度靠明暗分区与影像）
+ * - 顶部 Header：纯黑底 + 1px #27272a 分隔线 + 门店名 + 通知铃铛
+ * - 底部导航：暗色毛玻璃 rgba(0,0,0,.72) + backdrop-blur(20px) + 选中态纯白
+ *   tab 标签 uppercase + 字距，禁止 bounce 动画、语义化 aria-label
+ * - 字体：DM Sans (Latin) + Noto Sans SC (CJK)
  *
  * 底部导航路由说明：
  * 实际页面均在门店作用域下（/merchant/stores/{storeId}/...），不存在
  * /merchant/calendar、/merchant/today、/merchant/profile 等顶层路由。
  * 因此导航项在运行时按当前 storeId 拼接：
- * - 首页 → /merchant/stores/{storeId}
+ * - 工作台 → /merchant/stores/{storeId}
  * - 日历 → /merchant/stores/{storeId}/calendar
- * - 今日任务 → /merchant/stores/{storeId}/today
  * - 我的 → /merchant/stores/{storeId}/settings
- * storeId 优先取自当前路径（保证导航停留在正在查看的门店），否则回退到
- * /api/merchant/me 返回的首个门店。尚未确定门店或处于问诊页（/merchant/onboarding）
- * 时隐藏底部导航，避免出现指向不存在路由的 404，并避免遮挡问诊页的主操作按钮。
+ * storeId 优先取自当前路径，否则回退到 /api/merchant/me 返回的首个门店。
+ * 尚未确定门店或处于问诊页（/merchant/onboarding）时隐藏底部导航。
  *
- * 主框架与模块导航（merchant-billing-unification Req 8）：
- * 本地生活营销平台为主框架，视频重塑（/dashboard）为其下的一个能力模块。
- * 已重新评估并解除 local-life-marketing-platform Req 15.5
- * 「/merchant 与 /dashboard 完全隔离、禁止从商家界面跳转到 dashboard」的约束：
- * 二者共用同一套账号、积分与订阅体系，middleware 对 /merchant 与 /dashboard
- * 注入同一套 x-user-id / x-user-role，已登录会话在两区间导航无需重新认证，
- * 因此在主框架顶部提供进入视频重塑模块的导航入口。视频重塑模块内部页面结构
- * 与交互保持不变，仅调整其在主框架中的导航归属。
- *
- * Requirements: merchant-billing-unification 1.1, 8.1, 8.2, 8.3, 8.4（原 local-life 15.4）
+ * 主框架：
+ * 本地生活营销平台为唯一产品线。视频重塑已下线独立前端，仅作为封存的后端
+ * 视频生成能力（src/lib + src/workers）保留，供后续商家渲染按需接入。
+ * 账号、积分与订阅体系统一，middleware 注入同一套 x-user-id / x-user-role。
  */
 
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { useRouter, usePathname } from 'next/navigation'
-import { Home, Calendar, User, Bell, Clapperboard, LogOut, ArrowLeft } from 'lucide-react'
-import { Noto_Serif_SC, Noto_Sans_SC, Space_Grotesk } from 'next/font/google'
+import { Home, Calendar, User, Bell, LogOut, ArrowLeft } from 'lucide-react'
+import { DM_Sans, Noto_Sans_SC } from 'next/font/google'
 import { StoreSwitcher } from '@/components/merchant'
 
 /**
- * 字体加载配置 — v3 禅意编辑式字体体系
- * - Noto Serif SC: 标题/hero 场景（衬线体）
- * - Noto Sans SC: 正文/UI/表单（无衬线体）
- * - Space Grotesk: 数据数字展示（等宽数字）
+ * 字体加载配置 — Runway 暗色无衬线体系
+ * - DM Sans: Latin 文字（tabular-nums 数字展示）
+ * - Noto Sans SC: CJK 中文（无衬线体）
  */
-const notoSerif = Noto_Serif_SC({
+const dmSans = DM_Sans({
   subsets: ['latin'],
-  weight: ['500', '600', '700'],
-  variable: '--font-noto-serif-sc',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-dm-sans',
   display: 'swap',
 })
 
@@ -59,13 +48,6 @@ const notoSans = Noto_Sans_SC({
   subsets: ['latin'],
   weight: ['400', '500', '700'],
   variable: '--font-noto-sans-sc',
-  display: 'swap',
-})
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-space-grotesk',
   display: 'swap',
 })
 
@@ -170,7 +152,7 @@ export default function MerchantLayout({
   }
 
   return (
-    <div className={`ll-root min-h-screen flex flex-col ${notoSerif.variable} ${notoSans.variable} ${spaceGrotesk.variable}`}>
+    <div className={`ll-root min-h-screen flex flex-col ${dmSans.variable} ${notoSans.variable}`}>
       {/* 顶部 Header — 子页面简化为返回箭头，其余展示完整门店名 + 通知 */}
       <header className="sticky top-0 z-40 bg-[var(--ll-surface)]/90 backdrop-blur-sm border-b border-[var(--ll-hair)] safe-area-top">
         <div className="flex h-14 items-center justify-between px-4">
@@ -214,14 +196,6 @@ export default function MerchantLayout({
               )}
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => router.push('/dashboard')}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[var(--ll-green-sb)] hover:bg-[var(--ll-green-light)] transition-colors"
-                  aria-label="进入视频重塑"
-                >
-                  <Clapperboard className="h-5 w-5" />
-                  <span className="text-sm font-medium hidden sm:inline">视频重塑</span>
-                </button>
-                <button
                   className="relative p-2 rounded-full hover:bg-[var(--ll-green-light)] transition-colors disabled:opacity-40"
                   aria-label="任务与通知"
                   disabled={!storeId}
@@ -260,10 +234,10 @@ export default function MerchantLayout({
         <nav
           className="fixed bottom-0 left-0 right-0 z-40 safe-area-bottom"
           style={{
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            background: 'rgba(244,242,237,.88)',
-            borderTop: '1px solid var(--ll-hair)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            background: 'rgba(0,0,0,.72)',
+            borderTop: '1px solid #27272a',
           }}
         >
           <div className="flex items-center justify-around h-16">
@@ -286,7 +260,7 @@ export default function MerchantLayout({
                     className={`h-6 w-6 ${active ? 'text-[var(--ll-green)]' : 'text-[var(--ll-text-3)]'}`}
                     strokeWidth={1.5}
                   />
-                  <span className={`text-xs ${active ? 'font-semibold text-[var(--ll-green)]' : 'font-normal text-[var(--ll-text-3)]'}`}>
+                  <span className={`text-[10px] uppercase tracking-[.2px] ${active ? 'font-semibold text-white' : 'font-normal text-[#767d88]'}`}>
                     {item.label}
                   </span>
                 </button>

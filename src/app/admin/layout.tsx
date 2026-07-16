@@ -111,13 +111,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       })
       .then((data) => {
         if (data.user.role !== 'ADMIN') {
-          router.push('/dashboard')
+          router.push('/merchant')
           return
         }
         setUser(data.user)
         setLoading(false)
       })
-      .catch(() => router.push('/dashboard'))
+      .catch(() => router.push('/merchant'))
   }, [router])
 
   if (loading) {
@@ -179,16 +179,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        {/* 底部：返回仪表盘 */}
+        {/* 底部：返回商家平台 */}
         <div className="absolute bottom-4 left-0 w-full px-3">
           <Link
-            href="/dashboard"
+            href="/merchant"
             className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--cine-text-3)] transition-colors hover:bg-[var(--cine-surface)] hover:text-[var(--cine-text)]"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            返回仪表盘
+            返回商家平台
           </Link>
           {user && (
             <div className="mt-2 px-3 text-xs text-[var(--cine-text-3)]">{user.email}</div>

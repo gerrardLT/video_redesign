@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：✅ 已实现（当前生效）
+> **对应实现**：`src/lib/sse/**`、`src/lib/shared/progress-publisher.ts`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 实时进度推送功能：使用 Server-Sent Events (SSE) 实现服务端向客户端的实时进度推送，替代前端轮询机制。当后台 BullMQ Worker 处理视频生成、解析、合并等耗时任务时，通过 Redis Pub/Sub 将进度事件跨进程传递给 Next.js API 层，再经由 SSE 连接推送到客户端浏览器，让用户即时看到任务阶段变更、预估剩余时间和链式生成进度。SSE 作为增强手段，保留现有轮询兼容性。

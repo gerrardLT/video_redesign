@@ -2,7 +2,7 @@
  * 门店画像注入 AI Prompt
  *
  * 从 Store + StoreProfile 读取门店画像数据，构建 Seedance 生成用的「商家语境前缀」。
- * 仅在 merchant 入口创建的项目上激活，不影响通用入口（/dashboard）的行为。
+ * 仅在 merchant 入口创建的项目上激活，不影响通用视频处理入口的行为。
  *
  * 注入维度：
  * - 门店类型（industry）
@@ -19,6 +19,7 @@
  */
 
 import { prisma } from '../shared/db'
+import { asStringArray } from '../shared/prisma-json-helpers'
 
 // ========================
 // 类型定义
@@ -27,20 +28,6 @@ import { prisma } from '../shared/db'
 export interface MerchantContext {
   /** 构建好的 Seedance prompt 前缀 */
   promptPrefix: string
-  /** 行业标签 */
-  industry: string
-  /** 品牌调性 */
-  brandTone: string | null
-  /** 主打产品列表 */
-  mainProducts: string[]
-  /** 核心卖点列表 */
-  mainSellingPoints: string[]
-  /** 目标客群 */
-  targetCustomers: string[]
-  /** 内容定位 */
-  contentPositioning: string | null
-  /** 视觉风格 */
-  visualStyle: string | null
 }
 
 // ========================
@@ -49,34 +36,13 @@ export interface MerchantContext {
 
 const INDUSTRY_LABELS: Record<string, string> = {
   RESTAURANT: '餐饮',
-  BEVERAGE: '饮品/茶饮',
+  DRINK: '饮品/茶饮',
   BAKERY: '烘焙甜品',
-  BEAUTY: '美业（美容美发美甲）',
-  HOTEL: '酒店民宿',
-  RETAIL: '零售',
-  FITNESS: '健身运动',
-  EDUCATION: '教育培训',
-  ENTERTAINMENT: '休闲娱乐',
-  MEDICAL: '医疗健康',
-  PET: '宠物',
-  OTHER: '本地生活',
-}
-
-// ========================
-// JSON 安全解析
-// ========================
-
-function parseJsonArray(val: unknown): string[] {
-  if (Array.isArray(val)) return val.map(String)
-  if (typeof val === 'string') {
-    try {
-      const parsed = JSON.parse(val)
-      return Array.isArray(parsed) ? parsed.map(String) : []
-    } catch {
-      return []
-    }
-  }
-  return []
+  CAFE: '咖啡馆',
+  HOTPOT: '火锅店',
+  BBQ: '烧烤店',
+  FAST_FOOD: '快餐店',
+  OTHER_LOCAL: '其他本地生活',
 }
 
 // ========================
@@ -99,9 +65,9 @@ export async function buildMerchantContext(storeId: string): Promise<MerchantCon
 
   const industry = INDUSTRY_LABELS[store.industry] || store.industry
   const brandTone = store.brandTone || null
-  const mainProducts = parseJsonArray(store.mainProducts)
-  const mainSellingPoints = parseJsonArray(store.mainSellingPoints)
-  const targetCustomers = parseJsonArray(store.targetCustomers)
+  const mainProducts = asStringArray(store.mainProducts)
+  const mainSellingPoints = asStringArray(store.mainSellingPoints)
+  const targetCustomers = asStringArray(store.targetCustomers)
   const contentPositioning = store.profile?.contentPositioning || null
   const visualStyle = store.profile?.visualStyle || null
 
@@ -143,13 +109,6 @@ export async function buildMerchantContext(storeId: string): Promise<MerchantCon
 
   return {
     promptPrefix,
-    industry,
-    brandTone,
-    mainProducts,
-    mainSellingPoints,
-    targetCustomers,
-    contentPositioning,
-    visualStyle,
   }
 }
 

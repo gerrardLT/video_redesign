@@ -1,7 +1,10 @@
 ﻿/**
  * 商家积分计费服务（merchant-billing-service）
  *
- * 本地生活营销平台（/merchant）的可计费操作统一收敛到视频重塑既有的积分体系。
+ * 本地生活营销平台（/merchant）的**唯一计费入口**。
+ * 所有商家平台可计费操作（渲染、文案生成、内容计划生成等）必须经本服务调用，
+ * 禁止直接调用 credit-service 的 *ByBizRef 系列函数（已标注 @internal）。
+ *
  * 本服务对外暴露以「商家实体关联键（bizRefType + bizRefId）」为中心的计费接口，
  * 内部复用 credit-service 与全局积分写锁 withCreditLock，绝不写入 jobId，
  * 从源头杜绝 credit_ledger_job_id_fkey 外键违约。

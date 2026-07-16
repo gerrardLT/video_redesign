@@ -1,10 +1,10 @@
 'use client'
 
 /**
- * 空态插画组件 — v3 禅意编辑式风格
+ * 空态插画组件 — Runway 暗色风格
  *
- * 当页面数据为空时展示单色 SVG 线稿插画，配合衬线标题与引导文案。
- * 插画使用 #00754A 主色，不使用渐变背景或多色装饰。
+ * 当页面数据为空时展示单色 SVG 线稿插画，配合无衬线标题与引导文案。
+ * 插画使用 #ffffff 主色，不使用渐变背景或多色装饰。
  *
  * 插画资源位于 public/illustrations/ 目录（MIT 授权 SVG）。
  *
@@ -38,7 +38,7 @@ export interface EmptyStateProps {
 /**
  * EmptyState 空态插画组件
  *
- * 展示单色 SVG 线稿插画 + Noto Serif SC 衬线标题 + 引导文案。
+ * 展示单色 SVG 线稿插画 + DM Sans / Noto Sans SC 标题 + 引导文案。
  * 不使用渐变背景或多色装饰，保持克制留白。
  */
 export function EmptyState({ illustration, title, description }: EmptyStateProps) {
@@ -56,16 +56,16 @@ export function EmptyState({ illustration, title, description }: EmptyStateProps
         priority={false}
       />
 
-      {/* 衬线标题 — Noto Serif SC */}
+      {/* 标题 — DM Sans / Noto Sans SC */}
       <h3
-        className="text-lg font-semibold leading-relaxed text-[var(--ll-text-1,rgba(0,0,0,.87))]"
-        style={{ fontFamily: 'var(--font-serif)' }}
+        className="text-lg font-semibold leading-relaxed text-[var(--ll-text)]"
+        style={{ fontFamily: 'var(--font-sans)' }}
       >
         {title}
       </h3>
 
       {/* 一句话引导文案 */}
-      <p className="mt-2 max-w-[260px] text-sm leading-relaxed text-[var(--ll-text-3,rgba(0,0,0,.4))]">
+      <p className="mt-2 max-w-[260px] text-sm leading-relaxed text-[var(--ll-text-3)]">
         {description}
       </p>
     </div>

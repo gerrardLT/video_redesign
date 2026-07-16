@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：✅ 已实现（当前生效）
+> **对应实现**：`src/lib/merchant/merchant-billing-service.ts`（merchant-quota 体系已废除）、`src/lib/shared/{credit-service,privilege-engine}.ts`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 本平台同一套代码内并行运行两条产品线：①视频重塑平台（`/dashboard`，C 端 PC 端用户）；②本地生活营销平台（`/merchant`，本地实体门店商家，移动端）。产品的真实定位是：**本地生活营销平台是主框架，视频重塑是其下的一个能力模块**。

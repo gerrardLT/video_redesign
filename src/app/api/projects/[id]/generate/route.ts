@@ -48,7 +48,7 @@ export async function POST(
 
   try {
     // 速率限制
-    if (isRateLimited(userId, 'generate')) {
+    if (await isRateLimited(userId, 'generate')) {
       return NextResponse.json({ error: '请求过于频繁，请稍后重试' }, { status: 429 })
     }
 

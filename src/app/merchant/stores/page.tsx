@@ -159,7 +159,7 @@ export default function StoresListPage() {
         <Store className="h-12 w-12 text-[var(--ll-text-3)]" />
         <p className="text-[var(--ll-text-2)]">{error.message || '加载失败'}</p>
         <Link href="/merchant/onboarding">
-          <Button className="bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-white rounded-full">
+          <Button className="bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black rounded-full">
             开始问诊
           </Button>
         </Link>
@@ -180,7 +180,7 @@ export default function StoresListPage() {
           完成商家问诊后，系统将自动为你创建门店并生成营销计划
         </p>
         <Link href="/merchant/onboarding">
-          <Button className="bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-white rounded-full">
+          <Button className="bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black rounded-full">
             <Plus className="h-4 w-4 mr-1" />
             开始问诊
           </Button>

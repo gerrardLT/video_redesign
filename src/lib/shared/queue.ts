@@ -252,6 +252,30 @@ export const weeklyMerchantReportQueue = lazyQueue('weekly-merchant-report', {
   removeOnFail: 50,
 })
 
+/**
+ * 商家视频下载队列（REPLICATE_TRENDING 模式）
+ * 复刻爆款源视频下载 → 上传 OSS → 创建 RawAsset → 链式触发 render-local-video。
+ * 与 Project 流程的 video-download 解耦，专用于 ContentBrief 流程。
+ */
+export const merchantVideoDownloadQueue = lazyQueue('merchant-video-download', {
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 5000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
+/**
+ * 商家 HappyHorse V-Edit 视频编辑队列（REPLICATE_TRENDING 模式）
+ * merchant-video-download 下载源视频落 OSS 后链式入队本队列：
+ * 源视频 + 素材库参考图 + 提示词 → 调 HappyHorse V-Edit → 落 VideoVariant。
+ * attempts=1：V-Edit 单次调用成本高，失败即退款置 FAILED，不做 BullMQ 自动重试避免重复扣费。
+ */
+export const happyHorseVEditQueue = lazyQueue('merchant-vedit', {
+  attempts: 1,
+  removeOnComplete: 50,
+  removeOnFail: 100,
+})
+
 // ========================
 // 定时任务调度注册
 // ========================

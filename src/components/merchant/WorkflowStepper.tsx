@@ -44,8 +44,8 @@ export function WorkflowStepper({ currentStep, completedSteps }: WorkflowStepper
                   className={cn(
                     'flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold transition-all',
                     isCompleted && 'bg-green-100 text-green-600 ring-2 ring-green-200',
-                    isCurrent && 'bg-amber-500 text-white ring-2 ring-amber-300 shadow-md shadow-amber-200',
-                    isPending && 'bg-gray-100 text-gray-400 ring-1 ring-gray-200'
+                    isCurrent && 'bg-[var(--ll-green)] text-black ring-2 ring-[var(--ll-green)]/30 shadow-md shadow-[var(--ll-green)]/20',
+                    isPending && 'bg-[var(--ll-muted)] text-[var(--ll-text-3)] ring-1 ring-[var(--ll-hair)]'
                   )}
                   aria-current={isCurrent ? 'step' : undefined}
                 >
@@ -59,8 +59,8 @@ export function WorkflowStepper({ currentStep, completedSteps }: WorkflowStepper
                   className={cn(
                     'text-xs font-medium whitespace-nowrap',
                     isCompleted && 'text-green-600',
-                    isCurrent && 'text-amber-700 font-semibold',
-                    isPending && 'text-gray-400'
+                    isCurrent && 'text-[var(--ll-text)] font-semibold',
+                    isPending && 'text-[var(--ll-text-3)]'
                   )}
                 >
                   {label}
@@ -72,7 +72,7 @@ export function WorkflowStepper({ currentStep, completedSteps }: WorkflowStepper
                 <div
                   className={cn(
                     'flex-1 h-0.5 mx-2 rounded-full transition-colors',
-                    isCompleted ? 'bg-green-300' : 'bg-gray-200'
+                    isCompleted ? 'bg-[var(--ll-success)]/50' : 'bg-[var(--ll-muted)]'
                   )}
                   aria-hidden="true"
                 />

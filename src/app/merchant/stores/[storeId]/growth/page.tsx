@@ -305,7 +305,7 @@ function ComparisonDetail({
   const { thisBest, lastBest, evidence } = comparison
   const delta = thisBest.value - lastBest.value
   const TrendIcon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus
-  const trendColor = delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-500' : 'text-gray-500'
+  const trendColor = delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-500' : 'text-[var(--ll-text-3)]'
 
   return (
     <div className="space-y-3">
@@ -459,7 +459,7 @@ export default function GrowthPage() {
         <button
           type="button"
           onClick={() => mutate()}
-          className="rounded-full border border-amber-200 px-4 py-1.5 text-sm text-amber-700 hover:bg-amber-50"
+          className="rounded-full border border-[var(--ll-hair)] px-4 py-1.5 text-sm text-[var(--ll-text-2)] hover:bg-[var(--ll-muted)]"
         >
           重试
         </button>

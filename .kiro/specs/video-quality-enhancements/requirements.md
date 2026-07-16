@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：🔒 已封存（视频重绘后端能力保留，前端 /dashboard 已下线）
+> **对应实现**：`src/lib/video/transition-engine.ts`（转场后端已落地；导出分辨率前端随 /dashboard 下线）
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 视频质量增强功能集：包含三个互相独立但共同提升成片质量的优化模块。

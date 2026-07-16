@@ -1,113 +1,72 @@
 /**
  * 本地生活营销平台 — TypeScript 类型定义
  *
- * 与 Prisma schema 中新增的枚举和模型对应，供前端组件和服务层共用。
- * 枚举值使用 Zod schema 定义并导出推断类型，确保运行时校验与类型推断一致。
+ * 枚举类型统一以 Prisma Schema 为单一来源（@/generated/prisma），
+ * 本文件仅提供 Zod Schema（运行时校验）和纯业务 DTO interface。
+ * 服务端类型引用统一走 Prisma 生成类型，消除三头马车。
  */
 
 import { z } from 'zod/v4'
+import {
+  MerchantIndustry as PrismaMerchantIndustry,
+  ContentGoal as PrismaContentGoal,
+  ContentBriefStatus as PrismaContentBriefStatus,
+  ShotTaskType as PrismaShotTaskType,
+  VideoVariantType as PrismaVideoVariantType,
+  ComplianceRiskLevel as PrismaComplianceRiskLevel,
+  PublishPlatform as PrismaPublishPlatform,
+  PublishJobStatus as PrismaPublishJobStatus,
+} from '@/generated/prisma'
 
 // ========================
-// 枚举定义（对应 Prisma 枚举，前端使用）
+// Zod Schema（运行时校验，值来源于 Prisma Enum，单一来源）
 // ========================
 
 /** 商家行业类型 — 第一阶段仅餐饮行业细分 */
-export const MerchantIndustrySchema = z.enum([
-  'RESTAURANT',   // 中餐馆
-  'DRINK',        // 饮品店（奶茶、果汁）
-  'BAKERY',       // 烘焙面包
-  'CAFE',         // 咖啡馆
-  'HOTPOT',       // 火锅店
-  'BBQ',          // 烧烤店
-  'FAST_FOOD',    // 快餐店
-  'OTHER_LOCAL',  // 其他本地生活
-])
-export type MerchantIndustry = z.infer<typeof MerchantIndustrySchema>
+export const MerchantIndustrySchema = z.enum(PrismaMerchantIndustry)
 
 /** 内容目标 — 每日内容方向 */
-export const ContentGoalSchema = z.enum([
-  'TRAFFIC',              // 引流
-  'PROMOTION',            // 促销
-  'NEW_PRODUCT',          // 招牌/新品
-  'TRUST_BUILDING',       // 人设/信任
-  'BRAND_STORY',          // 品牌故事
-  'CUSTOMER_TESTIMONIAL', // 顾客证言
-  'WEEKEND_BOOST',        // 周末预热
-  'REPEAT_PURCHASE',      // 复购
-])
-export type ContentGoal = z.infer<typeof ContentGoalSchema>
+export const ContentGoalSchema = z.enum(PrismaContentGoal)
 
 /** 内容任务状态 — 从创建到发布的完整生命周期 */
-export const ContentBriefStatusSchema = z.enum([
-  'DRAFT',              // 草稿
-  'READY_TO_SHOOT',     // 待拍摄
-  'MATERIALS_UPLOADED', // 素材已上传
-  'RENDERING',          // 渲染中
-  'GENERATED',          // 已生成
-  'COMPLIANCE_REVIEW',  // 合规审查中
-  'READY_TO_EXPORT',    // 待导出
-  'EXPORTED',           // 已导出
-  'PUBLISHED',          // 已发布
-  'FAILED',             // 失败
-  'ARCHIVED',           // 已归档
-])
-export type ContentBriefStatus = z.infer<typeof ContentBriefStatusSchema>
+export const ContentBriefStatusSchema = z.enum(PrismaContentBriefStatus)
 
 /** 拍摄任务类型 — 镜头分类 */
-export const ShotTaskTypeSchema = z.enum([
-  'STOREFRONT',          // 门头/外观
-  'PRODUCT_CLOSEUP',     // 产品特写
-  'COOKING_PROCESS',     // 制作过程
-  'STAFF_ACTION',        // 员工操作
-  'CUSTOMER_REACTION',   // 顾客反应
-  'OWNER_TALKING',       // 老板口播
-  'ENVIRONMENT',         // 环境氛围
-  'OFFER_DISPLAY',       // 优惠展示
-  'CTA_SCREEN',          // 行动号召画面
-  'AI_GENERATED_FILLER', // AI 补充片段
-])
-export type ShotTaskType = z.infer<typeof ShotTaskTypeSchema>
+export const ShotTaskTypeSchema = z.enum(PrismaShotTaskType)
 
 /** 视频版本类型 — 渲染输出的不同版本 */
-export const VideoVariantTypeSchema = z.enum([
-  'PROMOTION',    // 促销引流版
-  'ATMOSPHERE',   // 氛围种草版
-  'OWNER_TALKING',// 老板口播版
-  'TRUST',        // 信任背书版
-  'PRODUCT',      // 产品展示版
-])
-export type VideoVariantType = z.infer<typeof VideoVariantTypeSchema>
+export const VideoVariantTypeSchema = z.enum(PrismaVideoVariantType)
 
 /** 合规风险等级 — 从低到高 */
-export const ComplianceRiskLevelSchema = z.enum([
-  'LOW',      // 无风险
-  'MEDIUM',   // 中等风险，警告但允许
-  'HIGH',     // 高风险，需用户确认
-  'BLOCKED',  // 阻断，禁止导出
-])
-export type ComplianceRiskLevel = z.infer<typeof ComplianceRiskLevelSchema>
+export const ComplianceRiskLevelSchema = z.enum(PrismaComplianceRiskLevel)
 
 /** 发布平台 — 支持的短视频/社交平台 */
-export const PublishPlatformSchema = z.enum([
-  'DOUYIN',           // 抖音
-  'KUAISHOU',         // 快手
-  'XIAOHONGSHU',      // 小红书
-  'WECHAT_CHANNELS',  // 微信视频号
-  'MANUAL_EXPORT',    // 手动导出（不指定平台）
-])
-export type PublishPlatform = z.infer<typeof PublishPlatformSchema>
+export const PublishPlatformSchema = z.enum(PrismaPublishPlatform)
 
 /** 发布任务状态 */
-export const PublishJobStatusSchema = z.enum([
-  'DRAFT',       // 草稿
-  'READY',       // 就绪
-  'EXPORTING',   // 导出中
-  'EXPORTED',    // 已导出
-  'PUBLISHING',  // 发布中
-  'PUBLISHED',   // 已发布
-  'FAILED',      // 失败
-])
-export type PublishJobStatus = z.infer<typeof PublishJobStatusSchema>
+export const PublishJobStatusSchema = z.enum(PrismaPublishJobStatus)
+
+// ========================
+// 类型再导出（统一从 Prisma 导入，供前端 / 未迁移模块使用）
+// ========================
+
+export type { MerchantIndustry } from '@/generated/prisma'
+export type { ContentGoal } from '@/generated/prisma'
+export type { ContentBriefStatus } from '@/generated/prisma'
+export type { ShotTaskType } from '@/generated/prisma'
+export type { VideoVariantType } from '@/generated/prisma'
+export type { ComplianceRiskLevel } from '@/generated/prisma'
+export type { PublishPlatform } from '@/generated/prisma'
+export type { PublishJobStatus } from '@/generated/prisma'
+
+// 文件内部使用的类型导入（re-export 不引入本地绑定）
+import type {
+  MerchantIndustry,
+  ContentGoal,
+  ComplianceRiskLevel,
+  PublishPlatform,
+  ShotTaskType,
+} from '@/generated/prisma'
 
 // ========================
 // 商家问诊
@@ -201,38 +160,6 @@ export interface WeeklyCadenceEntry {
   theme: string
   /** 当日发布数量 */
   count: number
-}
-
-/** 门店画像完整数据 */
-export interface StoreProfileData {
-  /** 画像 ID */
-  id: string
-  /** 关联门店 ID */
-  storeId: string
-  /** 内容定位 */
-  contentPositioning: string | null
-  /** 推荐人设 */
-  recommendedPersona: string | null
-  /** 视觉风格 */
-  visualStyle?: string | null
-  /** 内容应做清单 */
-  contentDos: string[] | null
-  /** 内容禁忌清单 */
-  contentDonts: string[] | null
-  /** 钩子关键词列表 (5-15 项) */
-  hookKeywords: string[] | null
-  /** 违禁表达列表 (≥5 项) */
-  forbiddenClaims: string[] | null
-  /** 首选行动号召列表 (3-5 项) */
-  preferredCta: string[] | null
-  /** 每周发布节奏 (7 天) */
-  weeklyCadence: WeeklyCadenceEntry[] | null
-  /** AI 生成的自然语言总结 */
-  aiSummary: string | null
-  /** 画像状态: COMPLETE | INCOMPLETE */
-  status: string
-  createdAt: Date
-  updatedAt: Date
 }
 
 // ========================

@@ -26,6 +26,7 @@ import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/mer
 import { applyInsights } from '@/lib/merchant/performance-learning-service'
 import { ContentGoalSchema } from '@/types/merchant'
 import { ApiError } from '@/lib/shared/api-error'
+import { logger } from '@/lib/shared/logger'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>
@@ -41,6 +42,11 @@ const ApplyInsightsSchema = z.object({
   reusePlaybookIds: z.array(z.string().min(1)).optional(),
   avoidPlaybookIds: z.array(z.string().min(1)).optional(),
   acceptedSuggestionSummaries: z.array(z.string()),
+  // 风格偏好反哺（屏 D → 屏 C 闭环）
+  stylePreference: z.object({
+    preferredStyleIds: z.array(z.string()),
+    avoidedStyleIds: z.array(z.string()),
+  }).optional(),
 })
 
 export async function POST(request: NextRequest, context: RouteContext) {
@@ -84,6 +90,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       reusePlaybookIds: data.reusePlaybookIds,
       avoidPlaybookIds: data.avoidPlaybookIds,
       acceptedSuggestionSummaries: data.acceptedSuggestionSummaries,
+      stylePreference: data.stylePreference,
     })
 
     return NextResponse.json({ planInput, message: '已采纳，将在下一轮内容计划生效' })
@@ -94,7 +101,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         { status: error.statusCode }
       )
     }
-    console.error('[POST /api/stores/[storeId]/insights/apply] 未知错误:', error)
+    logger.error('[POST /api/stores/[storeId]/insights/apply] 未知错误:', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
       { status: 500 }

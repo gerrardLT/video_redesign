@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：🔒 已封存（视频重绘后端能力保留，前端 /dashboard 已下线）
+> **对应实现**：`src/lib/shared/happyhorse.ts`、`src/lib/video/segment-service.ts`、`src/lib/shared/flux.ts`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 本功能将视频生成管线从单一 Seedance 2.0 模型扩展为支持 Seedance 2.0 和 HappyHorse 双模型可选。用户在发起生成前可选择引擎，两种引擎拥有各自独立的管线逻辑和积分计费规则。Seedance 2.0 保持原有链式分镜生成管线并新增背景图/背景音乐替换功能；HappyHorse 模式采用 V-Edit（视频编辑）管线，直接基于原视频进行风格化编辑，支持真人脸场景。

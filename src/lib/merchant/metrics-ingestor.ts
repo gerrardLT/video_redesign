@@ -12,15 +12,13 @@
 
 import { prisma } from '@/lib/shared/db'
 import { MetricsInputSchema } from '@/lib/validations/merchant'
+import { MAX_METRICS_PER_BRIEF } from '@/constants/merchant'
 import type { PublishPlatform } from '@/types/merchant'
 import type { PublishMetric } from '@/generated/prisma'
 
 // ========================
 // 常量定义
 // ========================
-
-/** 每个 ContentBrief 最多允许的 metrics 条目数 (Req 11.7) */
-const MAX_METRICS_PER_BRIEF = 50
 
 /**
  * 已过 EXPORTED 的状态集合（含 EXPORTED 自身）

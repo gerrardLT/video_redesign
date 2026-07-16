@@ -144,3 +144,6 @@ export const EXPORT_URL_EXPIRY_SECONDS = 24 * 60 * 60
 
 /** 每个 ContentBrief 最多允许的 metrics 条目数 */
 export const MAX_METRICS_PER_BRIEF = 50
+
+/** LLM 生成最大 token 数（适用于 compliance-service / publish-copy-service 的 LLM 调用） */
+export const LLM_MAX_TOKENS = 2000

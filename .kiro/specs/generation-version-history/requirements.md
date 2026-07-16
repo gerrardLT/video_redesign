@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：🔒 已封存（视频重绘后端能力保留，前端 /dashboard 已下线）
+> **对应实现**：`src/lib/video/version-history-service.ts`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 生成版本历史功能：为每个分镜组（ShotGroup）的视频生成结果提供版本历史管理。当前系统每次重新生成视频时会直接覆盖 genVideoUrl，导致用户无法回看之前的生成结果、无法对比不同提示词效果、无法在团队间共享多版本供选择。本功能通过自动保存每次生成的版本记录（视频URL、封面、使用的prompt、生成时间、积分消耗），支持版本列表浏览、A/B 对比预览、切换当前使用版本、删除历史版本，并确保合并导出时使用当前选中版本的视频。

@@ -114,8 +114,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       city: brief.store.city,
       district: brief.store.district,
       businessArea: brief.store.businessArea,
+      address: brief.store.address ?? null,
       mainProducts: (brief.store.mainProducts as string[]) || [],
       mainSellingPoints: (brief.store.mainSellingPoints as string[]) || [],
+      canShootKitchen: brief.store.canShootKitchen,
+      canShootStaff: brief.store.canShootStaff,
+      canShootCustomers: brief.store.canShootCustomers,
     }
 
     // 准备 profile 数据
@@ -135,17 +139,21 @@ export async function POST(request: NextRequest, context: RouteContext) {
       hookKeywords: profile.hookKeywords as string[] | null,
       forbiddenClaims: profile.forbiddenClaims as string[] | null,
       preferredCta: profile.preferredCta as string[] | null,
+      contentDos: (profile.contentDos as string[] | null) ?? null,
+      contentDonts: (profile.contentDonts as string[] | null) ?? null,
     }
 
     // 准备 offer 数据（PROMOTION 版本取关联优惠或门店最新优惠）
     let offerData: {
       id: string
+      storeId: string
       name: string
       description: string | null
       originalPrice: number | null
       salePrice: number | null
       sellingPoints: string[] | null
       usageRules: string | null
+      isActive: boolean
     } | undefined
 
     if (brief.offerId) {
@@ -156,12 +164,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       if (linkedOffer) {
         offerData = {
           id: linkedOffer.id,
+          storeId: linkedOffer.storeId,
           name: linkedOffer.name,
           description: linkedOffer.description,
           originalPrice: linkedOffer.originalPrice,
           salePrice: linkedOffer.salePrice,
           sellingPoints: linkedOffer.sellingPoints as string[] | null,
           usageRules: linkedOffer.usageRules,
+          isActive: linkedOffer.isActive,
         }
       }
     }
@@ -171,12 +181,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const firstOffer = brief.store.offers[0]
       offerData = {
         id: firstOffer.id,
+        storeId: firstOffer.storeId,
         name: firstOffer.name,
         description: firstOffer.description,
         originalPrice: firstOffer.originalPrice,
         salePrice: firstOffer.salePrice,
         sellingPoints: firstOffer.sellingPoints as string[] | null,
         usageRules: firstOffer.usageRules,
+        isActive: firstOffer.isActive,
       }
     }
 

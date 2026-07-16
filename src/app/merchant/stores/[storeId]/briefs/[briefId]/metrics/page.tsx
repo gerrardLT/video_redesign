@@ -157,10 +157,10 @@ export default function MetricsPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* 编辑式洞察标题 — serif 大标题 + kicker */}
-      <section className="zen-reveal border-b border-[var(--ll-hair)] pb-4">
+      {/* 编辑式洞察标题 */}
+      <section className="border-b border-white/10 pb-4">
         <p className="text-[11px] tracking-[.08em] text-[var(--ll-text-3)] font-medium uppercase">DATA INSIGHTS</p>
-        <h1 className="mt-1 text-[22px] font-semibold font-[var(--font-serif)] text-[var(--ll-text)] leading-snug">
+        <h1 className="mt-1 text-[22px] font-semibold text-[var(--ll-text)] leading-snug">
           数据复盘
         </h1>
         <p className="mt-1 text-sm text-[var(--ll-text-2)]">录入数据、获取洞察、反哺下一轮计划</p>
@@ -172,8 +172,8 @@ export default function MetricsPage() {
       {/* 本地生活指标评分 */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <Target className="h-5 w-5 text-amber-500" />
-          <h2 className="text-base font-semibold text-amber-900">本地生活指标</h2>
+          <Target className="h-5 w-5 text-white/50" />
+          <h2 className="text-base font-semibold text-[var(--ll-text)]">本地生活指标</h2>
         </div>
         <ContentScoreCard metrics={metrics} />
       </section>
@@ -181,8 +181,8 @@ export default function MetricsPage() {
       {/* 优化建议（门店维度，含解锁门控） */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-amber-500" />
-          <h2 className="text-base font-semibold text-amber-900">优化建议</h2>
+          <Lightbulb className="h-5 w-5 text-white/50" />
+          <h2 className="text-base font-semibold text-[var(--ll-text)]">优化建议</h2>
         </div>
 
         {insightsLoading ? (
@@ -194,21 +194,21 @@ export default function MetricsPage() {
           <InsightsUnlocked storeId={storeId} insights={gate.insights} />
         ) : gate && !gate.unlocked ? (
           // 不足 3 条带数据的内容：显式提示解锁门槛，不伪造建议
-          <Card className="border-amber-100 bg-amber-50/50">
+          <Card className="border-white/10 bg-white/[0.03]">
             <CardContent className="py-8 text-center">
-              <Lock className="h-7 w-7 text-amber-300 mx-auto mb-2" />
-              <p className="text-sm font-medium text-amber-800">
+              <Lock className="h-7 w-7 text-white/30 mx-auto mb-2" />
+              <p className="text-sm font-medium text-[var(--ll-text)]">
                 再录入 {gate.remaining} 条即可解锁优化建议
               </p>
-              <p className="mt-1 text-xs text-amber-600">
+              <p className="mt-1 text-xs text-[var(--ll-text-3)]">
                 录满 3 条带数据的内容后，系统会自动分析并给出可应用的下周建议
               </p>
             </CardContent>
           </Card>
         ) : (
-          <Card className="border-amber-100 bg-amber-50/50">
+          <Card className="border-white/10 bg-white/[0.03]">
             <CardContent className="py-8 text-center">
-              <p className="text-sm text-amber-700">复盘数据加载失败，请稍后重试</p>
+              <p className="text-sm text-[var(--ll-text-2)]">复盘数据加载失败，请稍后重试</p>
             </CardContent>
           </Card>
         )}
@@ -217,8 +217,8 @@ export default function MetricsPage() {
       {/* 指标趋势（门店维度） */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <LineChart className="h-5 w-5 text-amber-500" />
-          <h2 className="text-base font-semibold text-amber-900">指标趋势</h2>
+          <LineChart className="h-5 w-5 text-white/50" />
+          <h2 className="text-base font-semibold text-[var(--ll-text)]">指标趋势</h2>
         </div>
         <MetricTrendChart storeId={storeId} />
       </section>
@@ -226,8 +226,8 @@ export default function MetricsPage() {
       {/* 跨周对比（门店维度） */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <CalendarRange className="h-5 w-5 text-amber-500" />
-          <h2 className="text-base font-semibold text-amber-900">跨周对比</h2>
+          <CalendarRange className="h-5 w-5 text-white/50" />
+          <h2 className="text-base font-semibold text-[var(--ll-text)]">跨周对比</h2>
         </div>
         <PeriodComparisonCard storeId={storeId} />
       </section>
@@ -235,8 +235,8 @@ export default function MetricsPage() {
       {/* 已录入数据历史（内容维度） */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <History className="h-5 w-5 text-amber-500" />
-          <h2 className="text-base font-semibold text-amber-900">历史数据</h2>
+          <History className="h-5 w-5 text-white/50" />
+          <h2 className="text-base font-semibold text-[var(--ll-text)]">历史数据</h2>
         </div>
 
         {metricsLoading ? (
@@ -251,9 +251,9 @@ export default function MetricsPage() {
             ))}
           </div>
         ) : (
-          <Card className="border-amber-100 bg-amber-50/50">
+          <Card className="border-white/10 bg-white/[0.03]">
             <CardContent className="py-8 text-center">
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-[var(--ll-text-2)]">
                 还没有录入过数据，在上方表单中录入第一条吧
               </p>
             </CardContent>
@@ -285,9 +285,9 @@ function InsightsUnlocked({
           <PerformanceInsightCard key={index} suggestion={suggestion} />
         ))
       ) : (
-        <Card className="border-amber-100 bg-amber-50/50">
+        <Card className="border-white/10 bg-white/[0.03]">
           <CardContent className="py-6 text-center">
-            <p className="text-sm text-amber-700">
+            <p className="text-sm text-[var(--ll-text-2)]">
               当前数据暂未发现明显的优化点，保持节奏继续创作即可
             </p>
           </CardContent>
@@ -314,13 +314,13 @@ function MetricHistoryRow({ record }: { record: MetricRecord }) {
   const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 
   return (
-    <Card className="border-amber-100 bg-white">
+    <Card className="border-white/10 bg-white/[0.03]">
       <CardContent className="p-3">
         <div className="flex items-center justify-between mb-2">
-          <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-xs">
+          <Badge variant="secondary" className="bg-white/10 text-[var(--ll-text)] text-xs">
             {PLATFORM_LABELS[record.platform] || record.platform}
           </Badge>
-          <span className="text-xs text-gray-400">{dateStr}</span>
+          <span className="text-xs text-[var(--ll-text-3)]">{dateStr}</span>
         </div>
 
         {/* 关键指标概览 — 横向展示 */}
@@ -333,7 +333,7 @@ function MetricHistoryRow({ record }: { record: MetricRecord }) {
 
         {/* 次要指标 */}
         {(record.revenueCents > 0 || record.linkClicks > 0) && (
-          <div className="mt-2 flex gap-3 text-xs text-gray-500">
+          <div className="mt-2 flex gap-3 text-xs text-[var(--ll-text-3)]">
             {record.linkClicks > 0 && <span>链接点击 {formatNumber(record.linkClicks)}</span>}
             {record.revenueCents > 0 && <span>营收 ¥{(record.revenueCents / 100).toFixed(0)}</span>}
           </div>
@@ -350,8 +350,8 @@ function MetricHistoryRow({ record }: { record: MetricRecord }) {
 function MetricCell({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="text-sm font-semibold text-gray-900">{formatNumber(value)}</div>
-      <div className="text-[10px] text-gray-400">{label}</div>
+      <div className="text-sm font-semibold text-[var(--ll-text)]">{formatNumber(value)}</div>
+      <div className="text-[10px] text-[var(--ll-text-3)]">{label}</div>
     </div>
   )
 }
@@ -377,10 +377,10 @@ function ContentScoreCard({ metrics }: { metrics: MetricRecord[] }) {
 
   if (!latest) {
     return (
-      <Card className="border-amber-100 bg-amber-50/50">
+      <Card className="border-white/10 bg-white/[0.03]">
         <CardContent className="py-6 text-center">
-          <Target className="h-7 w-7 text-amber-300 mx-auto mb-2" />
-          <p className="text-sm text-amber-700">录入播放数据后即可查看本地生活指标评分</p>
+          <Target className="h-7 w-7 text-white/30 mx-auto mb-2" />
+          <p className="text-sm text-[var(--ll-text-2)]">录入播放数据后即可查看本地生活指标评分</p>
         </CardContent>
       </Card>
     )
@@ -400,24 +400,24 @@ function ContentScoreCard({ metrics }: { metrics: MetricRecord[] }) {
   const grade = overallScore >= 90 ? 'S' : overallScore >= 75 ? 'A' : overallScore >= 60 ? 'B' : overallScore >= 40 ? 'C' : 'D'
 
   const gradeColors: Record<string, string> = {
-    S: 'bg-amber-500 text-white',
-    A: 'bg-green-500 text-white',
-    B: 'bg-blue-500 text-white',
-    C: 'bg-yellow-500 text-white',
-    D: 'bg-red-500 text-white',
+    S: 'bg-white text-black',
+    A: 'bg-green-500/80 text-white',
+    B: 'bg-blue-500/80 text-white',
+    C: 'bg-yellow-500/80 text-white',
+    D: 'bg-red-500/80 text-white',
   }
 
   return (
-    <Card className="border-amber-100 bg-white">
+    <Card className="border-white/10 bg-white/[0.03]">
       <CardContent className="p-4">
         {/* 综合评分 */}
         <div className="flex items-center gap-4 mb-4">
-          <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold', gradeColors[grade] || 'bg-gray-200')}>
+          <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold', gradeColors[grade] || 'bg-white/10')}>
             {grade}
           </div>
           <div>
-            <div className="text-2xl font-bold text-gray-900">{overallScore}</div>
-            <div className="text-xs text-gray-400">综合评分</div>
+            <div className="text-2xl font-bold text-[var(--ll-text)]">{overallScore}</div>
+            <div className="text-xs text-[var(--ll-text-3)]">综合评分</div>
           </div>
         </div>
 
@@ -447,24 +447,24 @@ function ContentScoreCard({ metrics }: { metrics: MetricRecord[] }) {
         </div>
 
         {/* 快速建议 */}
-        <div className="mt-4 pt-3 border-t border-gray-100">
+        <div className="mt-4 pt-3 border-t border-white/10">
           <div className="flex items-center gap-1.5 mb-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-            <span className="text-xs font-medium text-gray-700">优化建议</span>
+            <AlertTriangle className="h-3.5 w-3.5 text-white/50" />
+            <span className="text-xs font-medium text-[var(--ll-text-2)]">优化建议</span>
           </div>
           <div className="space-y-1.5">
             {engagementScore < 60 && (
-              <p className="text-xs text-amber-700 bg-amber-50 px-2 py-1.5 rounded-lg">
+              <p className="text-xs text-[var(--ll-warning)] bg-[var(--ll-warning)]/20 px-2 py-1.5 rounded-lg">
                 互动率偏低，建议在视频结尾设置互动问题引导评论
               </p>
             )}
             {conversionScore < 60 && conversionScore > 0 && (
-              <p className="text-xs text-amber-700 bg-amber-50 px-2 py-1.5 rounded-lg">
+              <p className="text-xs text-[var(--ll-warning)] bg-[var(--ll-warning)]/20 px-2 py-1.5 rounded-lg">
                 转化率待提升，建议在视频中明确展示团购套餐内容和价格
               </p>
             )}
             {overallScore >= 75 && (
-              <p className="text-xs text-green-700 bg-green-50 px-2 py-1.5 rounded-lg">
+              <p className="text-xs text-green-400 bg-green-900/20 px-2 py-1.5 rounded-lg">
                 各项指标表现优秀，保持更新频率持续提升账号权重
               </p>
             )}
@@ -493,13 +493,13 @@ function DimensionBar({
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-gray-600">{label}</span>
-        <span className="text-xs font-medium text-gray-800">{value.toFixed(2)}{suffix}</span>
+        <span className="text-xs text-[var(--ll-text-2)]">{label}</span>
+        <span className="text-xs font-medium text-[var(--ll-text)]">{value.toFixed(2)}{suffix}</span>
       </div>
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
         <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${Math.min(100, score)}%` }} />
       </div>
-      <div className="text-[10px] text-gray-400 mt-0.5">{benchmark}</div>
+      <div className="text-[10px] text-[var(--ll-text-3)] mt-0.5">{benchmark}</div>
     </div>
   )
 }

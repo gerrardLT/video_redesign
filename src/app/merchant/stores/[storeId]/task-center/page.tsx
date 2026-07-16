@@ -197,7 +197,7 @@ export default function TaskCenterPage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-8">
-      {/* 标题 + SSE 连接状态 — v3 Zen: serif 标题 */}
+      {/* 标题 + SSE 连接状态 */}
       <div className="flex items-center justify-between pt-1 zen-reveal">
         <div className="flex items-center gap-2">
           <Inbox className="h-5 w-5 text-[var(--ll-green)]" strokeWidth={1.5} />
@@ -215,7 +215,7 @@ export default function TaskCenterPage() {
         </span>
       </div>
 
-      {/* 标签切换 — v3 Zen: 绿色选中态 */}
+      {/* 标签切换 */}
       <div className="flex gap-2 zen-reveal">
         <Button
           type="button"
@@ -295,9 +295,9 @@ function TaskList({
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
-        <Inbox className="h-10 w-10 text-gray-300" />
-        <p className="text-sm text-gray-500">当前没有进行中的任务</p>
-        <p className="text-xs text-gray-400">待拍摄、渲染中、待导出、待发布的内容会出现在这里</p>
+        <Inbox className="h-10 w-10 text-[var(--ll-text-3)]" />
+        <p className="text-sm text-[var(--ll-text-3)]">当前没有进行中的任务</p>
+        <p className="text-xs text-[var(--ll-text-3)]">待拍摄、渲染中、待导出、待发布的内容会出现在这里</p>
       </div>
     )
   }
@@ -310,7 +310,7 @@ function TaskList({
         return (
           <Card
             key={`${task.type}-${task.briefId}-${task.variantId ?? idx}`}
-            className="flex items-center gap-3 rounded-2xl border-gray-100 p-4 cursor-pointer transition-colors hover:border-amber-200 hover:bg-amber-50/40"
+            className="flex items-center gap-3 rounded-2xl border-[var(--ll-hair)] p-4 cursor-pointer transition-colors hover:border-[var(--ll-green-sb)] hover:bg-[var(--ll-green-light)]/40"
             onClick={() => onOpen(task.actionHref)}
           >
             <div
@@ -323,12 +323,12 @@ function TaskList({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-800">{task.status}</p>
-              <p className="mt-0.5 truncate text-xs text-gray-400">
+              <p className="text-sm font-semibold text-[var(--ll-text)]">{task.status}</p>
+              <p className="mt-0.5 truncate text-xs text-[var(--ll-text-3)]">
                 {TASK_ACTION_LABEL[task.type]} ›
               </p>
             </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-gray-300" />
+            <ChevronRight className="h-5 w-5 shrink-0 text-[var(--ll-text-3)]" />
           </Card>
         )
       })}
@@ -421,8 +421,8 @@ function NotificationList({
   if (notifications.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
-        <Bell className="h-10 w-10 text-gray-300" />
-        <p className="text-sm text-gray-500">暂无通知</p>
+        <Bell className="h-10 w-10 text-[var(--ll-text-3)]" />
+        <p className="text-sm text-[var(--ll-text-3)]">暂无通知</p>
       </div>
     )
   }
@@ -437,7 +437,7 @@ function NotificationList({
           <Button
             variant="ghost"
             size="sm"
-            className="text-xs text-amber-600 hover:text-amber-700"
+            className="text-xs text-[var(--ll-green)] hover:text-[var(--ll-green-sb)]"
             onClick={handleMarkAll}
             disabled={marking === 'ALL'}
           >
@@ -452,8 +452,8 @@ function NotificationList({
       {notifications.map((n) => {
         const meta = NOTIFICATION_META[n.type] ?? {
           icon: Bell,
-          color: 'text-gray-500',
-          bg: 'bg-gray-100',
+          color: 'text-[var(--ll-text-3)]',
+          bg: 'bg-[var(--ll-muted)]',
         }
         const Icon = meta.icon
         return (
@@ -461,9 +461,9 @@ function NotificationList({
             key={n.id}
             className={`flex items-start gap-3 rounded-2xl p-4 transition-colors ${
               n.read
-                ? 'border-gray-100 bg-white'
-                : 'border-amber-200 bg-amber-50/50'
-            } ${n.actionHref || !n.read ? 'cursor-pointer hover:border-amber-300' : ''}`}
+                ? 'border-[var(--ll-hair)] bg-[var(--ll-surface)]'
+                : 'border-[var(--ll-green)]/30 bg-[var(--ll-green-light)]/20'
+            } ${n.actionHref || !n.read ? 'cursor-pointer hover:border-[var(--ll-green-sb)]' : ''}`}
             onClick={() => handleClick(n)}
           >
             <div
@@ -473,25 +473,25 @@ function NotificationList({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <p className="truncate text-sm font-semibold text-gray-800">{n.title}</p>
+                <p className="truncate text-sm font-semibold text-[var(--ll-text)]">{n.title}</p>
                 {!n.read && (
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-label="未读" />
                 )}
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-gray-600">{n.body}</p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--ll-text-2)]">{n.body}</p>
               <div className="mt-1.5 flex items-center gap-2">
-                <span className="flex items-center gap-0.5 text-[11px] text-gray-400">
+                <span className="flex items-center gap-0.5 text-[11px] text-[var(--ll-text-3)]">
                   <Clock className="h-3 w-3" />
                   {formatRelativeTime(n.createdAt)}
                 </span>
                 {n.actionHref && (
-                  <Badge variant="outline" className="border-amber-200 text-[10px] text-amber-600">
+                  <Badge variant="outline" className="border-[var(--ll-hair)] text-[10px] text-[var(--ll-green)]">
                     点击查看
                   </Badge>
                 )}
               </div>
             </div>
-            {marking === n.id && <Loader2 className="h-4 w-4 animate-spin text-amber-500" />}
+            {marking === n.id && <Loader2 className="h-4 w-4 animate-spin text-[var(--ll-text-2)]" />}
           </Card>
         )
       })}

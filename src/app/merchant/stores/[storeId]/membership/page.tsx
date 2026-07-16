@@ -186,7 +186,7 @@ export default function MembershipPage() {
           variant="ghost"
           size="sm"
           onClick={() => router.push(`/merchant/stores/${storeId}/settings`)}
-          className="text-amber-700 hover:bg-amber-100 rounded-xl"
+          className="text-[var(--ll-text-2)] hover:bg-[var(--ll-muted)] rounded-xl"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           返回
@@ -224,11 +224,11 @@ export default function MembershipPage() {
 
       {/* 支付方式选择 */}
       <div className="mt-4 flex items-center gap-2">
-        <span className="text-sm text-gray-500">支付方式</span>
+        <span className="text-sm text-[var(--ll-text-3)]">支付方式</span>
         <button
           onClick={() => setPayMethod('wechat')}
           className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-            payMethod === 'wechat' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600'
+            payMethod === 'wechat' ? 'bg-green-500 text-white' : 'bg-[var(--ll-muted)] text-[var(--ll-text-2)]'
           }`}
         >
           微信支付
@@ -236,7 +236,7 @@ export default function MembershipPage() {
         <button
           onClick={() => setPayMethod('alipay')}
           className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-            payMethod === 'alipay' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'
+            payMethod === 'alipay' ? 'bg-blue-500 text-white' : 'bg-[var(--ll-muted)] text-[var(--ll-text-2)]'
           }`}
         >
           支付宝
@@ -248,7 +248,7 @@ export default function MembershipPage() {
         <button
           onClick={() => setTab('membership')}
           className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
-            tab === 'membership' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-600'
+            tab === 'membership' ? 'bg-[var(--ll-green)] text-black' : 'bg-[var(--ll-muted)] text-[var(--ll-text-2)]'
           }`}
         >
           会员套餐
@@ -256,7 +256,7 @@ export default function MembershipPage() {
         <button
           onClick={() => setTab('credits')}
           className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
-            tab === 'credits' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-600'
+            tab === 'credits' ? 'bg-[var(--ll-green)] text-black' : 'bg-[var(--ll-muted)] text-[var(--ll-text-2)]'
           }`}
         >
           积分充值
@@ -275,7 +275,7 @@ export default function MembershipPage() {
         <div className="mt-4 space-y-3">
           {plansLoading && <div className="flex justify-center py-6"><Spinner /></div>}
           {!plansLoading && plans.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-6">暂无可购买的会员套餐</p>
+            <p className="text-sm text-[var(--ll-text-3)] text-center py-6">暂无可购买的会员套餐</p>
           )}
           {plans.map((plan, idx) => {
             const isCurrent = currentTier === plan.type
@@ -283,7 +283,7 @@ export default function MembershipPage() {
             return (
               <Card key={plan.id} className={cn(
                 'rounded-2xl relative',
-                isRecommended ? 'border-t-[3px] border-t-[var(--ll-gold)] border-[var(--ll-gold)]/30' : 'border-amber-100'
+                isRecommended ? 'border-t-[3px] border-t-[var(--ll-gold)] border-[var(--ll-gold)]/30' : 'border-[var(--ll-hair)]'
               )}>
                 {isRecommended && (
                   <span className="absolute -top-3 right-4 inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--ll-gold)] text-white text-[10px] font-bold rounded-full shadow-sm">
@@ -294,19 +294,19 @@ export default function MembershipPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-base font-bold text-gray-800">{plan.name}</h3>
+                        <h3 className="text-base font-bold text-[var(--ll-text)]">{plan.name}</h3>
                         {isCurrent && (
                           <Badge variant="outline" className="text-[10px] border-green-200 text-green-700">
                             当前等级
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-[var(--ll-text-3)] mt-1">
                         每月 {plan.monthlyCredits} 积分
                         {plan.bonusCredits > 0 && ` + 赠 ${plan.bonusCredits}`}
                       </p>
                       {plan.description && (
-                        <p className="text-xs text-gray-400 mt-1">{plan.description}</p>
+                        <p className="text-xs text-[var(--ll-text-3)] mt-1">{plan.description}</p>
                       )}
                     </div>
                     <div className="text-right">
@@ -316,7 +316,7 @@ export default function MembershipPage() {
                   <Button
                     onClick={() => handleSubscribe(plan)}
                     disabled={submittingId === plan.id || isCurrent}
-                    className="w-full mt-3 h-10 rounded-xl bg-amber-500 hover:bg-amber-600 text-white disabled:bg-gray-200 disabled:text-gray-400"
+                    className="w-full mt-3 h-10 rounded-xl bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black disabled:bg-[var(--ll-muted)] disabled:text-[var(--ll-text-3)]"
                   >
                     {submittingId === plan.id ? <Spinner size="sm" /> : isCurrent ? '已是当前等级' : '立即升级'}
                   </Button>
@@ -332,20 +332,20 @@ export default function MembershipPage() {
         <div className="mt-4 space-y-3">
           {pkgLoading && <div className="flex justify-center py-6"><Spinner /></div>}
           {!pkgLoading && packages.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-6">暂无可购买的积分套餐</p>
+            <p className="text-sm text-[var(--ll-text-3)] text-center py-6">暂无可购买的积分套餐</p>
           )}
           {packages.map((pkg) => (
-            <Card key={pkg.id} className="border-amber-100 rounded-2xl">
+            <Card key={pkg.id} className="border-[var(--ll-hair)] rounded-2xl">
               <CardContent className="py-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-gray-800">{pkg.name}</h3>
-                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                    <h3 className="text-base font-bold text-[var(--ll-text)]">{pkg.name}</h3>
+                    <p className="text-xs text-[var(--ll-text-3)] mt-1 flex items-center gap-1">
                       <Coins className="h-3.5 w-3.5 text-[var(--ll-gold)]" />
                       {pkg.credits} 积分
                     </p>
                     {pkg.description && (
-                      <p className="text-xs text-gray-400 mt-1">{pkg.description}</p>
+                      <p className="text-xs text-[var(--ll-text-3)] mt-1">{pkg.description}</p>
                     )}
                   </div>
                   <p className="text-lg font-semibold font-[var(--font-num)] tabular-nums text-[var(--ll-green)]">¥{(pkg.price / 100).toFixed(0)}</p>
@@ -353,7 +353,7 @@ export default function MembershipPage() {
                 <Button
                   onClick={() => handleRecharge(pkg)}
                   disabled={submittingId === pkg.id}
-                  className="w-full mt-3 h-10 rounded-xl bg-amber-500 hover:bg-amber-600 text-white"
+                  className="w-full mt-3 h-10 rounded-xl bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black"
                 >
                   {submittingId === pkg.id ? <Spinner size="sm" /> : '立即充值'}
                 </Button>
@@ -374,12 +374,12 @@ export default function MembershipPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-bold text-gray-800">{qrModal.title}</h3>
+              <h3 className="text-base font-bold text-[var(--ll-text)]">{qrModal.title}</h3>
               <button onClick={() => setQrModal(null)} aria-label="关闭">
-                <X className="h-5 w-5 text-gray-400" />
+                <X className="h-5 w-5 text-[var(--ll-text-3)]" />
               </button>
             </div>
-            <div className="rounded-xl bg-white p-3 inline-block border border-gray-100">
+            <div className="rounded-xl bg-[var(--ll-surface)] border border-[var(--ll-hair)]">
               {/* 微信 code_url 转二维码图片展示，扫码后由支付回调入账 */}
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrModal.qrCode)}`}
@@ -387,7 +387,7 @@ export default function MembershipPage() {
                 className="h-48 w-48"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-3">请使用微信扫码完成支付</p>
+            <p className="text-xs text-[var(--ll-text-3)] mt-3">请使用微信扫码完成支付</p>
             <Button
               onClick={() => {
                 setQrModal(null)

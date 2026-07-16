@@ -42,6 +42,7 @@ import {
   ChevronRight,
   Megaphone,
   Sparkles,
+  Radio,
 } from 'lucide-react'
 import { cn } from '@/lib/shared/utils'
 import { Button } from '@/components/ui/button'
@@ -114,6 +115,15 @@ interface ExportResult {
   tier: string
 }
 
+interface StyleRecommendation {
+  id: string
+  name: string
+  description: string
+  proTags: string[]
+  conTags: string[]
+  previewHint: string
+}
+
 // ─── SWR Fetcher ───
 
 const fetcher = async (url: string) => {
@@ -167,6 +177,10 @@ export default function VariantsExportPage() {
   const [showHighRiskConfirm, setShowHighRiskConfirm] = useState<string | null>(null)
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformId | null>(null)
 
+  // ─── 风格推荐状态（屏 C） ───
+  const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null)
+  const [generateLoading, setGenerateLoading] = useState(false)
+
   // 获取 VideoVariants 列表
   const {
     data: variantsData,
@@ -188,6 +202,34 @@ export default function VariantsExportPage() {
   const platformCopies = briefData?.brief?.platformCopies ?? null
 
   const selectedVariant = variants.find((v) => v.id === selectedVariantId) ?? null
+
+  // 获取风格推荐（屏 C：无版本时展示）
+  const { data: styleData } = useSWR<{ recommendations: StyleRecommendation[] }>(
+    variants.length === 0 ? `/api/content-briefs/${briefId}/style-recommendations` : null,
+    fetcher
+  )
+  const recommendations = styleData?.recommendations ?? []
+
+  // ─── 生成选定风格 ───
+  const handleGenerateStyle = useCallback(async (styleId: string) => {
+    setGenerateLoading(true)
+    setErrorMessage(null)
+    try {
+      const res = await fetch(`/api/content-briefs/${briefId}/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectedStyle: styleId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error?.message || '生成失败')
+      // 触发 variants 刷新
+      mutateVariants()
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : '未知错误')
+    } finally {
+      setGenerateLoading(false)
+    }
+  }, [briefId, mutateVariants])
 
   // ─── 导出视频 ───
   const handleExport = useCallback(async (variantId: string) => {
@@ -251,8 +293,8 @@ export default function VariantsExportPage() {
   if (variantsLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
-        <p className="text-gray-500 text-sm">加载中...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+        <p className="text-[var(--ll-text-3)] text-sm">加载中...</p>
       </div>
     )
   }
@@ -269,10 +311,91 @@ export default function VariantsExportPage() {
 
   if (variants.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Play className="h-10 w-10 text-gray-300" />
-        <p className="text-gray-500">暂无视频版本</p>
-        <p className="text-xs text-gray-400">请先完成拍摄和上传，再生成视频</p>
+      <div className="max-w-lg mx-auto px-4 pb-8">
+        {/* 屏 C：风格推荐单选生成 */}
+        <section className="py-5 border-b border-[var(--ll-hair)]">
+          <p className="text-[11px] tracking-[.08em] text-[var(--ll-text-3)] font-medium uppercase">STUDIO</p>
+          <h1 className="mt-1 text-xl font-semibold text-[var(--ll-text)]">选择风格生成</h1>
+          <p className="text-sm text-[var(--ll-text-2)] mt-1">AI 推荐 3 种风格，选择一种开始生成</p>
+        </section>
+
+        {errorMessage && (
+          <div className="mt-4 p-3 bg-red-900/20 border border-red-800/30 rounded-xl text-sm text-red-400">
+            {errorMessage}
+          </div>
+        )}
+
+        {/* 风格推荐卡片 */}
+        <div className="mt-5 space-y-3">
+          {recommendations.map((rec, idx) => (
+            <button
+              key={rec.id}
+              className={cn(
+                'w-full p-4 rounded-xl border text-left transition-all',
+                selectedStyleId === rec.id
+                  ? 'border-white/30 bg-white/[0.04]'
+                  : 'border-white/10 bg-white/[0.01] hover:border-white/20',
+              )}
+              onClick={() => setSelectedStyleId(rec.id)}
+            >
+              <div className="flex items-center gap-3">
+                {/* 单选圆圈 */}
+                <div className={cn(
+                  'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                  selectedStyleId === rec.id
+                    ? 'border-white bg-white'
+                    : 'border-white/20',
+                )}>
+                  {selectedStyleId === rec.id && (
+                    <div className="w-2 h-2 rounded-full bg-black" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    {idx === 0 && <Sparkles className="h-3.5 w-3.5 text-white/50" />}
+                    <h3 className="text-sm font-bold text-[var(--ll-text)]">{rec.name}</h3>
+                  </div>
+                  <p className="text-xs text-[var(--ll-text-3)] mt-0.5">{rec.description}</p>
+                  {/* 优缺点标签 */}
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {rec.proTags.map(tag => (
+                      <span key={tag} className="px-2 py-0.5 text-[10px] bg-white/5 text-white/50 rounded-full">+ {tag}</span>
+                    ))}
+                    {rec.conTags.map(tag => (
+                      <span key={tag} className="px-2 py-0.5 text-[10px] bg-white/5 text-white/30 rounded-full">– {tag}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* 生成按钮 */}
+        {selectedStyleId && (
+          <button
+            className={cn(
+              'w-full mt-5 py-3 rounded-xl text-sm font-bold transition-all',
+              generateLoading
+                ? 'bg-white/5 text-white/20 cursor-not-allowed'
+                : 'bg-white text-black hover:bg-white/90 active:scale-[0.985]',
+            )}
+            disabled={generateLoading}
+            onClick={() => handleGenerateStyle(selectedStyleId)}
+          >
+            {generateLoading ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <Loader2 className="h-4 w-4 animate-spin" /> 生成中...
+              </span>
+            ) : (
+              <>生成此版本 · 单版本积分更省</>
+            )}
+          </button>
+        )}
+
+        <p className="text-[11px] text-[var(--ll-text-3)] text-center mt-2">
+          生成前会冻结预估积分，完成后多退少补
+        </p>
       </div>
     )
   }
@@ -282,13 +405,13 @@ export default function VariantsExportPage() {
       {/* 编辑式标题 */}
       <section className="zen-reveal py-5 border-b border-[var(--ll-hair)]">
         <p className="text-[11px] tracking-[.08em] text-[var(--ll-text-3)] font-medium uppercase">VARIANTS</p>
-        <h1 className="mt-1 text-xl font-semibold font-[var(--font-serif)] text-[var(--ll-text)]">选择版本导出</h1>
+        <h1 className="mt-1 text-xl font-semibold text-[var(--ll-text)]">选择版本导出</h1>
         <p className="text-sm text-[var(--ll-text-2)] mt-1">共生成 {variants.length} 个版本，选择合适的下载</p>
       </section>
 
       {/* 错误提示 */}
       {errorMessage && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+        <div className="mt-4 p-3 bg-red-900/20 border border-red-800/30 rounded-xl text-sm text-red-400">
           {errorMessage}
         </div>
       )}
@@ -321,8 +444,8 @@ export default function VariantsExportPage() {
       {selectedVariant && (
         <div className="mt-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-sm font-bold text-gray-800">导出平台</span>
-            <span className="text-xs text-gray-400">选择目标平台，自动适配分辨率</span>
+            <span className="text-sm font-bold text-[var(--ll-text)]">导出平台</span>
+            <span className="text-xs text-[var(--ll-text-3)]">选择目标平台，自动适配分辨率</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {PLATFORM_PRESETS.map((p) => (
@@ -331,17 +454,17 @@ export default function VariantsExportPage() {
                 className={cn(
                   'p-3 rounded-xl border-2 text-left transition-all',
                   selectedPlatform === p.id
-                    ? 'border-amber-300 bg-amber-50/50'
-                    : 'border-gray-100 hover:border-amber-200',
+                    ? 'border-white/30 bg-white/[0.04]'
+                    : 'border-white/10 hover:border-white/20',
                 )}
                 onClick={() => setSelectedPlatform(selectedPlatform === p.id ? null : p.id)}
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-gray-800">{p.label}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 rounded-full text-gray-500">{p.ratio}</span>
+                  <span className="text-xs font-bold text-[var(--ll-text)]">{p.label}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-white/5 rounded-full text-white/50">{p.ratio}</span>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">{p.resolution}{p.maxDurationLabel ? ` · ≤${p.maxDurationLabel}` : ''}</p>
-                <p className="text-[10px] text-amber-600 mt-0.5">{p.tips}</p>
+                <p className="text-[10px] text-[var(--ll-text-3)] mt-1">{p.resolution}{p.maxDurationLabel ? ` · ≤${p.maxDurationLabel}` : ''}</p>
+                <p className="text-[10px] text-white/40 mt-0.5">{p.tips}</p>
               </button>
             ))}
           </div>
@@ -376,15 +499,15 @@ export default function VariantsExportPage() {
           href={`/merchant/stores/${storeId}/publish-queue`}
           className="block mt-6"
         >
-          <Card className="p-4 rounded-2xl border-2 border-amber-100 bg-amber-50/40 flex items-center gap-3 hover:border-amber-300 transition-all cursor-pointer">
-            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+          <Card className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] flex items-center gap-3 hover:border-white/20 transition-all cursor-pointer">
+            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/5 text-white/60 flex items-center justify-center">
               <Megaphone className="h-5 w-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-bold text-gray-800">去发布这条视频</h3>
-              <p className="text-xs text-gray-500 mt-0.5">复制文案、下载视频、跳转平台发布，发完回来标记一下</p>
+              <h3 className="text-sm font-bold text-[var(--ll-text)]">去发布这条视频</h3>
+              <p className="text-xs text-[var(--ll-text-3)] mt-0.5">复制文案、下载视频、跳转平台发布，发完回来标记一下</p>
             </div>
-            <ChevronRight className="h-5 w-5 text-gray-300 flex-shrink-0" />
+            <ChevronRight className="h-5 w-5 text-[var(--ll-text-3)] flex-shrink-0" />
           </Card>
         </Link>
       )}
@@ -395,15 +518,15 @@ export default function VariantsExportPage() {
           href={`/merchant/stores/${storeId}/briefs/${briefId}/metrics`}
           className="block mt-4"
         >
-          <Card className="p-4 rounded-2xl border-2 border-green-100 bg-green-50/40 flex items-center gap-3 hover:border-green-300 transition-all cursor-pointer">
-            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 text-green-600 flex items-center justify-center">
+          <Card className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] flex items-center gap-3 hover:border-white/20 transition-all cursor-pointer">
+            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/5 text-white/60 flex items-center justify-center">
               <BarChart3 className="h-5 w-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-bold text-gray-800">发布后来回填数据</h3>
-              <p className="text-xs text-gray-500 mt-0.5">录入播放/转化数据，获取下一轮优化建议</p>
+              <h3 className="text-sm font-bold text-[var(--ll-text)]">发布后来回填数据</h3>
+              <p className="text-xs text-[var(--ll-text-3)] mt-0.5">录入播放/转化数据，获取下一轮优化建议</p>
             </div>
-            <ChevronRight className="h-5 w-5 text-gray-300 flex-shrink-0" />
+            <ChevronRight className="h-5 w-5 text-[var(--ll-text-3)] flex-shrink-0" />
           </Card>
         </Link>
       )}
@@ -445,7 +568,7 @@ function VariantCard({
   const typeConfig = VARIANT_TYPE_LABELS[variant.type] || {
     label: variant.type,
     desc: '',
-    color: 'bg-gray-50 text-gray-700 border-gray-200',
+    color: 'bg-white/5 text-[var(--ll-text)] border-white/10',
   }
 
   const compliance = variant.complianceChecks[0] ?? null
@@ -458,8 +581,8 @@ function VariantCard({
       className={cn(
         'p-4 rounded-2xl border-2 transition-all cursor-pointer relative',
         isRecommended && 'border-t-[var(--ll-gold)] border-t-[3px]',
-        isSelected && 'border-amber-300 bg-amber-50/30 shadow-md shadow-amber-100',
-        !isSelected && !isRecommended && 'border-gray-100 hover:border-amber-200',
+        isSelected && 'border-white/30 bg-white/[0.04] shadow-lg shadow-black/20',
+        !isSelected && !isRecommended && 'border-white/10 hover:border-white/20',
         !isSelected && isRecommended && 'border-[var(--ll-gold)]/30 hover:border-[var(--ll-gold)]/60',
       )}
       onClick={onSelect}
@@ -472,8 +595,8 @@ function VariantCard({
       )}
       <div className="flex items-start gap-3">
         {/* 缩略图区域 */}
-        <div className="flex-shrink-0 w-16 h-24 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden">
-          <Play className="h-6 w-6 text-gray-400" />
+        <div className="flex-shrink-0 w-16 h-24 rounded-lg bg-white/5 flex items-center justify-center overflow-hidden">
+          <Play className="h-6 w-6 text-white/30" />
         </div>
 
         {/* 信息区域 */}
@@ -487,12 +610,12 @@ function VariantCard({
           </span>
 
           {/* 标题 */}
-          <h3 className="mt-1.5 text-sm font-bold text-gray-800 truncate">
+          <h3 className="mt-1.5 text-sm font-bold text-[var(--ll-text)] truncate">
             {variant.title}
           </h3>
 
           {/* 时长 + 描述 */}
-          <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+          <div className="mt-1 flex items-center gap-2 text-xs text-[var(--ll-text-3)]">
             {variant.durationSec && (
               <span className="flex items-center gap-0.5">
                 <Clock className="h-3 w-3" />
@@ -523,14 +646,14 @@ function VariantCard({
 
       {/* 展开时显示导出按钮 */}
       {isSelected && (
-        <div className="mt-4 pt-3 border-t border-gray-100">
+        <div className="mt-4 pt-3 border-t border-white/10">
           {/* 已导出 → 显示下载链接 */}
           {exportResult && (
-            <div className="flex items-center gap-2 p-3 bg-green-50 rounded-xl">
-              <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+            <div className="flex items-center gap-2 p-3 bg-green-900/20 rounded-xl">
+              <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-green-700">导出完成</p>
-                <p className="text-xs text-green-600 mt-0.5">
+                <p className="text-sm font-medium text-green-400">导出完成</p>
+                <p className="text-xs text-green-500 mt-0.5">
                   分辨率: {exportResult.resolution} · 24小时内有效
                 </p>
               </div>
@@ -553,8 +676,8 @@ function VariantCard({
               className={cn(
                 'w-full h-10 rounded-xl text-sm font-bold transition-all',
                 isBlocked
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-200',
+                  ? 'bg-white/5 text-white/20 cursor-not-allowed'
+                  : 'bg-white text-black hover:bg-white/90 shadow-md shadow-black/20',
               )}
               disabled={isBlocked || isExporting}
               onClick={(e) => {
@@ -591,7 +714,7 @@ function VariantCard({
 function ComplianceBadge({ riskLevel }: { riskLevel: string | null }) {
   if (!riskLevel) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-white/5 text-white/50">
         <Clock className="h-3 w-3" />
         待检查
       </span>
@@ -602,22 +725,22 @@ function ComplianceBadge({ riskLevel }: { riskLevel: string | null }) {
     LOW: {
       icon: ShieldCheck,
       label: '合规通过',
-      className: 'bg-green-100 text-green-700',
+      className: 'bg-green-900/30 text-green-400',
     },
     MEDIUM: {
       icon: ShieldAlert,
       label: '低风险',
-      className: 'bg-yellow-100 text-yellow-700',
+      className: 'bg-yellow-900/30 text-yellow-400',
     },
     HIGH: {
       icon: ShieldAlert,
       label: '高风险',
-      className: 'bg-orange-100 text-orange-700',
+      className: 'bg-[var(--ll-danger)]/30 text-[var(--ll-danger)]',
     },
     BLOCKED: {
       icon: ShieldX,
       label: '合规不通过',
-      className: 'bg-red-100 text-red-700',
+      className: 'bg-red-900/30 text-red-400',
     },
   }
 
@@ -660,7 +783,7 @@ function PlatformCopiesPreview({
 
   return (
     <div className="mt-6">
-      <h2 className="text-sm font-bold text-gray-800 mb-3">平台文案预览</h2>
+      <h2 className="text-sm font-bold text-[var(--ll-text)] mb-3">平台文案预览</h2>
 
       {/* 平台切换标签 */}
       <div className="flex gap-1.5 mb-3 overflow-x-auto">
@@ -670,8 +793,8 @@ function PlatformCopiesPreview({
             className={cn(
               'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all',
               activePlatform === platform
-                ? 'bg-amber-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                ? 'bg-white text-black'
+                : 'bg-white/5 text-white/50 hover:bg-white/10',
             )}
             onClick={() => setActivePlatform(platform)}
           >
@@ -681,35 +804,35 @@ function PlatformCopiesPreview({
       </div>
 
       {/* 文案内容 */}
-      <Card className="p-4 rounded-xl border border-gray-100">
+      <Card className="p-4 rounded-xl border border-white/10 bg-white/[0.02]">
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-gray-400 font-medium">标题</label>
-            <p className="text-sm text-gray-800 mt-0.5">{activeCopy.title}</p>
+            <label className="text-xs text-[var(--ll-text-3)] font-medium">标题</label>
+            <p className="text-sm text-[var(--ll-text)] mt-0.5">{activeCopy.title}</p>
           </div>
           <div>
-            <label className="text-xs text-gray-400 font-medium">封面文字</label>
-            <p className="text-sm text-gray-800 mt-0.5">{activeCopy.coverTitle}</p>
+            <label className="text-xs text-[var(--ll-text-3)] font-medium">封面文字</label>
+            <p className="text-sm text-[var(--ll-text)] mt-0.5">{activeCopy.coverTitle}</p>
           </div>
           <div>
-            <label className="text-xs text-gray-400 font-medium">文案</label>
-            <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap leading-relaxed">
+            <label className="text-xs text-[var(--ll-text-3)] font-medium">文案</label>
+            <p className="text-sm text-[var(--ll-text-2)] mt-0.5 whitespace-pre-wrap leading-relaxed">
               {activeCopy.caption}
             </p>
           </div>
           <div>
-            <label className="text-xs text-gray-400 font-medium">标签</label>
+            <label className="text-xs text-[var(--ll-text-3)] font-medium">标签</label>
             <div className="flex flex-wrap gap-1.5 mt-1">
               {activeCopy.tags.map((tag, i) => (
-                <span key={i} className="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs rounded-full">
+                <span key={i} className="px-2 py-0.5 bg-white/5 text-white/50 text-xs rounded-full">
                   #{tag}
                 </span>
               ))}
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-400 font-medium">引导语</label>
-            <p className="text-sm text-amber-600 font-medium mt-0.5">{activeCopy.cta}</p>
+            <label className="text-xs text-[var(--ll-text-3)] font-medium">引导语</label>
+            <p className="text-sm text-white/60 font-medium mt-0.5">{activeCopy.cta}</p>
           </div>
         </div>
       </Card>
@@ -740,29 +863,29 @@ function HighRiskConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-5"
+        className="w-full max-w-sm bg-[var(--ll-surface)] border border-[var(--ll-hair)] rounded-2xl shadow-xl p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 text-orange-600">
+        <div className="flex items-center gap-2 text-[var(--ll-danger)]">
           <AlertTriangle className="h-5 w-5" />
           <h3 className="text-base font-bold">合规风险提醒</h3>
         </div>
 
-        <p className="mt-3 text-sm text-gray-600">
+        <p className="mt-3 text-sm text-[var(--ll-text-2)]">
           系统检测到以下高风险问题，导出后请谨慎发布：
         </p>
 
         <div className="mt-3 space-y-2 max-h-40 overflow-y-auto">
           {highIssues.map((issue, i) => (
-            <div key={i} className="p-2 bg-orange-50 rounded-lg text-xs text-orange-700">
+            <div key={i} className="p-2 bg-[var(--ll-danger)]/20 rounded-lg text-xs text-[var(--ll-danger)]">
               <p className="font-medium">{issue.reason}</p>
               {issue.matchedText && (
-                <p className="mt-0.5 text-orange-500">涉及文字：「{issue.matchedText}」</p>
+                <p className="mt-0.5 text-[var(--ll-danger)]">涉及文字：「{issue.matchedText}」</p>
               )}
             </div>
           ))}
           {highIssues.length === 0 && (
-            <p className="text-xs text-gray-500">存在高风险合规问题，请确认是否继续导出</p>
+            <p className="text-xs text-[var(--ll-text-3)]">存在高风险合规问题，请确认是否继续导出</p>
           )}
         </div>
 
@@ -775,7 +898,7 @@ function HighRiskConfirmDialog({
             取消
           </Button>
           <Button
-            className="flex-1 h-10 rounded-xl text-sm bg-orange-500 hover:bg-orange-600 text-white"
+            className="flex-1 h-10 rounded-xl text-sm bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black"
             onClick={() => onConfirm(variantId)}
           >
             确认导出

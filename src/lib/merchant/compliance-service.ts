@@ -15,7 +15,7 @@
  */
 
 import { randomUUID } from 'crypto'
-import { ABSOLUTE_CLAIMS, FALSE_POPULARITY } from '@/constants/merchant'
+import { ABSOLUTE_CLAIMS, FALSE_POPULARITY, LLM_MAX_TOKENS } from '@/constants/merchant'
 import { ApiError } from '@/lib/shared/api-error'
 import { calculateContentEntropy } from './content-entropy-service'
 import { getBalance } from '@/lib/shared/credit-service'
@@ -744,7 +744,7 @@ ${reasonList}
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.5,
-      max_tokens: 2000,
+      max_tokens: LLM_MAX_TOKENS,
     }),
   })
 

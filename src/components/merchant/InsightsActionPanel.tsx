@@ -22,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Check, Sparkles, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { cn } from '@/lib/shared/utils'
 import type { ContentGoal } from '@/types/merchant'
 
 /** 内容目标通俗标签（与 today/calendar 页保持一致，不暴露字段名） */
@@ -44,6 +45,8 @@ interface InsightsActionPanelProps {
   playbooksToReuse: string[]
   /** 建议规避的剧本 ID（来自 insights.playbooksToAvoid，不直接展示给用户） */
   playbooksToAvoid: string[]
+  /** 可选的风格 ID 列表（用于风格偏好反哺） */
+  availableStyleIds?: string[]
 }
 
 export function InsightsActionPanel({
@@ -51,6 +54,7 @@ export function InsightsActionPanel({
   recommendedNextGoals,
   playbooksToReuse,
   playbooksToAvoid,
+  availableStyleIds,
 }: InsightsActionPanelProps) {
   // 选中的下周目标
   const [selectedGoals, setSelectedGoals] = useState<Set<ContentGoal>>(new Set())
@@ -58,18 +62,22 @@ export function InsightsActionPanel({
   const [reuseChecked, setReuseChecked] = useState(false)
   // 是否采纳「少拍表现差的内容套路」
   const [avoidChecked, setAvoidChecked] = useState(false)
+  // 风格偏好：多选
+  const [preferredStyles, setPreferredStyles] = useState<Set<string>>(new Set())
+  const [avoidedStyles, setAvoidedStyles] = useState<Set<string>>(new Set())
   // 提交中 / 已采纳
   const [submitting, setSubmitting] = useState(false)
   const [applied, setApplied] = useState(false)
 
   const hasReuse = playbooksToReuse.length > 0
   const hasAvoid = playbooksToAvoid.length > 0
-  const hasAnyContent = recommendedNextGoals.length > 0 || hasReuse || hasAvoid
+  const hasStyles = (availableStyleIds?.length ?? 0) > 0
+  const hasAnyContent = recommendedNextGoals.length > 0 || hasReuse || hasAvoid || hasStyles
 
   // 无任何可应用项时不渲染面板（不展示空壳）
   if (!hasAnyContent) return null
 
-  const nothingSelected = selectedGoals.size === 0 && !reuseChecked && !avoidChecked
+  const nothingSelected = selectedGoals.size === 0 && !reuseChecked && !avoidChecked && preferredStyles.size === 0 && avoidedStyles.size === 0
 
   function toggleGoal(goal: ContentGoal) {
     setSelectedGoals((prev) => {
@@ -89,6 +97,8 @@ export function InsightsActionPanel({
     }
     if (reuseChecked) summaries.push('沿用近期表现好的内容套路')
     if (avoidChecked) summaries.push('避开近期表现差的内容套路')
+    if (preferredStyles.size > 0) summaries.push(`偏好风格: ${preferredStyles.size} 种`)
+    if (avoidedStyles.size > 0) summaries.push(`回避风格: ${avoidedStyles.size} 种`)
     return summaries
   }
 
@@ -108,6 +118,10 @@ export function InsightsActionPanel({
           reusePlaybookIds: reuseChecked ? playbooksToReuse : undefined,
           avoidPlaybookIds: avoidChecked ? playbooksToAvoid : undefined,
           acceptedSuggestionSummaries: buildSummaries(),
+          // 风格偏好反哺
+          ...(preferredStyles.size > 0 || avoidedStyles.size > 0
+            ? { stylePreference: { preferredStyleIds: Array.from(preferredStyles), avoidedStyleIds: Array.from(avoidedStyles) } }
+            : {}),
         }),
       })
 
@@ -126,21 +140,21 @@ export function InsightsActionPanel({
   }
 
   return (
-    <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
+    <Card className="border-white/10 bg-white/[0.03]">
       <CardContent className="p-4 space-y-4">
         {/* 标题 */}
         <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-amber-500" />
-          <h3 className="text-base font-semibold text-amber-900">下周怎么做</h3>
+          <Sparkles className="h-5 w-5 text-white/50" />
+          <h3 className="text-base font-semibold text-[var(--ll-text)]">下周怎么做</h3>
         </div>
-        <p className="text-xs text-gray-500 -mt-2">
+        <p className="text-xs text-[var(--ll-text-3)] -mt-2">
           勾选下面的建议，一键应用到下周内容计划，系统会自动据此安排选题。
         </p>
 
         {/* 推荐下周目标 */}
         {recommendedNextGoals.length > 0 && (
           <div className="space-y-2">
-            <div className="text-xs font-medium text-gray-600">推荐下周多拍的方向</div>
+            <div className="text-xs font-medium text-[var(--ll-text-2)]">推荐下周多拍的方向</div>
             <div className="flex flex-wrap gap-2">
               {recommendedNextGoals.map((goal) => {
                 const selected = selectedGoals.has(goal)
@@ -151,8 +165,8 @@ export function InsightsActionPanel({
                     onClick={() => toggleGoal(goal)}
                     className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                       selected
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-white text-amber-700 border border-amber-200 hover:bg-amber-50'
+                        ? 'bg-white text-black'
+                        : 'bg-white/5 text-[var(--ll-text)] border border-white/10 hover:bg-white/10'
                     }`}
                   >
                     {selected && <Check className="h-3.5 w-3.5" />}
@@ -169,7 +183,7 @@ export function InsightsActionPanel({
           <div className="space-y-2">
             {hasReuse && (
               <ToggleRow
-                icon={<ThumbsUp className="h-4 w-4 text-green-600" />}
+                icon={<ThumbsUp className="h-4 w-4 text-green-400" />}
                 title="多拍表现好的内容套路"
                 desc={`系统发现 ${playbooksToReuse.length} 类内容近期表现不错，下周多安排同类`}
                 checked={reuseChecked}
@@ -181,7 +195,7 @@ export function InsightsActionPanel({
             )}
             {hasAvoid && (
               <ToggleRow
-                icon={<ThumbsDown className="h-4 w-4 text-red-500" />}
+                icon={<ThumbsDown className="h-4 w-4 text-red-400" />}
                 title="少拍表现差的内容套路"
                 desc={`系统发现 ${playbooksToAvoid.length} 类内容近期表现欠佳，下周少安排同类`}
                 checked={avoidChecked}
@@ -194,11 +208,76 @@ export function InsightsActionPanel({
           </div>
         )}
 
+        {/* 风格偏好（屏 D → 屏 C 闭环） */}
+        {hasStyles && (
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-[var(--ll-text-2)]">风格偏好（可选）</div>
+            <div className="flex flex-wrap gap-2">
+              {availableStyleIds!.map((sid) => {
+                const isPref = preferredStyles.has(sid)
+                const isAvoid = avoidedStyles.has(sid)
+                return (
+                  <div key={sid} className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreferredStyles((p) => {
+                          const n = new Set(p)
+                          if (n.has(sid)) n.delete(sid)
+                          else n.add(sid)
+                          return n
+                        })
+                        setAvoidedStyles((a) => {
+                          const n = new Set(a)
+                          n.delete(sid)
+                          return n
+                        })
+                        setApplied(false)
+                      }}
+                      className={cn(
+                        'rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
+                        isPref ? 'bg-white text-black' : 'bg-white/5 text-[var(--ll-text-2)] border border-white/10 hover:bg-white/10'
+                      )}
+                    >
+                      {isPref && <Check className="inline h-3 w-3 mr-0.5" />}
+                      {sid}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAvoidedStyles((a) => {
+                          const n = new Set(a)
+                          if (n.has(sid)) n.delete(sid)
+                          else n.add(sid)
+                          return n
+                        })
+                        setPreferredStyles((p) => {
+                          const n = new Set(p)
+                          n.delete(sid)
+                          return n
+                        })
+                        setApplied(false)
+                      }}
+                      className={cn(
+                        'rounded-full px-1.5 py-1 text-xs transition-colors',
+                        isAvoid ? 'bg-red-900/40 text-red-300 border border-red-800/40' : 'text-white/30 hover:text-white/50'
+                      )}
+                      title="回避此风格"
+                    >
+                      <ThumbsDown className="h-3 w-3" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* 应用按钮 */}
         <Button
           onClick={handleApply}
           disabled={submitting || nothingSelected}
-          className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+          className="w-full bg-white text-black hover:bg-white/90"
         >
           {submitting ? (
             <>
@@ -241,18 +320,18 @@ function ToggleRow({
       type="button"
       onClick={onToggle}
       className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
-        checked ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+        checked ? 'border-white/30 bg-white/[0.08]' : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.05]'
       }`}
     >
       <div className="mt-0.5 flex-shrink-0">{icon}</div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-gray-900">{title}</div>
-        <div className="text-xs text-gray-500 leading-relaxed">{desc}</div>
+        <div className="text-sm font-medium text-[var(--ll-text)]">{title}</div>
+        <div className="text-xs text-[var(--ll-text-3)] leading-relaxed">{desc}</div>
       </div>
       {/* 勾选指示 */}
       <div
         className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border ${
-          checked ? 'border-amber-500 bg-amber-500' : 'border-gray-300 bg-white'
+          checked ? 'border-white/50 bg-white/20' : 'border-white/20 bg-transparent'
         }`}
       >
         {checked && <Check className="h-3.5 w-3.5 text-white" />}

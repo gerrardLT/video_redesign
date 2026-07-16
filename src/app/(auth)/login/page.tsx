@@ -34,7 +34,7 @@ export default function LoginPage() {
 
       // 从 URL 中直接读取 redirect 参数（兼容所有 Next.js 版本）
       const params = new URLSearchParams(window.location.search)
-      const redirect = params.get('redirect') || '/dashboard'
+      const redirect = params.get('redirect') || '/merchant'
       window.location.href = redirect
     } catch {
       setError('网络错误，请稍后重试')

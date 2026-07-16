@@ -37,7 +37,7 @@ export function SubscriptionQuotaBar({ current, limit, label }: SubscriptionQuot
     <div className="w-full space-y-2">
       {/* 标签和数值 */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-amber-900">{label}</span>
+        <span className="text-sm font-medium text-[var(--ll-text)]">{label}</span>
         <span className={cn('text-sm font-bold', textColor)}>
           {current} / {limit}
         </span>
@@ -45,7 +45,7 @@ export function SubscriptionQuotaBar({ current, limit, label }: SubscriptionQuot
 
       {/* 进度条 */}
       <div
-        className="w-full h-3 bg-gray-100 rounded-full overflow-hidden"
+        className="w-full h-3 bg-[var(--ll-muted)] rounded-full overflow-hidden"
         role="progressbar"
         aria-valuenow={current}
         aria-valuemin={0}

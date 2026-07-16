@@ -30,6 +30,7 @@ import { StoreInputSchema } from '@/lib/validations/merchant'
 import { MERCHANT_PRIVILEGE_MAPPING } from '@/constants/merchant'
 import type { UserTier } from '@/constants/concurrency'
 import { ApiError } from '@/lib/shared/api-error'
+import { logger } from '@/lib/shared/logger'
 /** UserTier 由低到高的等级序，用于推导可解除门店上限的最低等级 */
 const TIER_ORDER: readonly UserTier[] = ['FREE', 'MONTHLY', 'YEARLY']
 /** UserTier 中文展示名，用于升级提示文案 */
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
         { status: error.statusCode }
       )
     }
-    console.error('[GET /api/stores] 未知错误:', error)
+    logger.error('[GET /api/stores] 未知错误:', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
       { status: 500 }
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest) {
         { status: error.statusCode }
       )
     }
-    console.error('[POST /api/stores] 未知错误:', error)
+    logger.error('[POST /api/stores] 未知错误:', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
       { status: 500 }

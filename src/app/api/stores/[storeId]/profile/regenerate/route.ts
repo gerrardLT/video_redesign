@@ -21,6 +21,7 @@ import { prisma } from '@/lib/shared/db'
 import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import { generateStoreProfileQueue } from '@/lib/shared/queue'
 import { ApiError } from '@/lib/shared/api-error'
+import { logger } from '@/lib/shared/logger'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         { status: error.statusCode }
       )
     }
-    console.error('[POST /api/stores/[storeId]/profile/regenerate] 未知错误:', error)
+    logger.error('[POST /api/stores/[storeId]/profile/regenerate] 未知错误:', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
       { status: 500 }

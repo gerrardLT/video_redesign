@@ -4,7 +4,7 @@
  * 门店首页 — /merchant/stores/[storeId]
  *
  * 商家每日进入的第一个页面，展示：
- * - 今日任务 Hero 区域（v3 Zen 设计签名：kicker + 绿发丝线 + serif 大标题 + 绿色 border-left）
+ * - 今日任务 Hero 区域（kicker + 发丝线 + serif 大标题 + 绿色 border-left）
  * - 周计划概览（节气式七日布局）
  * - 待办事项数量
  * - 最佳视频区块（过去 14 天播放量最高的 VideoVariant）
@@ -29,7 +29,7 @@ import useSWR from 'swr'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { EmptyState, ZenButton } from '@/components/merchant'
-import { Film, Camera, Upload, Sparkles, Send, Trophy, Eye, Pin, ChevronRight } from 'lucide-react'
+import { Film, Camera, Upload, Sparkles, Send, Trophy, Eye, Pin, ChevronRight, Images } from 'lucide-react'
 import Link from 'next/link'
 
 // ========================
@@ -105,7 +105,7 @@ const MEMBER_TIER_LABELS: Record<string, string> = {
 
 /** 今日任务 Hero 区域 — 设计签名（Req 12.1, 12.2, 12.3, 1.3）
  *
- * v3 Zen 设计签名——整个商家端唯一一处明显的装饰性设计元素：
+ * 商家端装饰性设计元素：
  * - Kicker 文字（12px, letter-spacing:.1em, --ll-green, font-weight:500）+ 左侧 24px×1.5px 绿色发丝线
  * - 大标题 Noto Serif SC、29px、font-weight:600、line-height:1.38，左侧 2px 宽绿色 border-left
  * - 整体包裹在 .zen-reveal 动画容器内
@@ -282,7 +282,7 @@ function WeeklyCalendar({ briefs }: { briefs: BriefSummary[] }) {
                 {day.isToday && (
                   <span
                     className="w-[12px] h-[12px] rounded-full bg-[var(--ll-green)] relative z-10"
-                    style={{ boxShadow: '0 0 0 4px rgba(0,117,74,.12), 0 0 0 8px rgba(0,117,74,.05)' }}
+                    style={{ boxShadow: '0 0 0 4px rgba(255,255,255,.12), 0 0 0 8px rgba(255,255,255,.05)' }}
                   />
                 )}
                 {day.isFuture && (
@@ -522,6 +522,24 @@ export default function StoreHomePage() {
               <div>
                 <p className="text-sm font-medium text-[var(--ll-text)]">我的成长</p>
                 <p className="text-xs text-[var(--ll-text-3)]">连续创作 · 里程碑 · 效果对比</p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-[var(--ll-text-3)]" strokeWidth={1.5} />
+          </div>
+        </section>
+      </Link>
+
+      {/* 素材库入口 —— 复刻爆款 @素材 来源（去卡片化） */}
+      <Link href={`/merchant/stores/${storeId}/library`} className="block">
+        <section className="zen-reveal py-6 border-t border-[var(--ll-hair)] cursor-pointer active:bg-[var(--ll-ceramic)] rounded-[3px] transition-colors">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--ll-muted)]">
+                <Images className="h-5 w-5 text-[var(--ll-green)]" strokeWidth={1.5} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[var(--ll-text)]">素材库</p>
+                <p className="text-xs text-[var(--ll-text-3)]">人物 · 产品参考图 · 复刻爆款可 @引用</p>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--ll-text-3)]" strokeWidth={1.5} />

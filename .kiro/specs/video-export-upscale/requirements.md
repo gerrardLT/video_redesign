@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：🔒 已封存（视频重绘后端能力保留，前端 /dashboard 已下线）
+> **对应实现**：`src/lib/video/wavespeed.ts`、`src/workers/upscale-video.ts`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 视频导出超分功能：视频生成阶段统一使用 480p 分辨率以节省 Seedance 生成成本，在导出环节为用户提供分辨率选择（480p / 720p / 1080p），选择高分辨率时调用 WaveSpeed AI Video Upscaler API 对 480p 源视频进行超分处理，并按分辨率档位向用户收取不同积分。

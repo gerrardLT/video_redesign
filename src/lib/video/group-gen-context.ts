@@ -232,7 +232,7 @@ export async function buildGroupGenReference(shotGroupId: string): Promise<Group
   }
 
   // 商家画像前缀：若项目所属用户有 merchant 门店，自动注入到 prompt 前
-  // 仅对 merchant 用户生效，不影响通用入口（/dashboard）的行为
+  // 仅对 merchant 用户生效，不影响通用视频处理入口的行为
   let merchantPrefix: string | undefined
   try {
     const projectUser = await prisma.project.findUnique({

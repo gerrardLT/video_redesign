@@ -8,7 +8,7 @@
  * 2. 产品与卖点（主打产品列表、核心卖点、拍摄能力）
  * 3. 优惠活动（可选，可跳过）
  *
- * 手机端优先的响应式布局，v3 禅意编辑式 UI（serif 标题 + 暖奶油纯色底 + 3px 圆角 + 大地绿主色），使用日常用语。
+ * 手机端优先的响应式布局，Runway 暗色 UI（3px 圆角 + 白底主按钮 + CSS 变量色），使用日常用语。
  * 行业选择器的 emoji 属数据展示场景，按 Req 2.3 保留；标题/按钮的装饰性 emoji 已移除。
  *
  * Requirements: 1.1, 1.3, 14.1, 14.2, 15.2, 15.3
@@ -281,7 +281,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-[var(--ll-canvas)]">
-      {/* 顶部进度条 — v3 Zen: 暖奶油半透明磨砂 + 2px 细线进度 + Space Grotesk 步数 */}
+      {/* 顶部进度条 — 暗色磨砂 + 2px 细线进度 */}
       <div className="sticky top-0 z-10 bg-[var(--ll-surface)]/90 backdrop-blur-sm border-b border-[var(--ll-hair)]">
         <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center justify-between mb-2">
@@ -322,7 +322,7 @@ export default function OnboardingPage() {
 
             {/* 门店名称 */}
             <div className="space-y-2">
-              <label className="text-base font-medium text-gray-800">
+              <label className="text-base font-medium text-[var(--ll-text)]">
                 店铺名称 <span className="text-red-500">*</span>
               </label>
               <Input
@@ -331,14 +331,14 @@ export default function OnboardingPage() {
                 onChange={(e) =>
                   setFormData((d) => ({ ...d, merchantName: e.target.value }))
                 }
-                className="h-12 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                className="h-12 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                 maxLength={50}
               />
             </div>
 
             {/* 行业选择 — 网格按钮 */}
             <div className="space-y-2">
-              <label className="text-base font-medium text-gray-800">
+              <label className="text-base font-medium text-[var(--ll-text)]">
                 行业类型 <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-4 gap-2">
@@ -355,12 +355,12 @@ export default function OnboardingPage() {
                     className={cn(
                       'flex flex-col items-center justify-center gap-1 p-3 rounded-xl border-2 transition-all text-center',
                       formData.store.industry === opt.value
-                        ? 'border-orange-500 bg-orange-50 shadow-sm'
-                        : 'border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/50'
+                        ? 'border-[var(--ll-green)] bg-[var(--ll-green-light)]'
+                        : 'border-[var(--ll-hair)] bg-[var(--ll-surface)] hover:border-[var(--ll-green-sb)] hover:bg-[var(--ll-green-light)]/50'
                     )}
                   >
                     <span className="text-2xl">{opt.emoji}</span>
-                    <span className="text-xs font-medium text-gray-700">
+                    <span className="text-xs font-medium text-[var(--ll-text-2)]">
                       {opt.label}
                     </span>
                   </button>
@@ -370,7 +370,7 @@ export default function OnboardingPage() {
 
             {/* 地址信息 */}
             <div className="space-y-2">
-              <label className="text-base font-medium text-gray-800">
+              <label className="text-base font-medium text-[var(--ll-text)]">
                 门店地址
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -383,7 +383,7 @@ export default function OnboardingPage() {
                       store: { ...d.store, city: e.target.value },
                     }))
                   }
-                  className="h-11 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                  className="h-11 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                   maxLength={20}
                 />
                 <Input
@@ -395,7 +395,7 @@ export default function OnboardingPage() {
                       store: { ...d.store, district: e.target.value },
                     }))
                   }
-                  className="h-11 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                  className="h-11 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                   maxLength={20}
                 />
               </div>
@@ -408,7 +408,7 @@ export default function OnboardingPage() {
                     store: { ...d.store, address: e.target.value },
                   }))
                 }
-                className="h-11 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                className="h-11 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                 maxLength={100}
               />
             </div>
@@ -416,7 +416,7 @@ export default function OnboardingPage() {
             {/* 营业时间 & 客单价 */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-[var(--ll-text-2)]">
                   营业时间
                 </label>
                 <Input
@@ -428,12 +428,12 @@ export default function OnboardingPage() {
                       store: { ...d.store, openingHours: e.target.value },
                     }))
                   }
-                  className="h-11 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                  className="h-11 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                   maxLength={50}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-[var(--ll-text-2)]">
                   人均消费（元）
                 </label>
                 <Input
@@ -446,7 +446,7 @@ export default function OnboardingPage() {
                       store: { ...d.store, avgTicket: e.target.value },
                     }))
                   }
-                  className="h-11 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                  className="h-11 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                   min={0}
                 />
               </div>
@@ -468,10 +468,10 @@ export default function OnboardingPage() {
 
             {/* 主打产品（Tag 方式） */}
             <div className="space-y-2">
-              <label className="text-base font-medium text-gray-800">
+              <label className="text-base font-medium text-[var(--ll-text)]">
                 主打产品 <span className="text-red-500">*</span>
               </label>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--ll-text-3)]">
                 添加您的招牌菜品或主推产品（至少 1 个）
               </p>
               <div className="flex gap-2">
@@ -485,13 +485,13 @@ export default function OnboardingPage() {
                       addProduct()
                     }
                   }}
-                  className="h-11 flex-1 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                  className="h-11 flex-1 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                   maxLength={30}
                 />
                 <Button
                   type="button"
                   onClick={addProduct}
-                  className="h-11 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
+                  className="h-11 px-4 rounded-xl bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black"
                 >
                   添加
                 </Button>
@@ -503,13 +503,13 @@ export default function OnboardingPage() {
                   {formData.products.map((p, idx) => (
                     <span
                       key={idx}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-orange-100 text-orange-800 text-sm font-medium"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[var(--ll-green-light)] text-[var(--ll-text)] text-sm font-medium"
                     >
                       {p}
                       <button
                         type="button"
                         onClick={() => removeProduct(idx)}
-                        className="ml-1 text-orange-500 hover:text-orange-700 text-lg leading-none"
+                        className="ml-1 text-[var(--ll-green)] hover:text-[var(--ll-text)] text-lg leading-none"
                         aria-label={`删除 ${p}`}
                       >
                         ×
@@ -522,10 +522,10 @@ export default function OnboardingPage() {
 
             {/* 核心卖点（Tag 方式） */}
             <div className="space-y-2">
-              <label className="text-base font-medium text-gray-800">
+              <label className="text-base font-medium text-[var(--ll-text)]">
                 核心卖点 <span className="text-red-500">*</span>
               </label>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--ll-text-3)]">
                 您店铺的独特优势是什么？（至少 1 个）
               </p>
               <div className="flex gap-2">
@@ -539,13 +539,13 @@ export default function OnboardingPage() {
                       addSellingPoint()
                     }
                   }}
-                  className="h-11 flex-1 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                  className="h-11 flex-1 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                   maxLength={50}
                 />
                 <Button
                   type="button"
                   onClick={addSellingPoint}
-                  className="h-11 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
+                  className="h-11 px-4 rounded-xl bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black"
                 >
                   添加
                 </Button>
@@ -555,13 +555,13 @@ export default function OnboardingPage() {
                   {formData.sellingPoints.map((sp, idx) => (
                     <span
                       key={idx}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-sm font-medium"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[var(--ll-green-light)] text-[var(--ll-text)] text-sm font-medium"
                     >
                       {sp}
                       <button
                         type="button"
                         onClick={() => removeSellingPoint(idx)}
-                        className="ml-1 text-amber-500 hover:text-amber-700 text-lg leading-none"
+                        className="ml-1 text-[var(--ll-green)] hover:text-[var(--ll-text)] text-lg leading-none"
                         aria-label={`删除 ${sp}`}
                       >
                         ×
@@ -574,10 +574,10 @@ export default function OnboardingPage() {
 
             {/* 拍摄能力 */}
             <div className="space-y-3">
-              <label className="text-base font-medium text-gray-800">
+              <label className="text-base font-medium text-[var(--ll-text)]">
                 拍摄条件
               </label>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--ll-text-3)]">
                 选择您方便拍摄的场景（我们会据此推荐视频方案）
               </p>
               <div className="space-y-2">
@@ -591,8 +591,8 @@ export default function OnboardingPage() {
                     className={cn(
                       'flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all',
                       formData[key as keyof FormData]
-                        ? 'border-orange-400 bg-orange-50'
-                        : 'border-gray-200 bg-white hover:border-orange-200'
+                        ? 'border-[var(--ll-green)] bg-[var(--ll-green-light)]'
+                        : 'border-[var(--ll-hair)] bg-[var(--ll-surface)] hover:border-[var(--ll-hair)]'
                     )}
                   >
                     <input
@@ -601,9 +601,9 @@ export default function OnboardingPage() {
                       onChange={(e) =>
                         setFormData((d) => ({ ...d, [key]: e.target.checked }))
                       }
-                      className="w-5 h-5 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                      className="w-5 h-5 rounded border-[var(--ll-hair)] text-[var(--ll-green)] focus:ring-[var(--ll-green)]/20"
                     />
-                    <span className="text-base text-gray-700">{label}</span>
+                    <span className="text-base text-[var(--ll-text-2)]">{label}</span>
                   </label>
                 ))}
               </div>
@@ -625,10 +625,10 @@ export default function OnboardingPage() {
 
             {/* 已添加的优惠 */}
             {formData.offers.map((offer, idx) => (
-              <Card key={idx} className="border-orange-200 bg-white">
+              <Card key={idx} className="border-[var(--ll-hair)] bg-[var(--ll-surface)]">
                 <CardContent className="space-y-3 pt-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-orange-700">
+                    <span className="text-sm font-medium text-[var(--ll-text-2)]">
                       优惠 {idx + 1}
                     </span>
                     <button
@@ -643,7 +643,7 @@ export default function OnboardingPage() {
                     placeholder="活动名称，如：双人套餐"
                     value={offer.name}
                     onChange={(e) => updateOffer(idx, 'name', e.target.value)}
-                    className="h-11 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                    className="h-11 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                     maxLength={30}
                   />
                   <div className="grid grid-cols-2 gap-2">
@@ -654,7 +654,7 @@ export default function OnboardingPage() {
                       onChange={(e) =>
                         updateOffer(idx, 'originalPrice', e.target.value)
                       }
-                      className="h-11 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                      className="h-11 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                       min={0}
                     />
                     <Input
@@ -664,7 +664,7 @@ export default function OnboardingPage() {
                       onChange={(e) =>
                         updateOffer(idx, 'salePrice', e.target.value)
                       }
-                      className="h-11 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                      className="h-11 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                       min={0}
                     />
                   </div>
@@ -675,7 +675,7 @@ export default function OnboardingPage() {
                     onChange={(e) =>
                       updateOffer(idx, 'description', e.target.value)
                     }
-                    className="h-11 text-base rounded-xl border-orange-200 focus-visible:border-orange-400 focus-visible:ring-orange-200"
+                    className="h-11 text-base rounded-xl border-[var(--ll-hair)] focus-visible:border-[var(--ll-green)] focus-visible:ring-[var(--ll-green)]/20"
                     maxLength={200}
                   />
                 </CardContent>
@@ -687,7 +687,7 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={addOffer}
-                className="w-full p-4 rounded-xl border-2 border-dashed border-orange-300 text-orange-600 hover:bg-orange-50 transition-colors text-base font-medium"
+                className="w-full p-4 rounded-xl border-2 border-dashed border-[var(--ll-hair)] text-[var(--ll-text-2)] hover:bg-[var(--ll-green-light)] transition-colors text-base font-medium"
               >
                 + 添加一个优惠活动
               </button>
@@ -695,7 +695,7 @@ export default function OnboardingPage() {
 
             {formData.offers.length === 0 && (
               <div className="text-center py-6">
-                <p className="text-gray-400 text-sm">
+                <p className="text-[var(--ll-text-3)] text-sm">
                   没有正在进行的活动？可以直接提交
                 </p>
               </div>
@@ -704,7 +704,7 @@ export default function OnboardingPage() {
         )}
       </div>
 
-      {/* 底部固定操作栏 — v3 Zen: 暖奶油磨砂 + 发丝线 + 大地绿主按钮 */}
+      {/* 底部固定操作栏 — 暗色磨砂 + 发丝线 + 白底主按钮 */}
       <div className="fixed bottom-0 left-0 right-0 bg-[var(--ll-surface)]/95 backdrop-blur-sm border-t border-[var(--ll-hair)] px-4 py-4 safe-area-pb">
         <div className="max-w-lg mx-auto flex gap-3">
           {step > 1 && (
@@ -721,7 +721,7 @@ export default function OnboardingPage() {
             <Button
               type="button"
               onClick={handleNext}
-              className="h-12 flex-1 rounded-[3px] bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] active:bg-[var(--ll-green-active)] text-white text-base font-medium tracking-[.04em]"
+              className="h-12 flex-1 rounded-[3px] bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] active:bg-[var(--ll-green-active)] text-black text-base font-medium tracking-[.04em]"
             >
               下一步
             </Button>
@@ -730,7 +730,7 @@ export default function OnboardingPage() {
               type="button"
               onClick={handleSubmit}
               disabled={submitting}
-              className="h-12 flex-1 rounded-[3px] bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] active:bg-[var(--ll-green-active)] text-white text-base font-medium tracking-[.04em] disabled:opacity-60"
+              className="h-12 flex-1 rounded-[3px] bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] active:bg-[var(--ll-green-active)] text-black text-base font-medium tracking-[.04em] disabled:opacity-60"
             >
               {submitting ? '提交中...' : '开始生成方案'}
             </Button>

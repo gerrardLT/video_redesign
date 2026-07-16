@@ -293,8 +293,8 @@ export default function ShootUploadPage() {
   if (tasksLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
-        <p className="text-gray-500 text-sm">加载中...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--ll-green)]" />
+        <p className="text-[var(--ll-text-3)] text-sm">加载中...</p>
       </div>
     )
   }
@@ -324,7 +324,7 @@ export default function ShootUploadPage() {
 
       {/* 错误提示 */}
       {errorMessage && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-600">
           {errorMessage}
         </div>
       )}
@@ -342,15 +342,15 @@ export default function ShootUploadPage() {
       {/* 渲染完成：引导去成片导出页（闭环后半段入口） */}
       {!isRendering && isGenerated && (
         <div className="mt-8 flex flex-col items-center gap-4 py-12">
-          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
+          <div className="w-20 h-20 rounded-full bg-[var(--ll-success)]/10 flex items-center justify-center">
             <CheckCircle2 className="h-10 w-10 text-green-500" />
           </div>
-          <h2 className="text-lg font-bold text-gray-800">视频已生成</h2>
-          <p className="text-sm text-gray-500 text-center">
+          <h2 className="text-lg font-bold text-[var(--ll-text)]">视频已生成</h2>
+          <p className="text-sm text-[var(--ll-text-3)] text-center">
             已生成 3 个版本（促销/氛围/口播），去挑选并导出
           </p>
           <Link href={`/merchant/stores/${storeId}/briefs/${briefId}/variants`} className="w-full max-w-xs">
-            <Button className="w-full h-12 rounded-xl text-base font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-200">
+            <Button className="w-full h-12 rounded-xl text-base font-bold bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black shadow-lg shadow-[var(--ll-green)]/20">
               <Film className="h-5 w-5 mr-2" />
               查看成片并导出
             </Button>
@@ -375,14 +375,14 @@ export default function ShootUploadPage() {
 
       {/* 底部生成按钮 — 全部通过时脉冲发光，文案切换为「开始创作」 */}
       {!isRendering && !isGenerated && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-sm border-t border-[var(--ll-hair)]">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-[var(--ll-surface)]/95 backdrop-blur-sm border-t border-[var(--ll-hair)]">
           <div className="max-w-lg mx-auto">
             <Button
               className={cn(
                 'w-full h-12 rounded-xl text-base font-bold transition-all',
                 allRequiredPassed
-                  ? 'bg-[var(--ll-green)] hover:bg-[var(--ll-green)]/90 text-white shadow-lg shadow-[var(--ll-green)]/20'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-[var(--ll-green)] hover:bg-[var(--ll-green)]/90 text-black shadow-lg shadow-[var(--ll-green)]/20'
+                  : 'bg-[var(--ll-muted)] text-[var(--ll-text-3)] cursor-not-allowed'
               )}
               style={allRequiredPassed ? { animation: 'zenPulse 2.4s ease-in-out infinite' } : undefined}
               disabled={!allRequiredPassed || renderingState === 'submitting'}
@@ -406,7 +406,7 @@ export default function ShootUploadPage() {
               )}
             </Button>
             {!allRequiredPassed && (
-              <p className="text-center text-xs text-gray-400 mt-2">
+              <p className="text-center text-xs text-[var(--ll-text-3)] mt-2">
                 请先完成所有必拍镜头的上传
               </p>
             )}
@@ -446,27 +446,27 @@ function ShotTaskCard({ task, isUploading, onUpload, onDelete }: ShotTaskCardPro
   return (
     <Card className={cn(
       'p-4 rounded-2xl border-2 transition-all',
-      isPassed && 'border-green-200 bg-green-50/50',
-      isFailed && 'border-red-200 bg-red-50/50',
-      !latestAsset && 'border-gray-100 bg-white',
+      isPassed && 'border-[var(--ll-success)]/30 bg-[var(--ll-success)]/10',
+      isFailed && 'border-[var(--ll-danger)]/30 bg-[var(--ll-danger)]/10',
+      !latestAsset && 'border-[var(--ll-hair)] bg-[var(--ll-surface)]',
     )}>
       {/* 头部：序号 + 标题 + 状态 */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className={cn(
             'flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold',
-            isPassed ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600',
+            isPassed ? 'bg-[var(--ll-success)]/10 text-[var(--ll-success)]' : 'bg-[var(--ll-warning)]/10 text-[var(--ll-warning)]',
           )}>
             {task.order}
           </span>
           <div>
-            <h3 className="text-sm font-bold text-gray-800">
+            <h3 className="text-sm font-bold text-[var(--ll-text)]">
               {task.title}
               {task.required && (
                 <span className="ml-1 text-xs text-red-500">*必拍</span>
               )}
               {!task.required && (
-                <span className="ml-1 text-xs text-gray-400">选拍</span>
+                <span className="ml-1 text-xs text-[var(--ll-text-3)]">选拍</span>
               )}
             </h3>
           </div>
@@ -476,10 +476,10 @@ function ShotTaskCard({ task, isUploading, onUpload, onDelete }: ShotTaskCardPro
       </div>
 
       {/* 拍摄说明 */}
-      <p className="mt-2 text-sm text-gray-600 leading-relaxed pl-9">
+      <p className="mt-2 text-sm text-[var(--ll-text-2)] leading-relaxed pl-9">
         {task.instruction}
       </p>
-      <p className="mt-1 text-xs text-gray-400 pl-9">
+      <p className="mt-1 text-xs text-[var(--ll-text-3)] pl-9">
         建议时长 {task.durationSec} 秒
       </p>
 
@@ -496,7 +496,7 @@ function ShotTaskCard({ task, isUploading, onUpload, onDelete }: ShotTaskCardPro
               <QualityReportBadge score={latestAsset.qualityScore!} passed={true} />
               <button
                 onClick={() => onDelete(latestAsset.id)}
-                className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-0.5 transition-colors"
+                className="text-xs text-[var(--ll-text-3)] hover:text-red-500 flex items-center gap-0.5 transition-colors"
               >
                 <Trash2 className="h-3 w-3" />
                 删除
@@ -517,7 +517,7 @@ function ShotTaskCard({ task, isUploading, onUpload, onDelete }: ShotTaskCardPro
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-xs h-7 rounded-lg border-amber-300 text-amber-600 hover:bg-amber-50"
+                  className="text-xs h-7 rounded-lg border-[var(--ll-hair)] text-[var(--ll-text-2)] hover:bg-[var(--ll-muted)]"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
                 >
@@ -526,7 +526,7 @@ function ShotTaskCard({ task, isUploading, onUpload, onDelete }: ShotTaskCardPro
                 </Button>
                 <button
                   onClick={() => onDelete(latestAsset.id)}
-                  className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-0.5 transition-colors"
+                  className="text-xs text-[var(--ll-text-3)] hover:text-red-500 flex items-center gap-0.5 transition-colors"
                 >
                   <Trash2 className="h-3 w-3" />
                   删除
@@ -542,7 +542,7 @@ function ShotTaskCard({ task, isUploading, onUpload, onDelete }: ShotTaskCardPro
         <div className="mt-3 pl-9">
           <Button
             size="sm"
-            className="rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs h-8"
+            className="rounded-lg bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black text-xs h-8"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
           >
@@ -580,7 +580,7 @@ function QualityReportBadge({ score, passed }: { score: number; passed: boolean 
   return (
     <span className={cn(
       'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
-      passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700',
+      passed ? 'bg-[var(--ll-success)]/10 text-[var(--ll-success)]' : 'bg-[var(--ll-danger)]/10 text-[var(--ll-danger)]',
     )}>
       {passed ? (
         <CheckCircle2 className="h-3 w-3" />
@@ -633,20 +633,20 @@ function RenderingProgress({
     <div className="mt-8 flex flex-col items-center gap-4 py-12">
       {/* 动画 */}
       <div className="relative">
-        <div className="w-20 h-20 rounded-full border-4 border-amber-200 animate-pulse" />
-        <Video className="absolute inset-0 m-auto h-8 w-8 text-amber-500 animate-bounce" />
+        <div className="w-20 h-20 rounded-full border-4 border-[var(--ll-hair)] animate-pulse" />
+        <Video className="absolute inset-0 m-auto h-8 w-8 text-[var(--ll-green)] animate-bounce" />
       </div>
 
-      <h2 className="text-lg font-bold text-gray-800">视频生成中</h2>
-      <p className="text-sm text-gray-500 text-center">{statusMessage}</p>
+      <h2 className="text-lg font-bold text-[var(--ll-text)]">视频生成中</h2>
+      <p className="text-sm text-[var(--ll-text-3)] text-center">{statusMessage}</p>
 
       {/* 进度条 */}
       <div className="w-full max-w-xs">
-        <Progress value={progress} className="h-3 bg-amber-100" />
-        <p className="text-center text-xs text-gray-400 mt-1">{progress}%</p>
+        <Progress value={progress} className="h-3 bg-[var(--ll-muted)]" />
+        <p className="text-center text-xs text-[var(--ll-text-3)] mt-1">{progress}%</p>
       </div>
 
-      <p className="text-xs text-gray-400 mt-4">
+      <p className="text-xs text-[var(--ll-text-3)] mt-4">
         请耐心等待，通常需要 2-5 分钟
       </p>
     </div>
@@ -711,7 +711,7 @@ function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+      <div className="flex items-center gap-2 text-xs text-[var(--ll-text-3)] py-2">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
         正在准备拍摄引导...
       </div>
@@ -723,7 +723,7 @@ function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
     return (
       <button
         onClick={() => mutate()}
-        className="text-xs text-gray-400 hover:text-amber-600 flex items-center gap-1 py-2 transition-colors"
+        className="text-xs text-[var(--ll-text-3)] hover:text-[var(--ll-green)] flex items-center gap-1 py-2 transition-colors"
       >
         <RefreshCw className="h-3 w-3" />
         拍摄引导加载失败，点此重试
@@ -736,8 +736,8 @@ function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
   const referenceUrls = Array.from(new Set([...generatedUrls, ...guide.referenceUrls]))
 
   return (
-    <div className="rounded-xl bg-amber-50/60 border border-amber-100 p-3 space-y-3">
-      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-700">
+    <div className="rounded-xl bg-[var(--ll-muted)] border border-[var(--ll-hair)] p-3 space-y-3">
+      <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--ll-text)]">
         <Camera className="h-3.5 w-3.5" />
         拍之前先看这里
       </div>
@@ -747,24 +747,24 @@ function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
         <VerticalFramePreview subjectPosition={guide.framing.subjectPosition} />
 
         <div className="flex-1 min-w-0 space-y-2">
-          <div className="text-[11px] leading-relaxed text-gray-600">
-            <span className="font-medium text-gray-700">画面这样摆：</span>
+          <div className="text-[11px] leading-relaxed text-[var(--ll-text-2)]">
+            <span className="font-medium text-[var(--ll-text-2)]">画面这样摆：</span>
             {guide.framing.subjectPosition}
           </div>
-          <div className="text-[11px] leading-relaxed text-gray-600">
-            <span className="font-medium text-gray-700">镜头怎么动：</span>
+          <div className="text-[11px] leading-relaxed text-[var(--ll-text-2)]">
+            <span className="font-medium text-[var(--ll-text-2)]">镜头怎么动：</span>
             {guide.framing.movement}
           </div>
           {/* 是否需要录声音（通俗呈现，不暴露「音轨」术语） */}
-          <div className="flex items-center gap-1 text-[11px] text-gray-500">
+          <div className="flex items-center gap-1 text-[11px] text-[var(--ll-text-3)]">
             {guide.qualityThresholds.needsAudio ? (
               <>
-                <Mic className="h-3 w-3 text-amber-600" />
+                <Mic className="h-3 w-3 text-[var(--ll-green)]" />
                 这个镜头要把说话声录清楚
               </>
             ) : (
               <>
-                <MicOff className="h-3 w-3 text-gray-400" />
+                <MicOff className="h-3 w-3 text-[var(--ll-text-3)]" />
                 这个镜头不录声音也行
               </>
             )}
@@ -774,8 +774,8 @@ function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
 
       {/* 参考图对照（需求 3.5） */}
       <div className="space-y-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600">
-          <ImageIcon className="h-3.5 w-3.5 text-amber-600" />
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--ll-text-2)]">
+          <ImageIcon className="h-3.5 w-3.5 text-[var(--ll-green)]" />
           参考画面对照
         </div>
         {referenceUrls.length > 0 ? (
@@ -786,12 +786,12 @@ function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
                 key={url}
                 src={url}
                 alt="拍摄参考画面"
-                className="aspect-[9/16] w-full rounded-lg object-cover border border-amber-100 bg-white"
+                className="aspect-[9/16] w-full rounded-lg object-cover border border-[var(--ll-hair)] bg-[var(--ll-surface)]"
               />
             ))}
           </div>
         ) : (
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-[var(--ll-text-3)]">
             还没有参考画面，点下面按钮生成一张照着拍就行
           </p>
         )}
@@ -799,7 +799,7 @@ function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
         <Button
           size="sm"
           variant="outline"
-          className="text-xs h-7 rounded-lg border-amber-300 text-amber-600 hover:bg-amber-50"
+          className="text-xs h-7 rounded-lg border-[var(--ll-hair)] text-[var(--ll-text-2)] hover:bg-[var(--ll-muted)]"
           onClick={handleGenerateReference}
           disabled={generating}
         >
@@ -820,14 +820,14 @@ function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
 
       {/* 关键要点清单 */}
       <div className="space-y-1.5">
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600">
-          <ListChecks className="h-3.5 w-3.5 text-amber-600" />
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--ll-text-2)]">
+          <ListChecks className="h-3.5 w-3.5 text-[var(--ll-green)]" />
           照着这几条拍
         </div>
         <ul className="space-y-1">
           {guide.checklist.map((item, idx) => (
-            <li key={idx} className="flex items-start gap-1.5 text-[11px] text-gray-600 leading-relaxed">
-              <CheckCircle2 className="h-3 w-3 text-amber-400 flex-shrink-0 mt-0.5" />
+            <li key={idx} className="flex items-start gap-1.5 text-[11px] text-[var(--ll-text-2)] leading-relaxed">
+              <CheckCircle2 className="h-3 w-3 text-[var(--ll-green)] flex-shrink-0 mt-0.5" />
               <span>{item}</span>
             </li>
           ))}
@@ -836,14 +836,14 @@ function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
 
       {/* 通俗达标提示（量化阈值的日常语言转述，不暴露技术术语） */}
       <div className="space-y-1.5">
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600">
-          <Lightbulb className="h-3.5 w-3.5 text-amber-600" />
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--ll-text-2)]">
+          <Lightbulb className="h-3.5 w-3.5 text-[var(--ll-green)]" />
           这样拍才算合格
         </div>
         <ul className="space-y-1">
           {guide.plainLanguageTips.map((tip, idx) => (
-            <li key={idx} className="flex items-start gap-1.5 text-[11px] text-gray-500 leading-relaxed">
-              <span className="text-amber-400 flex-shrink-0">·</span>
+            <li key={idx} className="flex items-start gap-1.5 text-[11px] text-[var(--ll-text-3)] leading-relaxed">
+              <span className="text-[var(--ll-green)] flex-shrink-0">·</span>
               <span>{tip}</span>
             </li>
           ))}
@@ -861,30 +861,30 @@ function CaptureGuidePanel({ shotTaskId }: { shotTaskId: string }) {
 function VerticalFramePreview({ subjectPosition }: { subjectPosition: string }) {
   return (
     <div className="flex-shrink-0">
-      <div className="relative aspect-[9/16] w-20 rounded-lg border-2 border-amber-300 bg-gradient-to-b from-amber-100/40 to-amber-50 overflow-hidden">
+      <div className="relative aspect-[9/16] w-20 rounded-lg border-2 border-[var(--ll-hair)] bg-gradient-to-b from-[var(--ll-muted)]/40 to-[var(--ll-muted)] overflow-hidden">
         {/* 三分构图参考线 */}
         <div className="absolute inset-0">
-          <div className="absolute left-1/3 top-0 bottom-0 w-px bg-amber-200/70" />
-          <div className="absolute left-2/3 top-0 bottom-0 w-px bg-amber-200/70" />
-          <div className="absolute top-1/3 left-0 right-0 h-px bg-amber-200/70" />
-          <div className="absolute top-2/3 left-0 right-0 h-px bg-amber-200/70" />
+          <div className="absolute left-1/3 top-0 bottom-0 w-px bg-[var(--ll-hair)]" />
+          <div className="absolute left-2/3 top-0 bottom-0 w-px bg-[var(--ll-hair)]" />
+          <div className="absolute top-1/3 left-0 right-0 h-px bg-[var(--ll-hair)]" />
+          <div className="absolute top-2/3 left-0 right-0 h-px bg-[var(--ll-hair)]" />
         </div>
         {/* 主体位置标记（画面中心） */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex flex-col items-center gap-0.5">
-            <div className="h-6 w-6 rounded-full border-2 border-dashed border-amber-500/80 flex items-center justify-center">
-              <Camera className="h-3 w-3 text-amber-500" />
+            <div className="h-6 w-6 rounded-full border-2 border-dashed border-[var(--ll-green)]/80 flex items-center justify-center">
+              <Camera className="h-3 w-3 text-[var(--ll-green)]" />
             </div>
-            <span className="text-[8px] text-amber-600 font-medium">主体</span>
+            <span className="text-[8px] text-[var(--ll-green)] font-medium">主体</span>
           </div>
         </div>
         {/* 竖屏标识 */}
-        <div className="absolute top-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 text-[7px] text-amber-500 font-medium">
+        <div className="absolute top-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 text-[7px] text-[var(--ll-green)] font-medium">
           <Smartphone className="h-2.5 w-2.5" />
           竖屏
         </div>
       </div>
-      <p className="mt-1 text-center text-[8px] text-gray-400 w-20 leading-tight" title={subjectPosition}>
+      <p className="mt-1 text-center text-[8px] text-[var(--ll-text-3)] w-20 leading-tight" title={subjectPosition}>
         手机竖着拍
       </p>
     </div>
@@ -904,7 +904,7 @@ function ReshootAdvicePanel({ shotTaskId }: { shotTaskId: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-[11px] text-gray-400 py-1">
+      <div className="flex items-center gap-2 text-[11px] text-[var(--ll-text-3)] py-1">
         <Loader2 className="h-3 w-3 animate-spin" />
         正在分析怎么重拍...
       </div>
@@ -915,24 +915,24 @@ function ReshootAdvicePanel({ shotTaskId }: { shotTaskId: string }) {
 
   // 无质检结果：如实提示，不伪造
   if (!data.hasReport) {
-    return <p className="text-[11px] text-gray-400">{data.message}</p>
+    return <p className="text-[11px] text-[var(--ll-text-3)]">{data.message}</p>
   }
 
   if (data.advices.length === 0) return null
 
   return (
-    <div className="rounded-xl bg-orange-50 border border-orange-200 p-3 space-y-2">
-      <div className="flex items-center gap-1.5 text-xs font-bold text-orange-700">
+    <div className="rounded-xl bg-[var(--ll-muted)] border border-[var(--ll-hair)] p-3 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--ll-text)]">
         <Lightbulb className="h-3.5 w-3.5" />
         这样重拍就能过
       </div>
       <ul className="space-y-1.5">
         {data.advices.map((adv) => (
           <li key={adv.dimension} className="flex items-start gap-1.5 text-[11px] leading-relaxed">
-            <span className="flex-shrink-0 rounded-md bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700">
+            <span className="flex-shrink-0 rounded-md bg-[var(--ll-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ll-text)]">
               {RESHOOT_DIMENSION_LABELS[adv.dimension]}
             </span>
-            <span className="text-gray-600">{adv.advice}</span>
+            <span className="text-[var(--ll-text-2)]">{adv.advice}</span>
           </li>
         ))}
       </ul>

@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：✅ 已实现（平台核心，当前生效）
+> **对应实现**：`src/app/merchant/**`、`src/lib/merchant/**`、`src/workers/{generate-content-plan,render-local-video,compliance-review}.ts`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 将现有 AI 视频重绘 SaaS 平台改造为面向本地生活实体门店（第一阶段仅餐饮行业）的 AI 短视频营销代运营系统。系统解决商家不会策划、不会拍、不会剪、不会写文案、不会持续运营的问题，提供从商家问诊、内容计划、拍摄指引、自动成片、合规检查到数据复盘的完整闭环。保留旧系统视频生成、FFmpeg、OSS、BullMQ、积分、订阅等底层能力，仅改造上层业务逻辑和界面。

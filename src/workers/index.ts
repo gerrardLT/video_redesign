@@ -229,6 +229,22 @@ async function startWorkers() {
   }
 
   try {
+    const mod = await import('./merchant-video-download')
+    registerWorker(mod)
+    console.log('[Workers] ✅ merchant-video-download Worker 已启动')
+  } catch (err) {
+    console.error('[Workers] ❌ merchant-video-download Worker 启动失败:', err)
+  }
+
+  try {
+    const mod = await import('./merchant-vedit')
+    registerWorker(mod)
+    console.log('[Workers] ✅ merchant-vedit Worker 已启动')
+  } catch (err) {
+    console.error('[Workers] ❌ merchant-vedit Worker 启动失败:', err)
+  }
+
+  try {
     const mod = await import('./compliance-review')
     registerWorker(mod)
     console.log('[Workers] ✅ compliance-review Worker 已启动')
@@ -236,21 +252,8 @@ async function startWorkers() {
     console.error('[Workers] ❌ compliance-review Worker 启动失败:', err)
   }
 
-  try {
-    const mod = await import('./sync-metrics')
-    registerWorker(mod)
-    console.log('[Workers] ✅ sync-metrics Worker 已启动')
-  } catch (err) {
-    console.error('[Workers] ❌ sync-metrics Worker 启动失败:', err)
-  }
-
-  try {
-    const mod = await import('./weekly-merchant-report')
-    registerWorker(mod)
-    console.log('[Workers] ✅ weekly-merchant-report Worker 已启动')
-  } catch (err) {
-    console.error('[Workers] ❌ weekly-merchant-report Worker 启动失败:', err)
-  }
+  // sync-metrics 和 weekly-merchant-report 为第一阶段占位 Worker，
+  // 当前无代码向其队列添加任务，已暂停注册以避免启动报错。
 
   try {
     const mod = await import('./crawl-platform-metrics')

@@ -119,7 +119,7 @@ vi.mock('@/lib/shared/credit-service', () => ({
   refundCredits: (...args: unknown[]) => mockRefundCredits(...args),
 }))
 vi.mock('@/lib/shared/rate-limiter', () => ({
-  isRateLimited: () => false,
+  isRateLimited: async () => false,
 }))
 // 分布式锁在单测中直接放行：withCreditLock(fn) → fn()
 vi.mock('@/lib/shared/distributed-lock', () => ({

@@ -24,6 +24,7 @@ import { z } from 'zod'
 import { getUserIdFromRequest, validateMerchantAccess } from '@/lib/merchant/merchant-auth'
 import { adjustStoreProfile } from '@/lib/merchant/store-profile-service'
 import { ApiError } from '@/lib/shared/api-error'
+import { logger } from '@/lib/shared/logger'
 
 interface RouteContext {
   params: Promise<{ storeId: string }>
@@ -107,7 +108,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         { status: error.statusCode }
       )
     }
-    console.error('[PATCH /api/stores/[storeId]/profile/adjust] 未知错误:', error)
+    logger.error('[PATCH /api/stores/[storeId]/profile/adjust] 未知错误:', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } },
       { status: 500 }

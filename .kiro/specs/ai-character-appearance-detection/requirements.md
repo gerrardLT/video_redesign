@@ -1,5 +1,10 @@
 # Requirements Document
 
+> **文档状态**：🔒 已封存（视频重绘后端能力保留，前端 /dashboard 已下线）
+> **对应实现**：`src/lib/video/{appearance-comparator,video-analyzer,group-gen-context,frame-continuity}.ts`
+> **权威来源**：状态以 `AGENTS.md` + `docs/local-life-user-journey.md` 为准，冲突时以代码为准
+> **最后校准**：2026-07-11
+
 ## Introduction
 
 AI 角色外观状态变化自动识别功能。在视频解析阶段，利用多模态模型（qwen-vl-max）在分析每个分镜时额外输出角色的外观描述（发型、服装、配饰、妆容），并将这些描述持久化到数据模型中。生成阶段利用外观描述增强 Seedance prompt，实现角色造型变化的自动适配。当相邻分镜组的角色外观描述不同时，自动跳过尾帧承接，避免造型不一致的画面衔接。全流程零用户操作，全自动完成。

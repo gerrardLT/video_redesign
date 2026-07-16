@@ -65,7 +65,8 @@ import {
 
 import type { VideoVariantType } from '@/types/merchant'
 import { Prisma } from '@/generated/prisma'
-import type { VideoVariant, ContentBriefStatus } from '@/generated/prisma'
+import { toJson } from '@/lib/shared/prisma-json-helpers'
+import type { VideoVariant, ContentBriefStatus, CreationMode } from '@/generated/prisma'
 import { assertBriefTransition } from './content-brief-state-machine'
 
 // ========================
@@ -86,8 +87,12 @@ import { assertBriefTransition } from './content-brief-state-machine'
 export async function renderLocalVideoVariants(input: {
   contentBriefId: string
   userId: string
+  /** Inhot 创作模式（可选，来自 creation-mode-router） */
+  creationMode?: CreationMode
+  /** 选定风格 ID（可选，屏 C 单选生成时传入，仅生成单版本） */
+  selectedStyle?: string
 }): Promise<Array<{ id: string; type: string; ossKey: string | null }>> {
-  const { contentBriefId, userId } = input
+  const { contentBriefId, userId, creationMode, selectedStyle } = input
   const lockKey = `render:brief:${contentBriefId}`
   const lockValue = randomUUID()
   const tempDir = path.join(os.tmpdir(), `render-${contentBriefId}-${Date.now()}`)
@@ -153,15 +158,160 @@ export async function renderLocalVideoVariants(input: {
       return null
     })
 
-    // Step 5: 对 3 种版本分别编排和渲染
+    // Step 5: 根据 creationMode 决定渲染路径
+    // INSPIRE_TO_VIDEO / PHOTO_ANIMATE 走单版本 T2V/I2V 路径
+    // REPLICATE_TRENDING / IMMERSIVE_SHORT 走既有 3 版本路径
+    // creationMode 优先取入参，缺省时从已加载的 brief 兜底读取（creation-mode-router 在入队前
+    // 已将模式写入 brief，队列层不再重复透传），避免透传断链导致 T2V/I2V 分支悬空。
+    const effectiveCreationMode: CreationMode | undefined = creationMode ?? brief.creationMode ?? undefined
     const variantTypes: VideoVariantType[] = ['PROMOTION', 'ATMOSPHERE', 'OWNER_TALKING']
     // results 声明提到外层以便 catch 块访问，用于精确退款计算
     results = []
     // 收集 3 个 VideoVariant 的实际渲染时长，用于渲染成功后按组求和 CHARGE 实扣积分
     const renderedDurations: number[] = []
 
-    for (let vi = 0; vi < variantTypes.length; vi++) {
-      const variantType = variantTypes[vi]
+    if (effectiveCreationMode === 'INSPIRE_TO_VIDEO' || effectiveCreationMode === 'PHOTO_ANIMATE') {
+      // ─── Inhot 单版本路径：T2V / I2V ───
+      console.log(`[local-render] Inhot 单版本路径: ${effectiveCreationMode}`)
+
+      const singleVariantId = randomUUID()
+      const storeId = brief.storeId
+      const videoOssKey = `merchant/${storeId}/variants/${singleVariantId}.mp4`
+      const coverOssKey = `merchant/${storeId}/variants/${singleVariantId}_cover.jpg`
+
+      // 构建 Seedance 调用参数（textPrompt / sourceImageKeys 由 creation-mode-router 写入 brief）
+      const seedanceParams: {
+        prompt: string
+        referenceImages?: string[]
+      } = effectiveCreationMode === 'INSPIRE_TO_VIDEO'
+        ? { prompt: brief.textPrompt || '美食宣传片' }
+        : {
+            prompt: '让静态画面自然地动起来，保持原始构图与色彩',
+            referenceImages: (brief.sourceImageKeys as string[] | null) ?? [],
+          }
+
+      // 调用 Seedance 生成（创建任务 + 轮询等待完成）
+      const { createSeedanceTask, getSeedanceTaskStatus } = await import('../video/seedance')
+      const { taskId } = await createSeedanceTask({
+        prompt: seedanceParams.prompt,
+        duration: 5,
+        aspectRatio: '9:16',
+        resolution: '720p',
+        referenceImages: seedanceParams.referenceImages,
+      })
+
+      // 轮询等待任务完成（最多 5 分钟）
+      let seedanceResult: { videoUrl?: string; seconds?: number } | null = null
+      for (let poll = 0; poll < 60; poll++) {
+        await new Promise(r => setTimeout(r, 5000))
+        const status = await getSeedanceTaskStatus(taskId)
+        if (status.status === 'succeeded') {
+          seedanceResult = { videoUrl: status.videoUrl, seconds: status.seconds }
+          break
+        }
+        if (status.status === 'failed') {
+          throw new Error(`Seedance 任务失败: ${status.error?.message || '未知原因'}`)
+        }
+      }
+      if (!seedanceResult) throw new Error('Seedance 任务超时（5 分钟）')
+
+      // 下载生成的视频
+      const videoUrl = seedanceResult.videoUrl
+      if (!videoUrl) throw new Error('Seedance 未返回视频 URL')
+
+      const videoTempPath = path.join(tempDir, `${singleVariantId}.mp4`)
+      await downloadToTemp(videoUrl, videoTempPath)
+
+      // 读取视频文件并上传到 OSS
+      const { readFile } = await import('fs/promises')
+      const videoBuffer = await readFile(videoTempPath)
+      await uploadBuffer(videoOssKey, videoBuffer)
+
+      // 封面帧：用 ffmpeg 从生成视频第 1 秒抽取真实封面（与既有 compositeVideo 一致），
+      // 不再上传 0 字节占位文件（避免前端封面破图）
+      const { execFile } = await import('child_process')
+      const { promisify } = await import('util')
+      const execFileAsync = promisify(execFile)
+      const coverTempPath = path.join(tempDir, `${singleVariantId}_cover.jpg`)
+      await execFileAsync('ffmpeg', [
+        '-ss', '1',
+        '-i', videoTempPath,
+        '-frames:v', '1',
+        '-q:v', '2',
+        '-y', coverTempPath,
+      ], { timeout: 30_000 })
+      const coverBuffer = await readFile(coverTempPath)
+      await uploadBuffer(coverOssKey, coverBuffer)
+
+      // 创建 VideoVariant 记录
+      const modeLabel = effectiveCreationMode === 'INSPIRE_TO_VIDEO' ? '灵感生视频' : '照片跟我动'
+      const variant = await prisma.videoVariant.create({
+        data: {
+          id: singleVariantId,
+          contentBriefId,
+          type: 'PROMOTION',
+          title: modeLabel,
+          ossKey: videoOssKey,
+          coverOssKey,
+          durationSec: seedanceResult.seconds ?? 5,
+          width: 720,
+          height: 1280,
+          styleLabel: modeLabel,
+          generationLog: toJson([{ mode: effectiveCreationMode, prompt: seedanceParams.prompt }]),
+        },
+      })
+
+      results.push({ id: variant.id, type: variant.type, ossKey: variant.ossKey })
+      renderedDurations.push(variant.durationSec ?? 5)
+    } else {
+    // ─── 既有 3 版本路径 / 屏 C 单版本路径 ───
+    // selectedStyle 存在时仅生成指定风格的单版本（积分按单版本计）
+    //
+    // 风格 ID 来源有两类：
+    //  1. 预定义 style-* ID（style-recommendations DEFAULT_STYLES）
+    //  2. Playbook UUID（行业剧本库）
+    // 需要先解析为 VideoVariantType 再匹配渲染管线。
+    const STYLE_TO_VARIANT: Record<string, VideoVariantType> = {
+      'style-fast-paced': 'PROMOTION',
+      'style-emotional': 'ATMOSPHERE',
+      'style-talking-head': 'OWNER_TALKING',
+      'style-process': 'ATMOSPHERE',
+      'style-customer': 'PROMOTION',
+    }
+
+    let effectiveTypes: VideoVariantType[]
+    if (selectedStyle) {
+      if (variantTypes.includes(selectedStyle as VideoVariantType)) {
+        // 直接传入 VideoVariantType（向后兼容）
+        effectiveTypes = [selectedStyle as VideoVariantType]
+      } else if (STYLE_TO_VARIANT[selectedStyle]) {
+        // 预定义 style-* ID
+        effectiveTypes = [STYLE_TO_VARIANT[selectedStyle]]
+      } else {
+        // 可能是 Playbook UUID：查询 goal 字段映射到 variant type
+        const playbook = await prisma.playbook.findUnique({
+          where: { id: selectedStyle },
+          select: { goal: true },
+        }).catch(() => null)
+        if (playbook) {
+          const playbookGoalMap: Record<string, VideoVariantType> = {
+            TRAFFIC: 'PROMOTION',
+            PROMOTION: 'PROMOTION',
+            TRUST_BUILDING: 'OWNER_TALKING',
+            NEW_PRODUCT: 'ATMOSPHERE',
+            BRAND_STORY: 'ATMOSPHERE',
+          }
+          effectiveTypes = [playbookGoalMap[playbook.goal] ?? 'PROMOTION']
+        } else {
+          // 无法识别的风格 ID，抛错而非静默 fallback（避免积分冻结与实际渲染版本数不匹配）
+          throw new Error(`[local-render] 无法识别的 selectedStyle: ${selectedStyle}，拒绝渲染`)
+        }
+      }
+    } else {
+      effectiveTypes = variantTypes
+    }
+    for (let vi = 0; vi < effectiveTypes.length; vi++) {
+      const variantType = effectiveTypes[vi]
       // 每版本独立日志数组，避免跨版本污染
       const generationLogs: Record<string, unknown>[] = []
 
@@ -171,7 +321,7 @@ export async function renderLocalVideoVariants(input: {
       }
 
       // 发布渲染进度
-      const progress = 10 + Math.round(((vi + 0.5) / variantTypes.length) * 80)
+      const progress = 10 + Math.round(((vi + 0.5) / effectiveTypes.length) * 80)
       await progressPublisher.publishStateChange(
         userId, 'generation', contentBriefId, `RENDERING_${variantType}`, progress
       )
@@ -221,8 +371,8 @@ export async function renderLocalVideoVariants(input: {
           width: renderOutput.width,
           height: renderOutput.height,
           subtitles: renderOutput.subtitles,
-          renderParams: renderOutput.renderParams as unknown as Prisma.InputJsonValue,
-          generationLog: generationLogs as unknown as Prisma.InputJsonValue,
+          renderParams: toJson(renderOutput.renderParams),
+          generationLog: toJson(generationLogs),
         },
       })
 
@@ -235,6 +385,7 @@ export async function renderLocalVideoVariants(input: {
       // 收集本版本的实际渲染时长，用于渲染成功后按组求和 CHARGE 实扣积分
       renderedDurations.push(renderOutput.durationSec)
     }
+    } // end else (既有 3 版本路径)
 
     // Step 6: 渲染成功——置 GENERATED 并在同一事务内 CHARGE 实扣积分。
     // 入口 render/route.ts 已在入队前按计划时长 RESERVE 冻结积分（关联键 CONTENT_BRIEF + briefId）；
@@ -470,9 +621,9 @@ export async function regenerateSingleVariant(input: {
           width: renderOutput.width,
           height: renderOutput.height,
           subtitles: renderOutput.subtitles,
-          renderParams: renderParams as unknown as Prisma.InputJsonValue,
-          generationLog: generationLogs as unknown as Prisma.InputJsonValue,
-          regenScope: regenScope as unknown as Prisma.InputJsonValue,
+          renderParams: toJson(renderParams),
+          generationLog: toJson(generationLogs),
+          regenScope: toJson(regenScope),
         },
       })
       await chargeMerchantCredits(tx, {
@@ -667,9 +818,9 @@ export async function rerenderAffectedScope(input: {
             width: r.output.width,
             height: r.output.height,
             subtitles: r.output.subtitles,
-            renderParams: r.output.renderParams as unknown as Prisma.InputJsonValue,
-            generationLog: r.generationLogs as unknown as Prisma.InputJsonValue,
-            regenScope: regenScope as unknown as Prisma.InputJsonValue,
+            renderParams: toJson(r.output.renderParams),
+            generationLog: toJson(r.generationLogs),
+            regenScope: toJson(regenScope),
           },
         })
         list.push(v)

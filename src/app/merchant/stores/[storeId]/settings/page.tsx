@@ -147,100 +147,100 @@ function StoreInfoForm({ store, storeId }: { store: StoreData; storeId: string }
   }
 
   return (
-    <Card className="border-amber-100 rounded-2xl">
+    <Card className="border-[var(--ll-hair)] rounded-2xl">
       <CardHeader>
         <CardTitle className="font-[var(--font-serif)] text-[var(--ll-text)]">门店基本信息</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">门店名称</label>
+          <label className="text-sm font-medium text-[var(--ll-text-2)]">门店名称</label>
           <Input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="rounded-xl border-amber-200 focus:ring-orange-300"
+            className="rounded-xl border-[var(--ll-hair)] focus:ring-[var(--ll-green)]/20"
             placeholder="门店名称"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">城市</label>
+            <label className="text-sm font-medium text-[var(--ll-text-2)]">城市</label>
             <Input
               value={form.city}
               onChange={(e) => setForm({ ...form, city: e.target.value })}
-              className="rounded-xl border-amber-200"
+              className="rounded-xl border-[var(--ll-hair)]"
               placeholder="城市"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">区/县</label>
+            <label className="text-sm font-medium text-[var(--ll-text-2)]">区/县</label>
             <Input
               value={form.district}
               onChange={(e) => setForm({ ...form, district: e.target.value })}
-              className="rounded-xl border-amber-200"
+              className="rounded-xl border-[var(--ll-hair)]"
               placeholder="区/县"
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">商圈</label>
+          <label className="text-sm font-medium text-[var(--ll-text-2)]">商圈</label>
           <Input
             value={form.businessArea}
             onChange={(e) => setForm({ ...form, businessArea: e.target.value })}
-            className="rounded-xl border-amber-200"
+            className="rounded-xl border-[var(--ll-hair)]"
             placeholder="商圈名称"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">详细地址</label>
+          <label className="text-sm font-medium text-[var(--ll-text-2)]">详细地址</label>
           <Input
             value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })}
-            className="rounded-xl border-amber-200"
+            className="rounded-xl border-[var(--ll-hair)]"
             placeholder="详细地址"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">人均消费（分）</label>
+            <label className="text-sm font-medium text-[var(--ll-text-2)]">人均消费（分）</label>
             <Input
               type="number"
               value={form.avgTicket}
               onChange={(e) => setForm({ ...form, avgTicket: e.target.value })}
-              className="rounded-xl border-amber-200"
+              className="rounded-xl border-[var(--ll-hair)]"
               placeholder="如 3500 表示 35 元"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">营业时间</label>
+            <label className="text-sm font-medium text-[var(--ll-text-2)]">营业时间</label>
             <Input
               value={form.openingHours}
               onChange={(e) => setForm({ ...form, openingHours: e.target.value })}
-              className="rounded-xl border-amber-200"
+              className="rounded-xl border-[var(--ll-hair)]"
               placeholder="如 10:00-22:00"
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">主打产品（顿号分隔）</label>
+          <label className="text-sm font-medium text-[var(--ll-text-2)]">主打产品（顿号分隔）</label>
           <Input
             value={form.mainProducts}
             onChange={(e) => setForm({ ...form, mainProducts: e.target.value })}
-            className="rounded-xl border-amber-200"
+            className="rounded-xl border-[var(--ll-hair)]"
             placeholder="招牌菜1、招牌菜2"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">核心卖点（顿号分隔）</label>
+          <label className="text-sm font-medium text-[var(--ll-text-2)]">核心卖点（顿号分隔）</label>
           <Input
             value={form.mainSellingPoints}
             onChange={(e) => setForm({ ...form, mainSellingPoints: e.target.value })}
-            className="rounded-xl border-amber-200"
+            className="rounded-xl border-[var(--ll-hair)]"
             placeholder="卖点1、卖点2"
           />
         </div>
@@ -254,7 +254,7 @@ function StoreInfoForm({ store, storeId }: { store: StoreData; storeId: string }
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="w-full bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+          className="w-full bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black rounded-xl"
         >
           {saving ? <Spinner size="sm" /> : <Save className="h-4 w-4 mr-1" />}
           保存门店信息
@@ -325,7 +325,7 @@ function OffersManagement({ storeId }: { storeId: string }) {
   }
 
   return (
-    <Card className="border-amber-100 rounded-2xl">
+    <Card className="border-[var(--ll-hair)] rounded-2xl">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="font-[var(--font-serif)] text-[var(--ll-text)]">优惠活动管理</CardTitle>
@@ -333,7 +333,7 @@ function OffersManagement({ storeId }: { storeId: string }) {
             variant="outline"
             size="sm"
             onClick={() => setShowAdd(!showAdd)}
-            className="border-orange-200 text-orange-700 hover:bg-orange-50 rounded-xl"
+            className="border-[var(--ll-hair)] text-[var(--ll-text-2)] hover:bg-[var(--ll-muted)] rounded-xl"
           >
             <Plus className="h-4 w-4 mr-1" />
             新增
@@ -343,11 +343,11 @@ function OffersManagement({ storeId }: { storeId: string }) {
       <CardContent className="space-y-4">
         {/* 新增优惠表单 */}
         {showAdd && (
-          <div className="space-y-3 p-3 bg-orange-50 rounded-xl border border-orange-100">
+          <div className="space-y-3 p-3 bg-[var(--ll-muted)] rounded-xl border border-[var(--ll-hair)]">
             <Input
               value={newOffer.name}
               onChange={(e) => setNewOffer({ ...newOffer, name: e.target.value })}
-              className="rounded-xl border-orange-200"
+              className="rounded-xl border-[var(--ll-hair)]"
               placeholder="优惠名称（如: 双人套餐）"
             />
             <div className="grid grid-cols-2 gap-2">
@@ -355,27 +355,27 @@ function OffersManagement({ storeId }: { storeId: string }) {
                 type="number"
                 value={newOffer.originalPrice}
                 onChange={(e) => setNewOffer({ ...newOffer, originalPrice: e.target.value })}
-                className="rounded-xl border-orange-200"
+                className="rounded-xl border-[var(--ll-hair)]"
                 placeholder="原价（分）"
               />
               <Input
                 type="number"
                 value={newOffer.salePrice}
                 onChange={(e) => setNewOffer({ ...newOffer, salePrice: e.target.value })}
-                className="rounded-xl border-orange-200"
+                className="rounded-xl border-[var(--ll-hair)]"
                 placeholder="售价（分）"
               />
             </div>
             <Input
               value={newOffer.description}
               onChange={(e) => setNewOffer({ ...newOffer, description: e.target.value })}
-              className="rounded-xl border-orange-200"
+              className="rounded-xl border-[var(--ll-hair)]"
               placeholder="描述（可选）"
             />
             <Button
               onClick={handleCreate}
               disabled={creating || !newOffer.name.trim()}
-              className="w-full bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+              className="w-full bg-[var(--ll-green)] hover:bg-[var(--ll-green-sb)] text-black rounded-xl"
             >
               {creating ? <Spinner size="sm" /> : '创建优惠'}
             </Button>
@@ -388,29 +388,29 @@ function OffersManagement({ storeId }: { storeId: string }) {
             <Spinner size="sm" />
           </div>
         ) : offers.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">暂无优惠活动</p>
+          <p className="text-sm text-[var(--ll-text-3)] text-center py-4">暂无优惠活动</p>
         ) : (
           <div className="space-y-2">
             {offers.map((offer) => (
               <div
                 key={offer.id}
-                className="flex items-center justify-between p-3 bg-white border border-amber-100 rounded-xl"
+                className="flex items-center justify-between p-3 bg-[var(--ll-surface)] border border-[var(--ll-hair)] rounded-xl"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-800 truncate">{offer.name}</span>
+                    <span className="font-medium text-[var(--ll-text)] truncate">{offer.name}</span>
                     {!offer.isActive && (
-                      <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-500">
+                      <Badge variant="secondary" className="text-xs bg-[var(--ll-muted)] text-[var(--ll-text-3)]">
                         已停用
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 mt-1 text-sm text-[var(--ll-text-3)]">
                     {offer.originalPrice !== null && (
                       <span className="line-through">¥{(offer.originalPrice / 100).toFixed(0)}</span>
                     )}
                     {offer.salePrice !== null && (
-                      <span className="text-orange-600 font-medium">¥{(offer.salePrice / 100).toFixed(0)}</span>
+                      <span className="text-[var(--ll-text)] font-medium">¥{(offer.salePrice / 100).toFixed(0)}</span>
                     )}
                   </div>
                 </div>
@@ -418,7 +418,7 @@ function OffersManagement({ storeId }: { storeId: string }) {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDelete(offer.id)}
-                  className="text-gray-400 hover:text-red-500"
+                  className="text-[var(--ll-text-3)] hover:text-red-500"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -453,7 +453,7 @@ function TagSection({ title, items, tone }: { title: string; items: string[] | n
   if (!items || items.length === 0) return null
   return (
     <div>
-      <p className="text-xs text-gray-400 font-medium mb-1.5">{title}</p>
+      <p className="text-xs text-[var(--ll-text-3)] font-medium mb-1.5">{title}</p>
       <div className="flex flex-wrap gap-1.5">
         {items.map((item, i) => (
           <span key={i} className={`px-2 py-0.5 rounded-full text-xs ${tone}`}>{item}</span>
@@ -501,7 +501,7 @@ function StoreProfileCard({ storeId }: { storeId: string }) {
     data && !data.notReady ? (data.profile as StoreProfileData) : null
 
   return (
-    <Card className="border-amber-100 rounded-2xl">
+    <Card className="border-[var(--ll-hair)] rounded-2xl">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-1.5 font-[var(--font-serif)] text-[var(--ll-text)]">
@@ -513,7 +513,7 @@ function StoreProfileCard({ storeId }: { storeId: string }) {
             size="sm"
             onClick={handleRegenerate}
             disabled={regenerating}
-            className="border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs"
+            className="border-[var(--ll-hair)] text-[var(--ll-text-2)] hover:bg-[var(--ll-muted)] rounded-xl text-xs"
           >
             {regenerating ? <Spinner size="sm" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
             重新生成
@@ -531,7 +531,7 @@ function StoreProfileCard({ storeId }: { storeId: string }) {
 
         {/* 画像尚未生成 / 生成中 */}
         {!isLoading && !error && !profile && (
-          <p className="text-sm text-gray-400 text-center py-4">
+          <p className="text-sm text-[var(--ll-text-3)] text-center py-4">
             画像生成中或尚未生成，点击右上角「重新生成」稍后查看
           </p>
         )}
@@ -540,33 +540,33 @@ function StoreProfileCard({ storeId }: { storeId: string }) {
         {profile && (
           <>
             {profile.aiSummary && (
-              <p className="text-sm text-gray-700 leading-relaxed bg-amber-50/60 rounded-xl p-3">
+              <p className="text-sm text-[var(--ll-text-2)] leading-relaxed bg-[var(--ll-muted)] rounded-xl p-3">
                 {profile.aiSummary}
               </p>
             )}
             {profile.contentPositioning && (
               <div>
-                <p className="text-xs text-gray-400 font-medium mb-1">内容定位</p>
-                <p className="text-sm text-gray-700">{profile.contentPositioning}</p>
+                <p className="text-xs text-[var(--ll-text-3)] font-medium mb-1">内容定位</p>
+                <p className="text-sm text-[var(--ll-text-2)]">{profile.contentPositioning}</p>
               </div>
             )}
             {profile.recommendedPersona && (
               <div>
-                <p className="text-xs text-gray-400 font-medium mb-1">推荐人设</p>
-                <p className="text-sm text-gray-700">{profile.recommendedPersona}</p>
+                <p className="text-xs text-[var(--ll-text-3)] font-medium mb-1">推荐人设</p>
+                <p className="text-sm text-[var(--ll-text-2)]">{profile.recommendedPersona}</p>
               </div>
             )}
             {profile.visualStyle && (
               <div>
-                <p className="text-xs text-gray-400 font-medium mb-1">视觉风格</p>
-                <p className="text-sm text-gray-700">{profile.visualStyle}</p>
+                <p className="text-xs text-[var(--ll-text-3)] font-medium mb-1">视觉风格</p>
+                <p className="text-sm text-[var(--ll-text-2)]">{profile.visualStyle}</p>
               </div>
             )}
-            <TagSection title="钩子关键词" items={profile.hookKeywords} tone="bg-blue-50 text-blue-700" />
+            <TagSection title="钩子关键词" items={profile.hookKeywords} tone="bg-[var(--ll-muted)] text-[var(--ll-text-2)]" />
             <TagSection title="推荐做的" items={profile.contentDos} tone="bg-green-50 text-green-700" />
             <TagSection title="禁止做的" items={profile.contentDonts} tone="bg-red-50 text-red-600" />
             <TagSection title="违禁词" items={profile.forbiddenClaims} tone="bg-red-50 text-red-600" />
-            <TagSection title="推荐引导语" items={profile.preferredCta} tone="bg-amber-50 text-amber-700" />
+            <TagSection title="推荐引导语" items={profile.preferredCta} tone="bg-[var(--ll-muted)] text-[var(--ll-text-2)]" />
           </>
         )}
       </CardContent>
@@ -600,7 +600,7 @@ export default function StoreSettingsPage() {
   if (error || !data?.store) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-3">
-        <p className="text-gray-500">{error?.message || '门店不存在'}</p>
+        <p className="text-[var(--ll-text-3)]">{error?.message || '门店不存在'}</p>
         <Button variant="outline" onClick={() => router.back()} className="rounded-xl">
           返回
         </Button>
@@ -618,7 +618,7 @@ export default function StoreSettingsPage() {
           variant="ghost"
           size="sm"
           onClick={() => router.push(`/merchant/stores/${storeId}`)}
-          className="text-amber-700 hover:bg-amber-100 rounded-xl"
+          className="text-[var(--ll-text-2)] hover:bg-[var(--ll-muted)] rounded-xl"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           返回
@@ -637,16 +637,16 @@ export default function StoreSettingsPage() {
 
       {/* 会员与积分入口 */}
       <Link href={`/merchant/stores/${storeId}/membership`} className="block">
-        <Card className="border-amber-100 rounded-2xl hover:border-orange-300 transition-all cursor-pointer">
+        <Card className="border-[var(--ll-hair)] transition-all cursor-pointer">
           <CardContent className="flex items-center gap-3 py-4">
-            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[var(--ll-muted)] text-[var(--ll-text-2)] flex items-center justify-center">
               <Crown className="h-5 w-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-bold text-gray-800">会员与积分</h3>
-              <p className="text-xs text-gray-500 mt-0.5">升级会员解锁 1080p、多门店，或充值积分</p>
+              <h3 className="text-sm font-bold text-[var(--ll-text)]">会员与积分</h3>
+              <p className="text-xs text-[var(--ll-text-3)] mt-0.5">升级会员解锁 1080p、多门店，或充值积分</p>
             </div>
-            <ArrowLeft className="h-4 w-4 text-gray-300 rotate-180" />
+            <ArrowLeft className="h-4 w-4 text-[var(--ll-text-3)] rotate-180" />
           </CardContent>
         </Card>
       </Link>

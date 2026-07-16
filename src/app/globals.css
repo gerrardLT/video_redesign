@@ -571,166 +571,145 @@ main {
 
 
 /* ========================================================================
- * 本地生活营销 · Starbucks 风格 token（--ll-*）
- * 方向：暖奶油画布 + 大地绿行动主色 + 金色专供会员仪式
- * 依据 docs/design-md/starbucks/DESIGN.md，落地方案见 docs/统一设计系统方案.md
+ * 热店 STUDIO · Runway 暗色体系（--ll-*）
+ * 方向：纯黑 #000 / 暗底 #1a1a1a，零阴影，深度靠明暗分区与影像
+ * 视觉语言：Runway（docs/design-md/runwayml/DESIGN.md）
  * 作用域：仅商家端（/merchant），通过 .ll-root 容器类启用，不影响视频重塑(--cine-*)
  * ======================================================================== */
 :root {
-  /* 绿族（行动/信任 · Starbucks 四级绿） */
-  --ll-green: #00754A;        /* 行动主色：CTA / 选中（绿底白字 AA≈4.8:1） */
-  --ll-green-sb: #006241;     /* 标题 / hover */
-  --ll-green-active: #005C3A; /* 按下态 */
-  --ll-house: #1E3932;        /* 深绿 band（会员头部 / 特性区） */
-  --ll-green-light: #D4E9E2;  /* 浅绿底：选中底 / 成功 dim / 标签 */
-  /* 金线（会员/积分仪式，跨产品与 --cine-gold 同族识别） */
+  /* Runway 暗色 — 白 = 行动主色（CTA 白底黑字） */
+  --ll-green: #ffffff;
+  --ll-green-sb: #e0e0e0;
+  --ll-green-active: #cccccc;
+  --ll-house: #1a1a1a;
+  --ll-green-light: #27272a;
+  /* 金线（会员/积分仪式，保留） */
   --ll-gold: #CBA258;
   --ll-gold-light: #DFC49D;
-  --ll-gold-lightest: #FAF6EE;
-  --ll-gold-ink: #8A6D2F;     /* 金底之上深字 */
-  /* 中性（暖奶油） */
-  --ll-canvas: #F2F0EB;       /* 主画布·暖奶油 */
-  --ll-ceramic: #EDEBE9;      /* 次级底 / 分隔区 */
-  --ll-surface: #FFFFFF;      /* 卡片 / 模态 */
-  --ll-cool: #F9F9F9;         /* 表单 / 下拉浅底 */
-  --ll-hair: #E7E7E7;         /* 1px 分隔线 */
-  --ll-border-strong: #D6DBDE;
-  --ll-text: rgba(0, 0, 0, 0.87);   /* 主文字·非纯黑（配暖底更柔） */
-  --ll-text-2: rgba(0, 0, 0, 0.58); /* 次级文字 */
-  --ll-text-3: rgba(0, 0, 0, 0.40); /* 三级 / 占位 */
-  /* 语义状态 */
-  --ll-success: #00754A; --ll-success-dim: #D4E9E2;
-  --ll-warning: #B5791F; --ll-warning-dim: #FDF3E3;
-  --ll-danger: #C82014;  --ll-danger-dim: #FBEAE5;
-  --ll-info: #2F6F9E;    --ll-info-dim: #E6F0F7;
-  /* 阴影（轻柔多层，叠在实色之上，Starbucks 手感） */
-  --ll-shadow-card: 0 0 .5px rgba(0,0,0,.14), 0 1px 1px rgba(0,0,0,.24);
-  --ll-shadow-pop: 0 8px 24px rgba(30,57,50,.14);
-  --ll-shadow-frap: 0 0 6px rgba(0,0,0,.24), 0 8px 12px rgba(0,0,0,.14);
+  --ll-gold-lightest: #1a1a1a;
+  --ll-gold-ink: #ffffff;
+  /* 暗色阶 */
+  --ll-canvas: #000000;
+  --ll-ceramic: #0d0d0d;
+  --ll-surface: #161616;
+  --ll-cool: #1a1a1a;
+  --ll-hair: #27272a;
+  --ll-border-strong: #3a3a3e;
+  --ll-text: #ffffff;
+  --ll-text-2: #c9ccd1;
+  --ll-text-3: #767d88;
+  /* 语义状态（暗底适配） */
+  --ll-success: #22c55e; --ll-success-dim: #1a2e1a;
+  --ll-warning: #eab308; --ll-warning-dim: #2a2510;
+  --ll-danger: #ef4444;  --ll-danger-dim: #2a1010;
+  --ll-info: #3b82f6;    --ll-info-dim: #101a2a;
+  /* Runway 零阴影 */
+  --ll-shadow-card: none;
+  --ll-shadow-pop: none;
+  --ll-shadow-frap: none;
 }
 
-/* 商家端根容器：暖奶油底 + v3 Zen 字体体系 + 主文字色 + 紧字距 */
+/* 商家端根容器：Runway 纯黑暗色 + DM Sans / Noto Sans SC 无衬线体系 */
 .ll-root {
   background: var(--ll-canvas);
   color: var(--ll-text);
-  font-family: var(--font-sans), -apple-system, system-ui, sans-serif;
+  font-family: var(--font-sans), 'DM Sans', -apple-system, system-ui, sans-serif;
   letter-spacing: -0.01em;
 
-  /* ── v3 Zen 字体变量 ── */
-  --font-serif: var(--font-noto-serif-sc), 'Noto Serif SC', serif;
+  /* ── Runway 字体变量 ── */
+  /* 注意：设计系统已统一为无衬线体系，--font-serif 映射到 sans-serif 保持向后兼容 */
+  --font-serif: var(--font-noto-sans-sc), 'Noto Sans SC', sans-serif;
   --font-sans: var(--font-noto-sans-sc), 'Noto Sans SC', -apple-system, sans-serif;
-  --font-num: var(--font-space-grotesk), 'Space Grotesk', sans-serif;
+  --font-num: var(--font-dm-sans), 'DM Sans', sans-serif;
 
-  /* ── v3 Zen 字阶 ── */
+  /* ── 兼容旧组件的语义变量 ── */
+  --ll-muted: #1a1a1a;
+  --ll-text-1: var(--ll-text);
+
+  /* ── Runway 字阶 ── */
   --text-hero: 29px;
   --text-title: 17px;
   --text-body: 14px;
   --text-aux: 11px;
 
-  /* ── v3 Zen 动效曲线与时长 ── */
+  /* ── Runway 动效曲线与时长 ── */
   --ease-out: cubic-bezier(.16, 1, .3, 1);
   --ease-spring: cubic-bezier(.23, 1.4, .32, 1);
   --dur-fast: 150ms;
   --dur-base: 300ms;
   --dur-slow: 600ms;
 
-  /* ── v3 Zen 画布升级 ── */
-  --ll-canvas: #F4F2ED;
-  --ll-green-deep: #0E3A2A;
-
-  /* ── v3 Zen 圆角降级（从 14px 降至极克制 3px） ── */
-  --radius: 0.1875rem;
+  /* ── Runway 圆角（克制 4px） ── */
+  --radius: 0.25rem;
 }
-/* 商家端按压微交互（Starbucks 签名 scale .95），按需加 .ll-press */
-.ll-press:active { transform: scale(0.95); }
+/* 按压微交互（Runway scale .985），按需加 .ll-press */
+.ll-press:active { transform: scale(0.985); }
 
-/* 会员/成就/里程碑区域极淡金色氛围底色（克制不喧宾夺主） */
+/* 会员/成就/里程碑区域极淡金色氛围底色 */
 .ll-gold-ambient {
-  background: radial-gradient(ellipse, rgba(168,133,63,.04), transparent);
+  background: radial-gradient(ellipse, rgba(203,162,88,.06), transparent);
 }
 
 /* ------------------------------------------------------------------
  * 作用域调色板重映射（仅 .ll-root 内生效）
  * 利用 Tailwind v4「颜色即 CSS 变量」特性：把商家端历史遗留的
- * orange/amber/gray 工具类一次性、一致地重映射到 Starbucks 调色板，
- * 免去逐页手改上百处类名，且严格限定在 /merchant 子树，视频重塑零影响。
- * 仅重映射暖主色(orange/amber→大地绿)与中性(gray→暖中性)；
- * green/red/blue/purple/yellow 等语义色保持不变。
- * 后续如需精细化，可在单页用 --ll-* 显式覆盖。
+ * orange/amber/gray 工具类一次性重映射到 Runway 暗色适配值，
+ * 严格限定在 /merchant 子树，视频重塑零影响。
+ * orange/amber 保留语义色（合规警告/加载状态），暗底适配。
+ * gray 重映射为暗色灰阶。green/emerald 保留语义成功色。
  * ------------------------------------------------------------------ */
 .ll-root {
-  /* orange → 大地绿（暖主色统一为绿） */
-  --color-orange-50:#E7F1EC;  --color-orange-100:#D4E9E2; --color-orange-200:#B3D6C8;
-  --color-orange-300:#7FB89F; --color-orange-400:#3F9670; --color-orange-500:#00754A;
-  --color-orange-600:#006241; --color-orange-700:#005C3A; --color-orange-800:#0B4D34; --color-orange-900:#0A3D2A;
-  /* amber → 同绿族（暖主色统一），浅档偏奶油 */
-  --color-amber-50:#FAF6EE;  --color-amber-100:#EAF1EC; --color-amber-200:#CFE4DA;
-  --color-amber-300:#9CC9B5; --color-amber-400:#5BA888; --color-amber-500:#00754A;
-  --color-amber-600:#006241; --color-amber-700:#005C3A; --color-amber-800:#0B4D34; --color-amber-900:#13352B;
-  /* gray → 暖中性（贴合奶油底，避免冷灰发脏） */
-  --color-gray-50:#F7F4EF;  --color-gray-100:#EFEAE2; --color-gray-200:#E2DBD0; --color-gray-300:#D6DBDE;
-  --color-gray-400:#A89E8E; --color-gray-500:#807868; --color-gray-600:#5E574B; --color-gray-700:#403B33;
-  --color-gray-800:#2A2620; --color-gray-900:#1F1C17;
-  /* yellow → 金族（成就/里程碑/会员相邻语义统一为金，呼应「金=成就/会员」线） */
-  --color-yellow-50:#FAF6EE;  --color-yellow-100:#F1E6C9; --color-yellow-200:#E6D3A0; --color-yellow-300:#D9BE78;
-  --color-yellow-400:#CBA258; --color-yellow-500:#BE9748; --color-yellow-600:#8A6D2F; --color-yellow-700:#6E5523;
+  /* orange → 暗底语义警告色（保留暖橙色调，适配 #000 背景） */
+  --color-orange-50:#1a1005;  --color-orange-100:#2a1808; --color-orange-200:#4a2a0a;
+  --color-orange-300:#c2410c; --color-orange-400:#ea580c; --color-orange-500:#f97316;
+  --color-orange-600:#f97316; --color-orange-700:#ea580c; --color-orange-800:#9a3412; --color-orange-900:#7c2d12;
+  /* amber → 暗底语义强调色（保留金橙色调，适配 #000 背景） */
+  --color-amber-50:#1a1505;  --color-amber-100:#2a1e08; --color-amber-200:#4a350a;
+  --color-amber-300:#d97706; --color-amber-400:#f59e0b; --color-amber-500:#f59e0b;
+  --color-amber-600:#d97706; --color-amber-700:#b45309; --color-amber-800:#92400e; --color-amber-900:#78350f;
+  /* gray → 暗色中性（冷灰） */
+  --color-gray-50:#0d0d0d;  --color-gray-100:#161616; --color-gray-200:#1a1a1a; --color-gray-300:#27272a;
+  --color-gray-400:#3a3a3e; --color-gray-500:#767d88; --color-gray-600:#c9ccd1; --color-gray-700:#e0e0e0;
+  --color-gray-800:#f0f0f0; --color-gray-900:#ffffff;
+  /* yellow → 金族（成就/会员，保留金色） */
+  --color-yellow-50:#1a1a0a;  --color-yellow-100:#2a2510; --color-yellow-200:#3a300f; --color-yellow-300:#6E5523;
+  --color-yellow-400:#CBA258; --color-yellow-500:#DFC49D; --color-yellow-600:#CBA258; --color-yellow-700:#8A6D2F;
   --color-yellow-800:#574319; --color-yellow-900:#3F300F;
-  /* green → 统一大地绿族（success/已完成收敛成同一种绿，不再多绿并存） */
-  --color-green-50:#E7F1EC;  --color-green-100:#D4E9E2; --color-green-200:#B3D6C8; --color-green-300:#7FB89F;
-  --color-green-400:#3F9670; --color-green-500:#00754A; --color-green-600:#006241; --color-green-700:#1E5C44;
-  --color-green-800:#134A36; --color-green-900:#0E3A2A;
-  /* emerald → 并入大地绿族（避免与 green 形成两种相近绿） */
-  --color-emerald-50:#E7F1EC;  --color-emerald-100:#D4E9E2; --color-emerald-200:#B3D6C8; --color-emerald-300:#7FB89F;
-  --color-emerald-400:#3F9670; --color-emerald-500:#00754A; --color-emerald-600:#006241; --color-emerald-700:#1E5C44;
-  --color-emerald-800:#134A36; --color-emerald-900:#0E3A2A;
+  /* green → 语义成功色（暗底适配） */
+  --color-green-50:#1a2e1a;  --color-green-100:#1a3a1a; --color-green-200:#22552a; --color-green-300:#22c55e;
+  --color-green-400:#22c55e; --color-green-500:#22c55e; --color-green-600:#16a34a; --color-green-700:#15803d;
+  --color-green-800:#166534; --color-green-900:#14532d;
+  /* emerald → 语义成功色（同 green） */
+  --color-emerald-50:#1a2e1a;  --color-emerald-100:#1a3a1a; --color-emerald-200:#22552a; --color-emerald-300:#22c55e;
+  --color-emerald-400:#22c55e; --color-emerald-500:#22c55e; --color-emerald-600:#16a34a; --color-emerald-700:#15803d;
+  --color-emerald-800:#166534; --color-emerald-900:#14532d;
 }
 
 
 /* ========================================================================
  * shadcn token 绑定（仅 .ll-root 商家端作用域）
- * v3 Zen 品牌语义映射：暖奶油画布 + 大地绿主色 + 极克制圆角
+ * Runway 暗色语义映射：纯黑画布 + 白主色 + 暗灰阶
  * 严格限定在 /merchant 子树（.ll-root），视频重塑端（--cine-*）零影响。
  * ======================================================================== */
 .ll-root {
-  --background: #F4F2ED;                 /* 暖奶油画布 */
-  --foreground: #1A1714;                 /* 主文字·温暖近黑 */
-  --card: #FBFAF7;                       /* 卡片底色·比画布略亮 */
-  --card-foreground: #1A1714;
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #161616;
+  --card-foreground: #ffffff;
   --popover: var(--ll-surface);
   --popover-foreground: var(--ll-text);
-  --primary: #00754A;                    /* 大地绿主色 */
-  --primary-foreground: #FFFFFF;         /* 绿底白字（AA ≈ 4.8:1） */
-  --secondary: var(--ll-ceramic);        /* 次级按钮 = 陶瓷奶油 */
-  --secondary-foreground: var(--ll-text);
-  --muted: #EDEBE9;                      /* 静默底色 */
-  --muted-foreground: var(--ll-text-2);
-  --accent: var(--ll-green-light);       /* hover/选中 = 浅绿 */
-  --accent-foreground: var(--ll-green-sb);
-  --destructive: var(--ll-danger);
-  --border: rgba(26, 23, 20, .09);       /* 发丝线 */
-  --input: rgba(26, 23, 20, .09);
-  --ring: var(--ll-green);               /* focus 环 = 大地绿 */
-}
-
-/* ── 纸质噪点纹理（v3 Zen 质感层）──
- * SVG feTurbulence 生成 fractalNoise，叠加在 .ll-root 之上
- * 营造暖奶油纸张手感。pointer-events:none 不拦截交互。
- * Validates: Requirements 4.2, 4.3 */
-.ll-root::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 50;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-/* 尊重用户减少动效偏好：关闭噪点纹理 */
-@media (prefers-reduced-motion: reduce) {
-  .ll-root::after {
-    display: none;
-  }
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #c9ccd1;
+  --muted: #0d0d0d;
+  --muted-foreground: #767d88;
+  --accent: #27272a;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --border: #27272a;
+  --input: #1a1a1a;
+  --ring: #ffffff;
 }
 
 
@@ -738,7 +717,7 @@ main {
  * shadcn token 绑定（视频重塑创作端 · [data-surface="studio"] 作用域）
  * 让 /dashboard 下「无 className 的默认」shadcn 组件继承电影质感深底 + 暖金，
  * 而非 shadcn 出厂浅色中性。挂载点：dashboard/layout.tsx 根节点 data-surface="studio"。
- * 与 .ll-root（商家浅皮肤）互不干扰；金底配 ink 字达标。
+ * 与 .ll-root（商家暗色皮肤）互不干扰；金底配 ink 字达标。
  * ======================================================================== */
 [data-surface="studio"] {
   --background: var(--cine-bg);
@@ -764,7 +743,7 @@ main {
 
 
 /* ========================================================================
- * Stagger 入场动效（v3 Zen · .ll-root 商家端）
+ * Stagger 入场动效（Runway · .ll-root 商家端）
  * 通用入场动画类：opacity 0→1, translateY(14px)→0
  * duration: var(--dur-slow) = 600ms, timing: var(--ease-out)
  * 子元素 nth-child(1)~(7) 依次延迟 60ms，覆盖一屏内容
@@ -796,8 +775,8 @@ main {
  * zenGlow — 完成任务时的庆祝光晕
  * ======================================================================== */
 @keyframes zenGlow {
-  0% { box-shadow: 0 0 0 0 rgba(0, 117, 74, 0.35); }
-  50% { box-shadow: 0 0 12px 4px rgba(0, 117, 74, 0.15); }
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25); }
+  50% { box-shadow: 0 0 12px 4px rgba(255, 255, 255, 0.10); }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
@@ -805,8 +784,8 @@ main {
  * zenPulse — CTA 按钮就绪时的脉冲呼吸
  * ======================================================================== */
 @keyframes zenPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 117, 74, 0.4); }
-  50% { box-shadow: 0 0 16px 6px rgba(0, 117, 74, 0.12); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3); }
+  50% { box-shadow: 0 0 16px 6px rgba(255, 255, 255, 0.08); }
 }
 
 /* ========================================================================
@@ -826,8 +805,5 @@ main {
     animation: none;
     opacity: 1;
     transform: none;
-  }
-  .ll-root::after {
-    display: none;
   }
 }
